@@ -25567,12 +25567,12 @@ IncomingForm.prototype._initMultipart = function(boundary) {
         can be divided vy 3.
         */
         var offset = parseInt(part.transferBuffer.length / 4, 10) * 4;
-        part.emit('data', new Buffer(part.transferBuffer.substring(0, offset), 'base64'));
+        part.emit('data', Buffer.from(part.transferBuffer.substring(0, offset), 'base64'));
         part.transferBuffer = part.transferBuffer.substring(offset);
       };
 
       parser.onPartEnd = function() {
-        part.emit('data', new Buffer(part.transferBuffer, 'base64'));
+        part.emit('data', Buffer.from(part.transferBuffer, 'base64'));
         part.emit('end');
       };
       break;
@@ -25872,10 +25872,10 @@ MultipartParser.stateToString = function(stateNumber) {
 };
 
 MultipartParser.prototype.initWithBoundary = function(str) {
-  this.boundary = new Buffer(str.length+4);
+  this.boundary = Buffer.alloc(str.length+4);
   this.boundary.write('\r\n--', 0);
   this.boundary.write(str, 4);
-  this.lookbehind = new Buffer(this.boundary.length+8);
+  this.lookbehind = Buffer.alloc(this.boundary.length+8);
   this.state = S.START;
 
   this.boundaryChars = {};

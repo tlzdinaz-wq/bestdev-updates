@@ -408,6 +408,10 @@ RegisterCommand('+inventory', function()
         return
     end
 
+    if LocalPlayer.state.staffScreenshotOpen then
+        return
+    end
+
     if IsPlayerInTIG() then
         VFW.ShowNotification({
             type = 'ROUGE',
