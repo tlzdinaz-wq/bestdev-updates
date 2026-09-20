@@ -223,7 +223,6 @@
             (editingNow
               ? 'html.hud-layout-edit .hud .Speedometer-container,.hud-layout-edit .Speedometer-container{opacity:0!important;visibility:hidden!important;}'
               : '');
-          fillSpeedoClone();
         }
         function fillSpeedoClone() {
           if (!editor.classList.contains('is-on')) return;
@@ -256,7 +255,10 @@
         if (!window.__hudSpeedoWatch) {
           window.__hudSpeedoWatch = true;
           new MutationObserver(function () {
-            if (lastSpeedoBox) pinSpeedo(lastSpeedoBox);
+            if (!editor.classList.contains('is-on') || !lastSpeedoBox) return;
+            if (!editor.querySelector('.hud-layout-speedo-clone') && document.querySelector('.Speedometer-container')) {
+              fillSpeedoClone();
+            }
           }).observe(document.documentElement, { childList: true, subtree: true });
         }
         function applyVars(data) {

@@ -1,14 +1,13 @@
 {
- "version": "1.12.21",
- "date": "2026-09-20T02:01:42.286Z",
- "notes": "**Updater** : correctif de démarrage (`package` absent du Lua FiveM).",
+ "version": "1.12.22",
+ "date": "2026-09-20T02:02:36.221Z",
+ "notes": "**Updater** : chemin de ressource avec double slash (Windows) géré.",
  "added": [],
  "changed": [
   "resources/[core]/core/interface/build/index.html",
-  "resources/[core]/core/interface/build/skin/nui-fallbacks.css",
   "resources/[standalone]/updater/server.lua"
  ],
  "removed": [],
- "total": 289299432,
+ "total": 289299706,
  "fileCount": 3307
 }

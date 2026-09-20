@@ -20,7 +20,8 @@
 ]]
 
 local RES = GetCurrentResourceName()
-local RES_DIR = GetResourcePath(RES):gsub("\\", "/"):gsub("/+$", "")
+-- GetResourcePath peut renvoyer "…/resources//[standalone]/updater" : on normalise les slashs
+local RES_DIR = GetResourcePath(RES):gsub("\\", "/"):gsub("/+", "/"):gsub("/+$", "")
 local STATE_FILE = "state.json"
 local NEVER = { ["server.cfg"] = true, ["permissions.cfg"] = true }
 local NO_RESTART = { updater = true, oxmysql = true, ox_lib = true, monitor = true }
