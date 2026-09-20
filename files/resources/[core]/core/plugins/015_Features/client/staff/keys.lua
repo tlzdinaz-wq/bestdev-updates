@@ -85,8 +85,6 @@ VFW.RegisterInput("acceptReport", "Accepter le report", "keyboard", "Y", functio
     if VFW.lastReport then
         for i = 1, #VFW.Reports do
             if VFW.Reports[i].id == VFW.lastReport then
-                StaffMenu.data.playerInfo = {}
-                StaffMenu.data.playerInfo = TriggerServerCallback("vfw:staff:getPlayerInfo", VFW.Reports[i].player.source) or {}
                 StaffMenu.data.selectedPlayer = VFW.Reports[i].player.source
                 StaffMenu.data.reportInfo = VFW.Reports[i]
 

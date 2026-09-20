@@ -17,12 +17,13 @@ end)
 --- .BuildFactionsMenu
 ---@return any
 function StaffMenu.BuildFactionsMenu()
+    StaffMenu.FetchOrganizations(false)
     local firstLabel = factionQuery == nil and "RECHERCHER" or "RECHERCHER:"
   local lastLabel = factionQuery == nil and "UNE FACTION" or factionQuery
 
     -- Bouton refresh pour recharger les données
     StaffMenu.factions.Button(":refresh: ACTUALISER", "Recharger les factions depuis le serveur", nil, "chevron", false, function()
-        StaffMenu.data.factionsList = TriggerServerCallback("core:staff:getOrganizations") or {}
+        StaffMenu.FetchOrganizations(true)
         StaffMenu.data.playerInfo = TriggerServerCallback("vfw:staff:getPlayerInfo", StaffMenu.data.selectedPlayer) or {}
         VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Gestion Factions', message = "Liste des factions actualisée." })
         StaffMenu.factions.refresh()

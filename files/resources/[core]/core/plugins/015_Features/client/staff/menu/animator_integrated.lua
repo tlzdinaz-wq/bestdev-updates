@@ -530,26 +530,15 @@ function StaffMenu.BuildAnimatorReportMenu(isStandalone)
 
         local playerName = report.player and report.player.name or "Inconnu"
       local playerSource = report.player and report.player.source or 0
-        local animBanner = exports["core"]:GetVUIBanner("animator")
-        local VUI = exports["VUI"]
-
-        StaffMenu.player = VUI:CreateSubMenu(reportMenu, string.format("%s [%d]", playerName, playerSource), animBanner, true)
-        StaffMenu.player.OnOpen(function()
-            StaffMenu.animatorPlayerContext = true
-            StaffMenu.data.selectedPlayer = playerSource
-            StaffMenu.data.playerInfo = TriggerServerCallback("vfw:staff:getPlayerInfo", playerSource) or {}
-            StaffMenu.data.playerList = TriggerServerCallback("vfw:staff:getPlayerList") or {}
-            StaffMenu.data.sanctionsPlayerList = TriggerServerCallback("vfw:staff:getPlayerSanctions",
-                playerSource, StaffMenu.data.playerInfo.identifier, StaffMenu.data.playerInfo.discord) or {}
-            StaffMenu.BuildPlayerMenu()
-        end)
 
         if not report.takenBy then
             reportMenu.Button(":document: PRENDRE LE REPORT", "Prendre en charge ce report et ouvrir le menu du joueur concerné", nil, "chevron", false, function()
                 TriggerServerEvent("vfw:animator:takeReport", StaffMenu.animatorData.selectedPlayer)
+                StaffMenu.PreparePlayerMenu(playerSource, reportMenu, nil, true)
             end, StaffMenu.player)
         else
             reportMenu.Button(":user: ACTIONS SUR LE JOUEUR", "Ouvrir le menu d'actions sur le joueur concerné par le report", nil, "chevron", false, function()
+                StaffMenu.PreparePlayerMenu(playerSource, reportMenu, nil, true)
             end, StaffMenu.player)
 
             reportMenu.Button(":x: ABANDONNER LA PRISE EN CHARGE", "Libérer le report pour qu'un autre animateur puisse le prendre", nil, nil, false, function()

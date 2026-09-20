@@ -3,7 +3,6 @@
 
 local playerStates = {}
 local savedOriginalSkin = nil
-local adminBanner = exports["core"]:GetVUIBanner("admin")
 
 ---Get PlayerState
 ---@param playerId number|table Player ID or player object
@@ -52,7 +51,7 @@ function StaffMenu.BuildPlayerMenu()
     local previewData = {
         { type = "header", iconUrl = "people.png",   label = "",                  value = tostring(info.pseudo or "Sans pseudo") },
         { type = "body",   iconUrl = "people.png",   label = "ID Session",        value = tostring(info.source or "?") },
-        { type = "body",   iconUrl = "data.png",     label = "UUID",              value = tostring(info.id or "?") },
+        { type = "body",   iconUrl = "data.png",     label = "UUID",              value = tostring(info.uuid or info.id or "?") },
         { type = "body",   iconUrl = "shield.png",   label = "Rôle",              value = tostring(info.roleFormatted or info.role or "Joueur") },
         { type = "body",   iconUrl = "time.png",     label = "Temps de jeu",      value = tostring(info.time or "00:00:00") },
         { type = "body",   iconUrl = "people.png",   label = "Nom Prénom RP",     value = tostring(rpName) },
@@ -73,10 +72,20 @@ function StaffMenu.BuildPlayerMenu()
         { "Nombre de sanctions reçues", sanctionsCount },
     }
 
-    StaffMenu.player.PlayerPreview(nil, info.color or 0xFFFFFF, previewData, stats)
+    local selectedPlayer = StaffMenu.data.selectedPlayer
+    -- Si la fiche est déjà à l'écran (sélection dans la liste), ne pas la renvoyer.
+    -- Sinon, l'envoyer APRÈS l'ouverture du menu (SetTimeout) pour ne pas bloquer le paint.
+    if StaffMenu._previewSource ~= selectedPlayer then
+        local color = info.color or 0xFFFFFF
+        SetTimeout(0, function()
+            if not StaffMenu.player or not StaffMenu.player.opened then return end
+            if StaffMenu.data.selectedPlayer ~= selectedPlayer then return end
+            StaffMenu.player.PlayerPreview(nil, color, previewData, stats)
+            StaffMenu._previewSource = selectedPlayer
+        end)
+    end
 
     local perms = VFW.StaffPerms()
-    local selectedPlayer = StaffMenu.data.selectedPlayer
     local notifTitle = isAnimatorCtx and VFW.AnimatorTitle() or nil
     local notifSub = isAnimatorCtx and 'Mode Animateur' or 'Gestion Joueur'
 
@@ -281,7 +290,7 @@ function StaffMenu.BuildPlayerMenu()
 
     if perms["setjob"] then
         P_Button(":briefcase: CHANGER LE MÉTIER", "Choisir un nouveau job et un grade pour le joueur", nil, "chevron", false, function()
-            StaffMenu.data.jobsList = TriggerServerCallback("vfw:staff:getJobs") or {}
+            StaffMenu.FetchJobs(false)
         end, StaffMenu.jobs)
     end
 
@@ -453,89 +462,15 @@ local function openPlayerOnAdminMenu(id, isAnimatorCtx)
         return
     end
 
-    StaffMenu.data.playerInfo = TriggerServerCallback("vfw:staff:getPlayerInfo", id) or {}
-    StaffMenu.data.playerList = TriggerServerCallback("vfw:staff:getPlayerList") or {}
-    StaffMenu.data.jobsList = TriggerServerCallback("vfw:staff:getJobs") or {}
-    StaffMenu.data.factionsList = TriggerServerCallback("core:staff:getOrganizations") or {}
-    StaffMenu.data.sanctionsPlayerList = TriggerServerCallback("vfw:staff:getPlayerSanctions",
-        id, StaffMenu.data.playerInfo.identifier, StaffMenu.data.playerInfo.discord) or {}
-
-    if not StaffMenu.data.playerInfo then
+    local parentMenu = isAnimatorCtx and StaffMenu.animatorStandalone or StaffMenu.players
+    local info = StaffMenu.PreparePlayerMenu(id, parentMenu, nil, isAnimatorCtx)
+    if not info or not (info.source or info.identifier or info.id) then
+        VFW.ShowNotification({
+            type = 'STAFF', variant = 'ERROR', subtitle = 'Gestion Joueur',
+            message = "Impossible d'ouvrir le menu de ce joueur : ses données n'ont pas pu être chargées."
+        })
         return
     end
-
-    StaffMenu.data.selectedPlayer = id
-
-    local playerTitle = string.format("%s [%d]", StaffMenu.data.playerInfo.name or "Unknown", id)
-    local banner = isAnimatorCtx and exports["core"]:GetVUIBanner("animator") or exports["core"]:GetVUIBanner("admin")
-    local VUI = exports["VUI"]
-
-    local parentMenu = isAnimatorCtx and StaffMenu.animatorStandalone or StaffMenu.players
-    StaffMenu.player = VUI:CreateSubMenu(parentMenu, playerTitle, banner, true)
-
-    if not isAnimatorCtx then
-        StaffMenu.wipe = VUI:CreateSubMenu(StaffMenu.player, "WIPE", adminBanner, true)
-        StaffMenu.items = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES ITEMS", adminBanner, true)
-        StaffMenu.AttachItemsMenuCallback()
-        StaffMenu.jobs = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES JOBS", adminBanner, true)
-        StaffMenu.grades_jobs = VUI:CreateSubMenu(StaffMenu.jobs, "LISTE DES GRADES", adminBanner, true)
-        StaffMenu.factions = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES FACTIONS", adminBanner, true)
-        StaffMenu.grades_factions = VUI:CreateSubMenu(StaffMenu.factions, "LISTE DES GRADES", adminBanner, true)
-        StaffMenu.vehs = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES VÉHICULES", adminBanner, true)
-        StaffMenu.vehs_owned = VUI:CreateSubMenu(StaffMenu.vehs, "LISTE DES VÉHICULES DU JOUEUR", adminBanner, true)
-        StaffMenu.vehs_job = VUI:CreateSubMenu(StaffMenu.vehs, "LISTE DES VÉHICULES DU JOB", adminBanner, true)
-        StaffMenu.vehs_faction = VUI:CreateSubMenu(StaffMenu.vehs, "LISTE DES VÉHICULES DE FACTION", adminBanner, true)
-        StaffMenu.vehicleActions = VUI:CreateSubMenu(StaffMenu.vehs_owned, "ACTIONS VÉHICULE", adminBanner, true)
-        StaffMenu.playerSanctions = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES SANCTIONS", adminBanner, true)
-        StaffMenu.playerLicense = VUI:CreateSubMenu(StaffMenu.player, "DONNER UN PERMIS", adminBanner, true)
-        StaffMenu.playerGiveItem = VUI:CreateSubMenu(StaffMenu.player, "DONNER UN ITEM", adminBanner, true)
-        StaffMenu.playerSetRank = VUI:CreateSubMenu(StaffMenu.player, "CHANGER LE RANG", adminBanner, true)
-
-        StaffMenu.jobs.OnOpen(function()
-            StaffMenu.BuildJobsMenu()
-        end)
-        StaffMenu.grades_jobs.OnOpen(function()
-            StaffMenu.BuildGradesJobsMenu()
-        end)
-        StaffMenu.factions.OnOpen(function()
-            StaffMenu.BuildFactionsMenu()
-        end)
-        StaffMenu.grades_factions.OnOpen(function()
-            StaffMenu.BuildGradesFactionsMenu()
-        end)
-        StaffMenu.vehs.OnOpen(function()
-            StaffMenu.BuildVehsMenu()
-        end)
-        StaffMenu.vehs_owned.OnOpen(function()
-            StaffMenu.BuildVehsOwnedMenu()
-        end)
-        StaffMenu.vehs_job.OnOpen(function()
-            StaffMenu.BuildVehsJobMenu()
-        end)
-        StaffMenu.vehs_faction.OnOpen(function()
-            StaffMenu.BuildVehsFactionMenu()
-        end)
-        StaffMenu.vehicleActions.OnOpen(function()
-            StaffMenu.BuildVehicleActionsMenu()
-        end)
-        StaffMenu.playerSanctions.OnOpen(function()
-            StaffMenu.BuildPlayerSanctionsMenu()
-        end)
-        StaffMenu.playerLicense.OnOpen(function()
-            StaffMenu.BuildPlayerLicenseMenu()
-        end)
-        StaffMenu.playerGiveItem.OnOpen(function()
-            StaffMenu.playerGiveItem.ClearItems()
-            StaffMenu.BuildPlayerGiveItemMenu()
-        end)
-        StaffMenu.playerSetRank.OnOpen(function()
-            StaffMenu.BuildStaffRoleChangeMenu(StaffMenu.playerSetRank, "vfw:staff:setRankByLevel")
-        end)
-    end
-
-    StaffMenu.player.OnOpen(function()
-        StaffMenu.BuildPlayerMenu()
-    end)
 
     StaffMenu.player.open()
 end

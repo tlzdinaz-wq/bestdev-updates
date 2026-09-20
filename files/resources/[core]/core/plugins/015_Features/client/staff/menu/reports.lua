@@ -40,8 +40,6 @@ function StaffMenu.BuildReportsMenu()
 
         local label = ":report: N°" .. v.id .. " | " .. status
         StaffMenu.reports.Button(label, displayName, dot, nil, false, function()
-            StaffMenu.data.playerInfo = {}
-            StaffMenu.data.playerInfo = TriggerServerCallback("vfw:staff:getPlayerInfo", v.player.source) or {}
             StaffMenu.data.selectedPlayer = v.player.source
             StaffMenu.data.reportInfo = v
         end, StaffMenu.report)

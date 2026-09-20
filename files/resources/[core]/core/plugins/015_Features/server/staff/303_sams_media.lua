@@ -807,38 +807,49 @@ RegisterNetEvent("vfw:staff:deleteCustomTeleport", function(teleportId)
     Staff29.Notify(source, "INFO", "Outils Staff", "Le point a été supprimé.")
 end)
 
+local playerListCache, playerListCacheAt = nil, 0
+local PLAYER_LIST_CACHE_SEC = 2
+
+local function playtimeOf(target)
+    local base = 0
+    if target.globalData then
+        base = tonumber(target.globalData.playtime) or 0
+    end
+    if target.sessionStart then
+        base = base + math.max(0, os.time() - target.sessionStart)
+    end
+    return base
+end
+
+local function discordCached(src, target)
+    if target.discordId then return target.discordId end
+    local id = discordOf(src)
+    target.discordId = id
+    return id
+end
+
 Staff29.Cb("vfw:staff:getPlayerList", function(source)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer or not xPlayer.hasPermission("staff_menu") then return {} end
 
-    local accounts, a = {}, 0
-    for _, target in pairs(VFW.Players) do
-        if target.accountId then
-            a = a + 1
-            accounts[a] = target.accountId
-        end
-    end
-
-    local playtimes = {}
-    if a > 0 then
-        local marks = {}
-        for i = 1, a do marks[i] = "?" end
-        local rows = Staff29.Query(
-            ("SELECT id, playtime FROM users WHERE id IN (%s)"):format(table.concat(marks, ",")), accounts)
-        for i = 1, #rows do
-            playtimes[rows[i].id] = tonumber(rows[i].playtime) or 0
-        end
+    local now = os.time()
+    if playerListCache and (now - playerListCacheAt) < PLAYER_LIST_CACHE_SEC then
+        return playerListCache
     end
 
     local out, n = {}, 0
     for src, target in pairs(VFW.Players) do
         local global = target.globalData or {}
-        local playtime = playtimes[target.accountId] or 0
+        local playtime = playtimeOf(target)
 
         n = n + 1
         out[n] = {
             source = src,
             id = target.uuid,
+            uuid = target.uuid,
+            charId = target.charId,
+            identifier = target.identifier,
+            accountId = target.accountId,
             pseudo = target.playerName,
             name = target.name,
             firstName = target.firstName,
@@ -854,10 +865,12 @@ Staff29.Cb("vfw:staff:getPlayerList", function(source)
             crew = target.faction ~= "" and target.faction or nil,
             factionFull = target.job2 and jobLabel(target.job2.name, target.job2.grade) or "Civil",
             instance = GetPlayerRoutingBucket(src) or 0,
-            discord = discordOf(src),
+            discord = discordCached(src, target),
         }
     end
 
+    playerListCache = out
+    playerListCacheAt = now
     return out
 end)
 

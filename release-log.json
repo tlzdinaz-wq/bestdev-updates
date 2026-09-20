@@ -1,14 +1,31 @@
 {
- "version": "1.12.23",
- "date": "2026-09-20T02:14:16.403Z",
- "notes": "**Updater** : vérification sans à-coup serveur (pause tous les 150 fichiers).",
+ "version": "1.12.24",
+ "date": "2026-09-20T02:25:17.968Z",
+ "notes": "**Menus staff plus réactifs**\n\n- **Liste des joueurs** : ouverture et clic sur un joueur beaucoup plus rapides (plus d’attente SQL / double chargement).\n- **Clic sur un nom** : le menu JOUEUR s’ouvre tout de suite ; la fiche déjà affichée à côté est conservée.\n- Navigation ↑↓ dans les menus VUI : plus de latence à chaque flèche.\n- Cache des listes (joueurs / jobs / factions) pour éviter de recharger à chaque ouverture.\n\n`ensure core` puis `ensure VUI` (ou redémarrage) après `update`.",
  "added": [],
  "changed": [
-  "resources/[core]/core/interface/build/index.html",
-  "resources/[core]/core/interface/build/skin/nui-fallbacks.css",
-  "resources/[standalone]/updater/server.lua"
+  "resources/[core]/core/plugins/000_framework/server/005_paycheck.lua",
+  "resources/[core]/core/plugins/000_framework/shared/001_main.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/keys.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/_manager.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/additional_features.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/animator_integrated.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderMotel.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/factions.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/jobs.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/outils.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/personal_actions.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/player.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/players.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/report.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/reports.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/staff.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/warns.lua",
+  "resources/[core]/core/plugins/015_Features/server/misc_b/34_16_misc_jobs.lua",
+  "resources/[core]/core/plugins/015_Features/server/staff/303_sams_media.lua",
+  "resources/[core]/VUI/callbacks.lua"
  ],
  "removed": [],
- "total": 289299991,
+ "total": 289288512,
  "fileCount": 3307
 }

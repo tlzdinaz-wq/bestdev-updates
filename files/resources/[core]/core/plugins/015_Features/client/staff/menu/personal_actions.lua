@@ -270,7 +270,7 @@ function StaffMenu.BuildPersonalActionsMenu()
             end
             if StaffMenu.outilsState then StaffMenu.outilsState.Spectate = _checked end
             if _checked then
-                local players = TriggerServerCallback("vfw:staff:getPlayerList") or {}
+                local players = StaffMenu.FetchPlayerList(false) or {}
                 local validPlayers = {}
                 local selfId = GetPlayerServerId(PlayerId())
                 for _, p in pairs(players) do

@@ -615,13 +615,13 @@ function StaffMenu.BuildOutilsMenu()
 
     if perms["setjob"] then
         StaffMenu.outils.Button(":briefcase: CHANGER LE MÉTIER", "Modifier le job d'un joueur connecté en le sélectionnant dans la liste", nil, "chevron", false, function()
-            StaffMenu.data.playerListForJob = TriggerServerCallback("vfw:staff:getPlayerList") or {}
+            StaffMenu.data.playerListForJob = StaffMenu.FetchPlayerList(false) or {}
         end, StaffMenu.selectPlayerForJob)
     end
 
     if perms["setjob2"] then
         StaffMenu.outils.Button(":users: CHANGER LA FACTION", "Modifier la faction (gang, organisation) d'un joueur connecté", nil, "chevron", false, function()
-            StaffMenu.data.playerListForFaction = TriggerServerCallback("vfw:staff:getPlayerList") or {}
+            StaffMenu.data.playerListForFaction = StaffMenu.FetchPlayerList(false) or {}
         end, StaffMenu.selectPlayerForFaction)
     end
 
@@ -1217,7 +1217,7 @@ function StaffMenu.BuildSelectPlayerForJobMenu()
 
     -- Bouton actualiser
     StaffMenu.selectPlayerForJob.Button(":refresh: ACTUALISER", "Recharger la liste des joueurs", nil, "chevron", false, function()
-        StaffMenu.data.playerListForJob = TriggerServerCallback("vfw:staff:getPlayerList") or {}
+        StaffMenu.data.playerListForJob = StaffMenu.FetchPlayerList(true) or {}
         VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Outils Staff', message = "Liste des joueurs actualisée." })
         StaffMenu.selectPlayerForJob.refresh()
     end)
@@ -1271,7 +1271,7 @@ function StaffMenu.BuildSelectPlayerForJobMenu()
                         VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Outils Staff', message = "Joueur non trouvé ou non connecté." })
                         return false
                     end
-                    StaffMenu.data.jobsList = TriggerServerCallback("vfw:staff:getJobs") or {}
+                    StaffMenu.FetchJobs(false)
                     if not StaffMenu.data.jobsList or not next(StaffMenu.data.jobsList) then
                         VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Outils Staff', message = "Impossible de charger la liste des jobs." })
                         return false
@@ -1289,7 +1289,7 @@ function StaffMenu.BuildSelectPlayerForFactionMenu()
 
     -- Bouton actualiser
     StaffMenu.selectPlayerForFaction.Button(":refresh: ACTUALISER", "Recharger la liste des joueurs", nil, "chevron", false, function()
-        StaffMenu.data.playerListForFaction = TriggerServerCallback("vfw:staff:getPlayerList") or {}
+        StaffMenu.data.playerListForFaction = StaffMenu.FetchPlayerList(true) or {}
         VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Outils Staff', message = "Liste des joueurs actualisée." })
         StaffMenu.selectPlayerForFaction.refresh()
     end)
@@ -1343,7 +1343,7 @@ function StaffMenu.BuildSelectPlayerForFactionMenu()
                         VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Outils Staff', message = "Joueur non trouvé ou non connecté." })
                         return false
                     end
-                    StaffMenu.data.factionsList = TriggerServerCallback("core:staff:getOrganizations") or {}
+                    StaffMenu.data.factionsList = StaffMenu.FetchOrganizations(false) or {}
                     if not StaffMenu.data.factionsList or not next(StaffMenu.data.factionsList) then
                         VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Outils Staff', message = "Impossible de charger la liste des factions." })
                         return false

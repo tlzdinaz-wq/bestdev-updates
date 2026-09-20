@@ -27,7 +27,7 @@ function StaffMenu.BuildPlayersMenu()
             StaffMenu.playerQuery = nil
             StaffMenu.playerPage = 1
             StaffMenu.data.playerList = {}
-            StaffMenu.data.playerList = TriggerServerCallback("vfw:staff:getPlayerList") or {}
+            StaffMenu.data.playerList = StaffMenu.FetchPlayerList(true) or {}
             StaffMenu.players.refresh()
             return
         end
@@ -103,93 +103,16 @@ function StaffMenu.BuildPlayersMenu()
                 local new = v.new and "[NEW] " or ""
               local displayPseudo = v.pseudo or "No Pseudo"
 
-              StaffMenu.playerIndexMap[currentIndex] = v
+                StaffMenu.playerIndexMap[currentIndex] = v
                 currentIndex = currentIndex + 1
 
                 StaffMenu.players.Button(new .. displayPseudo, v.name or "Unknown", nil, nil, false, function()
-                    StaffMenu.players.PlayerPreview()
+                    -- Zéro yield ici : le sous-menu s'ouvre tout de suite.
+                    -- Préparation + build dans player.OnOpen (données déjà en cache).
+                    StaffMenu._pendingPlayerRow = v
                     StaffMenu.animatorPlayerContext = false
-
-                    StaffMenu.data.playerInfo = TriggerServerCallback("vfw:staff:getPlayerInfo", v.source) or {}
                     StaffMenu.data.selectedPlayer = v.source
-                    StaffMenu.data.warnsPlayerList = TriggerServerCallback("core:warn:getwarnsbydiscord", v.discord) or
-                        {}
-                    StaffMenu.data.sanctionsPlayerList = TriggerServerCallback("vfw:staff:getPlayerSanctions",
-                        v.source, StaffMenu.data.playerInfo.identifier, StaffMenu.data.playerInfo.discord) or {}
-
-                    local playerTitle = string.format("%s [%d]", StaffMenu.data.playerInfo.name or "Unknown", v.source)
-                    local adminBanner = exports["core"]:GetVUIBanner("admin")
-                    local VUI = exports["VUI"]
-
-                    StaffMenu.player = VUI:CreateSubMenu(StaffMenu.players, playerTitle, adminBanner, true)
-
-                    StaffMenu.wipe = VUI:CreateSubMenu(StaffMenu.player, "WIPE", adminBanner, true)
-                    StaffMenu.items = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES ITEMS", adminBanner, true)
-                    StaffMenu.AttachItemsMenuCallback()
-                    StaffMenu.jobs = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES JOBS", adminBanner, true)
-                    StaffMenu.grades_jobs = VUI:CreateSubMenu(StaffMenu.jobs, "LISTE DES GRADES", adminBanner, true)
-                    StaffMenu.factions = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES FACTIONS", adminBanner, true)
-                    StaffMenu.grades_factions = VUI:CreateSubMenu(StaffMenu.factions, "LISTE DES GRADES", adminBanner, true)
-                    StaffMenu.vehs = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES VÉHICULES", adminBanner, true)
-                    StaffMenu.vehs_owned = VUI:CreateSubMenu(StaffMenu.vehs, "LISTE DES VÉHICULES DU JOUEUR", adminBanner, true)
-                    StaffMenu.vehs_job = VUI:CreateSubMenu(StaffMenu.vehs, "LISTE DES VÉHICULES DU JOB", adminBanner, true)
-                    StaffMenu.vehs_faction = VUI:CreateSubMenu(StaffMenu.vehs, "LISTE DES VÉHICULES DE FACTION", adminBanner, true)
-                    StaffMenu.vehicleActions = VUI:CreateSubMenu(StaffMenu.vehs_owned, "ACTIONS VÉHICULE", adminBanner, true)
-                    StaffMenu.playerSanctions = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES SANCTIONS", adminBanner, true)
-                    StaffMenu.playerLicense = VUI:CreateSubMenu(StaffMenu.player, "DONNER UN PERMIS", adminBanner, true)
-                    StaffMenu.playerGiveItem = VUI:CreateSubMenu(StaffMenu.player, "DONNER UN ITEM", adminBanner, true)
-                    StaffMenu.playerSetRank = VUI:CreateSubMenu(StaffMenu.player, "CHANGER LE RANG", adminBanner, true)
-
-                    StaffMenu.jobs.OnOpen(function()
-                        StaffMenu.BuildJobsMenu()
-                    end)
-                    StaffMenu.grades_jobs.OnOpen(function()
-                        StaffMenu.BuildGradesJobsMenu()
-                    end)
-                    StaffMenu.factions.OnOpen(function()
-                        StaffMenu.BuildFactionsMenu()
-                    end)
-                    StaffMenu.grades_factions.OnOpen(function()
-                        StaffMenu.BuildGradesFactionsMenu()
-                    end)
-                    StaffMenu.vehs.OnOpen(function()
-                        StaffMenu.BuildVehsMenu()
-                    end)
-
-                    StaffMenu.vehs_owned.OnOpen(function()
-                        StaffMenu.BuildVehsOwnedMenu()
-                    end)
-
-                    StaffMenu.vehs_job.OnOpen(function()
-                        StaffMenu.BuildVehsJobMenu()
-                    end)
-
-                    StaffMenu.vehs_faction.OnOpen(function()
-                        StaffMenu.BuildVehsFactionMenu()
-                    end)
-                    StaffMenu.vehicleActions.OnOpen(function()
-                        StaffMenu.BuildVehicleActionsMenu()
-                    end)
-                    StaffMenu.player.OnOpen(function()
-                        StaffMenu.BuildPlayerMenu()
-                    end)
-
-                    StaffMenu.playerSanctions.OnOpen(function()
-                        StaffMenu.BuildPlayerSanctionsMenu()
-                    end)
-                    StaffMenu.playerLicense.OnOpen(function()
-                        StaffMenu.BuildPlayerLicenseMenu()
-                    end)
-                    StaffMenu.playerGiveItem.OnOpen(function()
-                        StaffMenu.playerGiveItem.ClearItems()
-                        StaffMenu.BuildPlayerGiveItemMenu()
-                    end)
-                    StaffMenu.playerSetRank.OnOpen(function()
-                        StaffMenu.BuildStaffRoleChangeMenu(StaffMenu.playerSetRank, "vfw:staff:setRankByLevel")
-                    end)
-
-                    StaffMenu.player.open()
-                end)
+                end, StaffMenu.player)
             end
         end
 

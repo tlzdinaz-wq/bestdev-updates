@@ -73,6 +73,7 @@ end)
 
 -- Déclenché quand l'utilisateur utilise ◀▶ sur un item List2.
 RegisterNUICallback('vui:menu:list2Change', function(data, cb)
+    cb()
     if not VUI_CurrentMenu then return end
 
     local item
@@ -88,13 +89,13 @@ RegisterNUICallback('vui:menu:list2Change', function(data, cb)
         item.props.index = data.item.props.index + 1
         item.callback(item.props.index, item.props.items[item.props.index])
     end
-
-    cb()
 end)
 
 -- Déclenché quand le curseur change de position (↑↓).
 -- Met à jour VUI_CurrentMenu.index et appelle OnIndexChange si défini.
+-- cb() en premier : sinon chaque flèche bloque le NUI (latence dans les listes).
 RegisterNUICallback('vui:menu:indexChange', function(data, cb)
+    cb()
     if not VUI_CurrentMenu then return end
     if VUI_SoundEnabled == true then
         PlaySoundFrontend(-1, "NAV_UP_DOWN", "HUD_FRONTEND_DEFAULT_SOUNDSET", 1)
@@ -111,7 +112,6 @@ RegisterNUICallback('vui:menu:indexChange', function(data, cb)
         end
         VUI_CurrentMenu._idxChangeFn(VUI_CurrentMenu.index, item)
     end
-    cb()
 end)
 
 local focusState = false
@@ -140,6 +140,7 @@ end)
 -- Déclenché par le SearchInput : reçoit la liste des items filtrés depuis le NUI
 -- et reconstruit VUI_CurrentMenu.filterItems côté Lua pour synchronisation.
 RegisterNUICallback("vui:menu:filteritems", function(data, cb)
+    cb()
     if VUI_CurrentMenu then
         VUI_CurrentMenu._isFiltered = true
         VUI_CurrentMenu.index = 1
@@ -157,16 +158,15 @@ RegisterNUICallback("vui:menu:filteritems", function(data, cb)
             end
         end
     end
-    cb()
 end)
 
 -- Déclenché quand le SearchInput est vidé : retire le filtre côté Lua.
 RegisterNUICallback("vui:menu:unfilteritems", function(data, cb)
+    cb()
     if VUI_CurrentMenu then
         VUI_CurrentMenu._isFiltered = false
         VUI_CurrentMenu.filterItems = {}
     end
-    cb()
 end)
 
 -- Color Picker callback for real-time color updates

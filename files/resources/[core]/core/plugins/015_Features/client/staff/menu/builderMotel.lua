@@ -922,7 +922,7 @@ StaffMenu.motelAssignPlayer.OnOpen(function()
 
     StaffMenu.motelAssignPlayer.Separator(":key: ATTRIBUER · CHAMBRE " .. selectedRoom.roomNumber)
 
-    local playerList <const> = TriggerServerCallback("vfw:staff:getPlayerList") or {}
+    local playerList <const> = StaffMenu.FetchPlayerList(false) or {}
 
     local hasPlayers = false
     for _ in pairs(playerList) do hasPlayers = true; break end

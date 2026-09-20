@@ -6,12 +6,13 @@ local jobQuery = nil
 --- .BuildJobsMenu
 ---@return any
 function StaffMenu.BuildJobsMenu()
+    StaffMenu.FetchJobs(false)
     local firstLabel = jobQuery == nil and "RECHERCHER" or "RECHERCHER:"
   local lastLabel = jobQuery == nil and "UN JOB" or jobQuery
 
     -- Bouton refresh pour recharger les données
     StaffMenu.jobs.Button(":refresh: ACTUALISER", "Recharger les jobs depuis le serveur", nil, "chevron", false, function()
-        StaffMenu.data.jobsList = TriggerServerCallback("vfw:staff:getJobs") or {}
+        StaffMenu.FetchJobs(true)
         StaffMenu.data.playerInfo = TriggerServerCallback("vfw:staff:getPlayerInfo", StaffMenu.data.selectedPlayer) or {}
         VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Gestion Métiers', message = "Liste des jobs actualisée." })
         StaffMenu.jobs.refresh()

@@ -27,6 +27,136 @@ StaffMenu.data = {
 ---@class vehsList
     vehsList = { owned = {}, job = {}, faction = {} }
 }
+
+local PLAYER_LIST_TTL = 8000
+local JOBS_TTL = 60000
+local ORGS_TTL = 60000
+
+function StaffMenu.FetchPlayerList(force)
+    local now = GetGameTimer()
+    if not force
+        and type(StaffMenu.data.playerList) == "table"
+        and next(StaffMenu.data.playerList)
+        and StaffMenu._playerListAt
+        and (now - StaffMenu._playerListAt) < PLAYER_LIST_TTL
+    then
+        return StaffMenu.data.playerList
+    end
+
+    if StaffMenu._playerListFetching then
+        local t0 = GetGameTimer()
+        while StaffMenu._playerListFetching and (GetGameTimer() - t0) < 8000 do
+            Wait(0)
+        end
+        if not force and StaffMenu.data.playerList and next(StaffMenu.data.playerList) then
+            return StaffMenu.data.playerList
+        end
+    end
+
+    StaffMenu._playerListFetching = true
+    local ok, list = pcall(TriggerServerCallback, "vfw:staff:getPlayerList")
+    StaffMenu._playerListFetching = false
+    StaffMenu.data.playerList = (ok and list) or {}
+    StaffMenu._playerListAt = GetGameTimer()
+    return StaffMenu.data.playerList
+end
+
+function StaffMenu.FetchJobs(force)
+    local now = GetGameTimer()
+    if not force
+        and type(StaffMenu.data.jobsList) == "table"
+        and next(StaffMenu.data.jobsList)
+        and StaffMenu._jobsAt
+        and (now - StaffMenu._jobsAt) < JOBS_TTL
+    then
+        return StaffMenu.data.jobsList
+    end
+    StaffMenu.data.jobsList = TriggerServerCallback("vfw:staff:getJobs") or {}
+    StaffMenu._jobsAt = GetGameTimer()
+    return StaffMenu.data.jobsList
+end
+
+function StaffMenu.FetchOrganizations(force)
+    local now = GetGameTimer()
+    if not force
+        and type(StaffMenu.data.factionsList) == "table"
+        and next(StaffMenu.data.factionsList)
+        and StaffMenu._orgsAt
+        and (now - StaffMenu._orgsAt) < ORGS_TTL
+    then
+        return StaffMenu.data.factionsList
+    end
+    StaffMenu.data.factionsList = TriggerServerCallback("core:staff:getOrganizations") or {}
+    StaffMenu._orgsAt = GetGameTimer()
+    return StaffMenu.data.factionsList
+end
+
+function StaffMenu.PlayerInfoFromRow(v)
+    if type(v) ~= "table" then return {} end
+    return {
+        source = v.source,
+        id = v.charId or v.id,
+        charId = v.charId or v.id,
+        uuid = v.uuid or v.id,
+        pseudo = v.pseudo or v.playerName,
+        playerName = v.playerName or v.pseudo,
+        name = v.name,
+        firstName = v.firstName,
+        lastName = v.lastName,
+        role = v.role,
+        roleFormatted = v.roleFormatted or v.role,
+        time = v.time,
+        dateOfBirth = v.dateOfBirth or v.dateofbirth,
+        height = v.height,
+        sex = v.sex,
+        job = v.job,
+        jobName = v.jobName or v.job,
+        jobFull = v.jobFull,
+        grade = v.grade,
+        crew = v.crew,
+        faction = v.faction,
+        factionName = v.factionName or v.crew,
+        factionFull = v.factionFull,
+        instance = v.instance,
+        discord = v.discord,
+        identifier = v.identifier,
+        accountId = v.accountId,
+        color = v.color,
+        hasTig = v.hasTig,
+        new = v.new,
+        online = true,
+    }
+end
+
+--- Prépare le menu joueur existant (sans le recréer ni spammer le serveur).
+function StaffMenu.PreparePlayerMenu(source, parent, row, isAnimatorCtx)
+    StaffMenu.animatorPlayerContext = isAnimatorCtx and true or false
+    StaffMenu.data.selectedPlayer = source
+    if StaffMenu._sanctionsFor ~= source then
+        StaffMenu.data.sanctionsPlayerList = {}
+        StaffMenu._sanctionsFor = nil
+    end
+    StaffMenu.data.warnsPlayerList = {}
+
+    if type(row) == "table" then
+        StaffMenu.data.playerInfo = StaffMenu.PlayerInfoFromRow(row)
+        StaffMenu.data.playerInfo.source = StaffMenu.data.playerInfo.source or source
+    else
+        local info = TriggerServerCallback("vfw:staff:getPlayerInfo", source) or {}
+        StaffMenu.data.playerInfo = StaffMenu.PlayerInfoFromRow(info)
+        StaffMenu.data.playerInfo.source = StaffMenu.data.playerInfo.source or source
+    end
+
+    local info = StaffMenu.data.playerInfo or {}
+    local title = string.format("%s [%d]", info.name or info.pseudo or "Joueur", tonumber(source) or 0)
+    if StaffMenu.player and StaffMenu.player.SetTitle then
+        StaffMenu.player.SetTitle(title)
+    end
+    if parent and StaffMenu.player then
+        StaffMenu.player.parent = parent
+    end
+    return info
+end
 StaffMenu.adminChecked = false
 local adminBanner = exports["core"]:GetVUIBanner("admin")
 StaffMenu.main = VUI:CreateMenu("MENU ADMINISTRATION", adminBanner, true)
@@ -60,6 +190,7 @@ StaffMenu.vehs_faction = VUI:CreateSubMenu(StaffMenu.vehs, "LISTE DES VÉHICULES
 StaffMenu.vehicleActions = VUI:CreateSubMenu(StaffMenu.vehs_owned, "ACTIONS VÉHICULE", adminBanner, true)
 StaffMenu.playerSanctions = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES SANCTIONS", adminBanner, true)
 StaffMenu.playerGiveItem = VUI:CreateSubMenu(StaffMenu.player, "DONNER UN ITEM", adminBanner, true)
+StaffMenu.playerSetRank = VUI:CreateSubMenu(StaffMenu.player, "CHANGER LE RANG", adminBanner, true)
 StaffMenu.staff = VUI:CreateSubMenu(StaffMenu.main, "STAFF", adminBanner, true)
 StaffMenu.staffDetails = VUI:CreateSubMenu(StaffMenu.staff, "DÉTAILS STAFF", adminBanner, true)
 StaffMenu.staffRoleChange = VUI:CreateSubMenu(StaffMenu.staffDetails, "CHANGER LE RÔLE", adminBanner, true)
@@ -1020,6 +1151,13 @@ StaffMenu.main.OnOpen(function()
     StaffMenu.menuContext = 'staff'
     StaffMenu.ResetPlayerSearchState()
     StaffMenu.BuildMainMenu()
+    CreateThread(function()
+        StaffMenu.FetchPlayerList(false)
+    end)
+end)
+
+StaffMenu.main.OnClose(function()
+    StaffMenu._previewSource = nil
 end)
 
 StaffMenu.videoManagement.OnOpen(function()
@@ -1134,9 +1272,10 @@ StaffMenu.players.OnOpen(function()
     StaffMenu.skipPlayerReset = nil
 
     if not hasActiveSearch and not skipReset then
-        -- Fresh open - reset everything and get player list
         StaffMenu.ResetPlayerSearchState()
-        StaffMenu.data.playerList = TriggerServerCallback("vfw:staff:getPlayerList") or {}
+        StaffMenu.FetchPlayerList(false)
+    elseif not StaffMenu.data.playerList or not next(StaffMenu.data.playerList) then
+        StaffMenu.FetchPlayerList(false)
     end
 
     StaffMenu.BuildPlayersMenu()
@@ -1145,9 +1284,15 @@ end)
 StaffMenu.players.OnIndexChange(function(index, item)
     local playerData = StaffMenu.playerIndexMap and StaffMenu.playerIndexMap[index]
     if not playerData then
+        StaffMenu._previewSource = nil
         StaffMenu.players.PlayerPreview()
         return
     end
+
+    if StaffMenu._previewSource == playerData.source then
+        return
+    end
+    StaffMenu._previewSource = playerData.source
 
     local rpName = "Inconnu"
   if playerData.firstName and playerData.lastName then
@@ -1187,14 +1332,30 @@ StaffMenu.players.OnIndexChange(function(index, item)
 end)
 
 StaffMenu.players.OnClose(function()
-    StaffMenu.players.PlayerPreview()
+    -- Ne pas vider la fiche ici : au clic joueur on enchaîne vers le menu JOUEUR
+    -- et la fiche déjà affichée (OnIndexChange) doit rester. Elle est nettoyée
+    -- à la sortie de la liste (playersList.OnOpen / OnClose).
 end)
 
 StaffMenu.player.OnOpen(function()
+    local row = StaffMenu._pendingPlayerRow
+    StaffMenu._pendingPlayerRow = nil
+    if row then
+        StaffMenu.PreparePlayerMenu(row.source, StaffMenu.players, row, StaffMenu.animatorPlayerContext)
+    elseif StaffMenu.data.selectedPlayer then
+        local info = StaffMenu.data.playerInfo
+        if not info or info.source ~= StaffMenu.data.selectedPlayer then
+            StaffMenu.PreparePlayerMenu(StaffMenu.data.selectedPlayer, StaffMenu.player.parent, nil, StaffMenu.animatorPlayerContext)
+        else
+            local title = string.format("%s [%d]", info.name or info.pseudo or "Joueur", tonumber(StaffMenu.data.selectedPlayer) or 0)
+            if StaffMenu.player.SetTitle then StaffMenu.player.SetTitle(title) end
+        end
+    end
     StaffMenu.BuildPlayerMenu()
 end)
 
 StaffMenu.player.OnClose(function()
+    StaffMenu._previewSource = nil
     StaffMenu.main.PlayerPreview()
 end)
 
@@ -1434,6 +1595,18 @@ StaffMenu.playerGiveItem.OnOpen(function()
     StaffMenu.playerGiveItem.ClearItems()
     StaffMenu.BuildPlayerGiveItemMenu()
 end)
+
+if StaffMenu.wipe then
+    StaffMenu.wipe.OnOpen(function()
+        StaffMenu.BuildWipeMenu()
+    end)
+end
+
+if StaffMenu.playerSetRank then
+    StaffMenu.playerSetRank.OnOpen(function()
+        StaffMenu.BuildStaffRoleChangeMenu(StaffMenu.playerSetRank, "vfw:staff:setRankByLevel")
+    end)
+end
 
 StaffMenu.selectPlayerForJob.OnOpen(function()
     StaffMenu.BuildSelectPlayerForJobMenu()
@@ -2818,7 +2991,7 @@ function StaffMenu.BuildMainMenu()
 
         if hasShortcutSetjob then
             StaffMenu.main.Button(":briefcase: DÉFINIR LE MÉTIER", "Sélectionner un joueur, puis choisir un job et un grade", nil, "chevron", false, function()
-                StaffMenu.data.playerListForJob = TriggerServerCallback("vfw:staff:getPlayerList") or {}
+                StaffMenu.data.playerListForJob = StaffMenu.FetchPlayerList(false) or {}
             end, StaffMenu.selectPlayerForJob)
         end
 
@@ -2856,21 +3029,25 @@ end
 
 --- .BuildPlayersListMenu
 StaffMenu.playersList.OnOpen(function()
+    StaffMenu._previewSource = nil
+    if StaffMenu.players and StaffMenu.players.PlayerPreview then
+        StaffMenu.players.PlayerPreview()
+    end
     StaffMenu.playersList.ClearItems()
+    CreateThread(function()
+        StaffMenu.FetchPlayerList(false)
+    end)
 
     StaffMenu.playersList.Button(":search: RECHERCHER UN JOUEUR", "Recherche par ID, UUID, prénom, nom, faction ou job.\nEn ligne ou Hors ligne", nil, "search", false, function()
         local query = VFW.Nui.KeyboardInput(true, "Entrez un ID / UUID / Prénom / Nom / Faction / Job")
         if not query or query == "" then return end
         StaffMenu.playerQuery = query
-        StaffMenu.data.playerList = {}
-        StaffMenu.data.playerList = TriggerServerCallback("vfw:staff:getPlayerList") or {}
+        StaffMenu.FetchPlayerList(false)
         StaffMenu.players.open()
     end)
 
     StaffMenu.playersList.Button(":users: JOUEURS EN LIGNE", "Voir la liste complète des joueurs actuellement connectés", nil, "chevron", false, function()
         StaffMenu.playerQuery = nil
-        StaffMenu.data.playerList = {}
-        StaffMenu.data.playerList = TriggerServerCallback("vfw:staff:getPlayerList") or {}
     end, StaffMenu.players)
 
     StaffMenu.playersList.Button(":user: JOUEURS HORS LIGNE", "Accéder aux profils des joueurs déconnectés pour sanction ou gestion", nil, "chevron", false, function()

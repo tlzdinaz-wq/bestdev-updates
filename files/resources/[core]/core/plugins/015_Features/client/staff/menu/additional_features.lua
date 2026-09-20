@@ -99,66 +99,7 @@ function StaffMenu.SpectatePlayer(targetSource, isRandomSpectate)
             if IsControlJustPressed(0, 73) then -- X - Quitter
                 StaffMenu.StopSpectate()
             elseif VFW.Interact.JustPressed(0, 38) then -- E - Gérer le joueur
-                StaffMenu.data.selectedPlayer = additionalFeatures.spectateTarget
-                StaffMenu.data.playerInfo = TriggerServerCallback("vfw:staff:getPlayerInfo", additionalFeatures.spectateTarget) or {}
-
-                -- Recreate the player menu with the player's name as title
-                local playerTitle = string.format("%s [%d]", StaffMenu.data.playerInfo.name or "Unknown", additionalFeatures.spectateTarget)
-                local adminBanner = exports["core"]:GetVUIBanner("admin")
-                local VUI = exports["VUI"]
-
-                StaffMenu.player = VUI:CreateSubMenu(StaffMenu.players, playerTitle, adminBanner, true)
-
-                -- Re-attach child menus
-                StaffMenu.wipe = VUI:CreateSubMenu(StaffMenu.player, "WIPE", adminBanner, true)
-                StaffMenu.items = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES ITEMS", adminBanner, true)
-                StaffMenu.AttachItemsMenuCallback()
-                StaffMenu.jobs = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES JOBS", adminBanner, true)
-                StaffMenu.grades_jobs = VUI:CreateSubMenu(StaffMenu.jobs, "LISTE DES GRADES", adminBanner, true)
-                StaffMenu.factions = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES FACTIONS", adminBanner, true)
-                StaffMenu.grades_factions = VUI:CreateSubMenu(StaffMenu.factions, "LISTE DES GRADES", adminBanner, true)
-                StaffMenu.vehs = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES VÉHICULES", adminBanner, true)
-                StaffMenu.vehs_owned = VUI:CreateSubMenu(StaffMenu.vehs, "LISTE DES VÉHICULES DU JOUEUR", adminBanner, true)
-                StaffMenu.vehs_job = VUI:CreateSubMenu(StaffMenu.vehs, "LISTE DES VÉHICULES DU JOB", adminBanner, true)
-                StaffMenu.vehs_faction = VUI:CreateSubMenu(StaffMenu.vehs, "LISTE DES VÉHICULES DE FACTION", adminBanner, true)
-                StaffMenu.vehicleActions = VUI:CreateSubMenu(StaffMenu.vehs_owned, "ACTIONS VÉHICULE", adminBanner, true)
-                StaffMenu.playerSanctions = VUI:CreateSubMenu(StaffMenu.player, "LISTE DES SANCTIONS", adminBanner, true)
-
-                -- Re-attach OnOpen callbacks
-                StaffMenu.jobs.OnOpen(function()
-                    StaffMenu.BuildJobsMenu()
-                end)
-                StaffMenu.grades_jobs.OnOpen(function()
-                    StaffMenu.BuildGradesJobsMenu()
-                end)
-                StaffMenu.factions.OnOpen(function()
-                    StaffMenu.BuildFactionsMenu()
-                end)
-                StaffMenu.grades_factions.OnOpen(function()
-                    StaffMenu.BuildGradesFactionsMenu()
-                end)
-                StaffMenu.vehs.OnOpen(function()
-                    StaffMenu.BuildVehsMenu()
-                end)
-
-                StaffMenu.vehs_owned.OnOpen(function()
-                    StaffMenu.BuildVehsOwnedMenu()
-                end)
-
-                StaffMenu.vehs_job.OnOpen(function()
-                    StaffMenu.BuildVehsJobMenu()
-                end)
-
-                StaffMenu.vehs_faction.OnOpen(function()
-                    StaffMenu.BuildVehsFactionMenu()
-                end)
-                StaffMenu.vehicleActions.OnOpen(function()
-                    StaffMenu.BuildVehicleActionsMenu()
-                end)
-                StaffMenu.player.OnOpen(function()
-                    StaffMenu.BuildPlayerMenu()
-                end)
-
+                StaffMenu.PreparePlayerMenu(additionalFeatures.spectateTarget, StaffMenu.players, nil, false)
                 StaffMenu.player.open()
             elseif additionalFeatures.isRandomSpectate and IsControlJustPressed(0, 24) then -- Clic gauche - Joueur suivant
                 StaffMenu.SpectateNextRandom()
@@ -206,7 +147,7 @@ end
 function StaffMenu.SpectateNextRandom()
     if not additionalFeatures.spectateMode or not additionalFeatures.isRandomSpectate then return end
 
-    local players = TriggerServerCallback("vfw:staff:getPlayerList") or {}
+    local players = StaffMenu.FetchPlayerList(false) or {}
     local validPlayers = {}
     local selfId = GetPlayerServerId(PlayerId())
     local currentTarget = additionalFeatures.spectateTarget

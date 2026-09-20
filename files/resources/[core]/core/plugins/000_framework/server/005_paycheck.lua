@@ -7,6 +7,10 @@ end)
 
 AddEventHandler("vfw:characterLoaded", function(source)
     lastActivity[source] = os.time()
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if xPlayer and not xPlayer.sessionStart then
+        xPlayer.sessionStart = os.time()
+    end
 end)
 
 AddEventHandler("playerDropped", function()

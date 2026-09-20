@@ -138,11 +138,13 @@ end
 ---Map complète des droits staff (clés Config.Permissions + flags internes).
 ---@return table<string, boolean>
 function VFW.BuildFullPermissions()
+    if VFW._fullPermsCache then return VFW._fullPermsCache end
     local all = { dev = true, staff = true, admin = true }
     local source = (Config and Config.Permissions) or {}
     for key in pairs(source) do
         all[key] = true
     end
+    VFW._fullPermsCache = all
     return all
 end
 
@@ -212,24 +214,29 @@ end
 ---Table réelle des droits. `niveau_6` / dev / admin / grade cassé = tout.
 ---@return table<string, boolean>
 function VFW.StaffPerms()
+    if VFW._staffPermsCache then return VFW._staffPermsCache end
     local data = VFW.PlayerGlobalData
     if not data then return {} end
+    local out
     if VFW.IsNiveau6Role(data.role or data.roleId) then
-        return VFW.BuildFullPermissions()
-    end
-    local src = data.permissions
-    if type(src) ~= "table" then return {} end
-    if permGranted(src.dev) or permGranted(src.admin) or VFW.IsSparseStaffPerms(src) then
-        return VFW.BuildFullPermissions()
-    end
-    local out = {}
-    for k, v in pairs(src) do
-        if type(k) == "number" and type(v) == "string" then
-            out[v] = true
-        elseif permGranted(v) then
-            out[k] = true
+        out = VFW.BuildFullPermissions()
+    else
+        local src = data.permissions
+        if type(src) ~= "table" then return {} end
+        if permGranted(src.dev) or permGranted(src.admin) or VFW.IsSparseStaffPerms(src) then
+            out = VFW.BuildFullPermissions()
+        else
+            out = {}
+            for k, v in pairs(src) do
+                if type(k) == "number" and type(v) == "string" then
+                    out[v] = true
+                elseif permGranted(v) then
+                    out[k] = true
+                end
+            end
         end
     end
+    VFW._staffPermsCache = out
     return out
 end
 
@@ -237,6 +244,7 @@ end
 ---@param payload table|nil
 function VFW.ApplyStaffAccess(payload)
     if type(payload) ~= "table" then return end
+    VFW._staffPermsCache = nil
     VFW.PlayerGlobalData = VFW.PlayerGlobalData or {}
     if payload.role ~= nil then
         VFW.PlayerGlobalData.role = payload.role

@@ -15,6 +15,14 @@ local sanctionConfig = {
 --- .BuildPlayerSanctionsMenu
 ---@return any
 function StaffMenu.BuildPlayerSanctionsMenu()
+    local selected = StaffMenu.data.selectedPlayer
+    local info = StaffMenu.data.playerInfo or {}
+    if selected and StaffMenu._sanctionsFor ~= selected then
+        StaffMenu.data.sanctionsPlayerList = TriggerServerCallback("vfw:staff:getPlayerSanctions",
+            selected, info.identifier, info.discord) or {}
+        StaffMenu._sanctionsFor = selected
+    end
+
     local firstLabel = sanctionQuery == nil and "RECHERCHER" or "RECHERCHER:"
   local lastLabel = sanctionQuery == nil and "UNE SANCTION" or sanctionQuery
 

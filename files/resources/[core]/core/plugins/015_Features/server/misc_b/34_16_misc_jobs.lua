@@ -18,27 +18,56 @@ MiscB.Cb("vfw:staff:getPlayerInfo", function(source, targetServerId)
     local xTarget = VFW.GetPlayerFromId(target)
     if not xTarget then return nil end
 
-    local discord = nil
-    local identifiers = GetPlayerIdentifiers(target) or {}
-    for i = 1, #identifiers do
-        if identifiers[i]:sub(1, 8) == "discord:" then discord = identifiers[i]:sub(9) end
+    local discord = xTarget.discordId
+    if not discord then
+        local identifiers = GetPlayerIdentifiers(target) or {}
+        for i = 1, #identifiers do
+            if identifiers[i]:sub(1, 8) == "discord:" then discord = identifiers[i]:sub(9) end
+        end
+        xTarget.discordId = discord
     end
+
+    local playtime = 0
+    if xTarget.globalData then
+        playtime = tonumber(xTarget.globalData.playtime) or 0
+    end
+    if xTarget.sessionStart then
+        playtime = playtime + math.max(0, os.time() - xTarget.sessionStart)
+    end
+
+    local job = xTarget.job
+    local job2 = xTarget.job2
+    local hours = math.floor(playtime / 3600)
+    local minutes = math.floor((playtime % 3600) / 60)
+    local seconds = playtime % 60
 
     return {
         id = xTarget.charId,
+        charId = xTarget.charId,
         source = target,
         name = MiscB.CharName(xTarget),
         playerName = xTarget.playerName,
+        pseudo = xTarget.playerName,
         firstName = xTarget.firstName,
         lastName = xTarget.lastName,
         identifier = xTarget.identifier,
         accountId = xTarget.accountId,
         discord = discord,
         job = MiscB.JobName(xTarget),
+        jobName = job and job.name or "unemployed",
+        jobFull = job and (job.label or job.name) or "Civil",
         grade = MiscB.GradeLevel(xTarget),
+        faction = xTarget.faction,
+        factionName = job2 and job2.name or nil,
+        factionFull = job2 and (job2.label or job2.name) or "Civil",
         group = xTarget.group,
         vipTier = xTarget.vipTier,
         uuid = xTarget.uuid,
+        dateOfBirth = xTarget.dateofbirth,
+        height = xTarget.height,
+        sex = xTarget.sex,
+        instance = GetPlayerRoutingBucket(target) or 0,
+        time = ("%02d:%02d:%02d"):format(hours, minutes, seconds),
         online = true,
     }
 end)
