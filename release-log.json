@@ -1,19 +1,14 @@
 {
- "version": "1.12.20",
- "date": "2026-09-20T02:00:41.951Z",
- "notes": "**Updater réécrit en Lua**\n• Les serveurs FiveM récents interdisent aux scripts Node l'accès aux fichiers hors de leur ressource : `update` ne pouvait plus rien lire. L'updater est maintenant en Lua (`server.lua`), sans cette restriction — mêmes commandes, même fonctionnement (fichiers modifiés uniquement, `.new` pour vos fichiers modifiés, sauvegardes, `server.cfg` jamais touché).\n\nUne seule fois : `restart updater` puis `update check`.",
- "added": [
-  "resources/[standalone]/updater/server.lua"
- ],
+ "version": "1.12.21",
+ "date": "2026-09-20T02:01:42.286Z",
+ "notes": "**Updater** : correctif de démarrage (`package` absent du Lua FiveM).",
+ "added": [],
  "changed": [
-  "resources/[core]/core/interface/build/assets/index-yMOrF4qJ.css",
   "resources/[core]/core/interface/build/index.html",
   "resources/[core]/core/interface/build/skin/nui-fallbacks.css",
-  "resources/[standalone]/updater/fxmanifest.lua"
+  "resources/[standalone]/updater/server.lua"
  ],
- "removed": [
-  "resources/[standalone]/updater/server.js"
- ],
- "total": 289297868,
+ "removed": [],
+ "total": 289299432,
  "fileCount": 3307
 }

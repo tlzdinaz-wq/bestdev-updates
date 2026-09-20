@@ -106,19 +106,38 @@ html.hud-layout-on .hud {
 }
 
 html.hud-layout-on .Speedometer-container,
-html.hud-layout-edit .Speedometer-container,
 html.hud-layout-on .hud .Speedometer-container {
   position: relative !important;
   left: var(--hud-speedo-left) !important;
   top: 0 !important;
   right: auto !important;
   bottom: auto !important;
-  transform: translateY(var(--hud-speedo-shift, 86vh)) !important;
-  -webkit-transform: translateY(var(--hud-speedo-shift, 86vh)) !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  margin-top: var(--hud-speedo-shift, 86vh) !important;
   width: var(--hud-speedo-width, 20vw) !important;
   height: var(--hud-speedo-height, 12vh) !important;
-  margin: 0 !important;
   z-index: 30 !important;
+}
+
+html.hud-layout-edit .Speedometer-container {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.hud-layout-box[data-key="speedo"] {
+  overflow: visible;
+}
+
+.hud-layout-speedo-clone {
+  position: absolute !important;
+  inset: 0 !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  margin: 0 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: none !important;
 }
 
 html.hud-layout-on .server-logo-wrapper,

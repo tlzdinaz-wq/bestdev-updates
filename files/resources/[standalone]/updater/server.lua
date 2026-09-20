@@ -25,7 +25,9 @@ local STATE_FILE = "state.json"
 local NEVER = { ["server.cfg"] = true, ["permissions.cfg"] = true }
 local NO_RESTART = { updater = true, oxmysql = true, ox_lib = true, monitor = true }
 local CONCURRENCY = 4
-local IS_WINDOWS = package.config:sub(1, 1) == "\\"
+-- pas de `package` dans le Lua de FXServer : on détecte Windows au chemin (lettre de lecteur / antislash)
+local RAW_DIR = GetResourcePath(RES)
+local IS_WINDOWS = RAW_DIR:match("^%a:") ~= nil or RAW_DIR:find("\\", 1, true) ~= nil
 
 local function log(msg) print("^5[update]^7 " .. msg) end
 local function warn(msg) print("^3[update]^7 " .. msg) end
