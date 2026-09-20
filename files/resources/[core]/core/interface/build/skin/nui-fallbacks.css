@@ -100,22 +100,25 @@ html.hud-layout-on .health-armor-wrapper {
   top: var(--hud-health-top) !important;
 }
 
+html.hud-layout-on .hud {
+  height: 100vh !important;
+  width: 100% !important;
+}
+
 html.hud-layout-on .Speedometer-container,
 html.hud-layout-edit .Speedometer-container,
 html.hud-layout-on .hud .Speedometer-container {
-  position: fixed !important;
+  position: relative !important;
   left: var(--hud-speedo-left) !important;
-  top: var(--hud-speedo-top) !important;
+  top: 0 !important;
   right: auto !important;
   bottom: auto !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-  translate: none !important;
-  width: var(--hud-speedo-width, 20%) !important;
-  height: var(--hud-speedo-height, 12%) !important;
+  transform: translateY(var(--hud-speedo-shift, 86vh)) !important;
+  -webkit-transform: translateY(var(--hud-speedo-shift, 86vh)) !important;
+  width: var(--hud-speedo-width, 20vw) !important;
+  height: var(--hud-speedo-height, 12vh) !important;
   margin: 0 !important;
   z-index: 30 !important;
-  align-items: center !important;
 }
 
 html.hud-layout-on .server-logo-wrapper,

@@ -1,16 +1,19 @@
 {
- "version": "1.12.19",
- "date": "2026-09-20T01:54:52.144Z",
- "notes": "**Updater** : se relance tout seul après s'être mis à jour (plus besoin de `restart updater` à la main).",
- "added": [],
+ "version": "1.12.20",
+ "date": "2026-09-20T02:00:41.951Z",
+ "notes": "**Updater réécrit en Lua**\n• Les serveurs FiveM récents interdisent aux scripts Node l'accès aux fichiers hors de leur ressource : `update` ne pouvait plus rien lire. L'updater est maintenant en Lua (`server.lua`), sans cette restriction — mêmes commandes, même fonctionnement (fichiers modifiés uniquement, `.new` pour vos fichiers modifiés, sauvegardes, `server.cfg` jamais touché).\n\nUne seule fois : `restart updater` puis `update check`.",
+ "added": [
+  "resources/[standalone]/updater/server.lua"
+ ],
  "changed": [
+  "resources/[core]/core/interface/build/assets/index-yMOrF4qJ.css",
   "resources/[core]/core/interface/build/index.html",
   "resources/[core]/core/interface/build/skin/nui-fallbacks.css",
-  "resources/[core]/core/plugins/015_Features/client/hud_layout.lua",
-  "resources/[core]/core/plugins/015_Features/client/hud.lua",
+  "resources/[standalone]/updater/fxmanifest.lua"
+ ],
+ "removed": [
   "resources/[standalone]/updater/server.js"
  ],
- "removed": [],
- "total": 289291754,
+ "total": 289297868,
  "fileCount": 3307
 }
