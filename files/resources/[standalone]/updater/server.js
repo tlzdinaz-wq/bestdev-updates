@@ -338,6 +338,11 @@ async function command(args) {
         for (const s of p.skipped) warn(s.rel + ' : ' + s.reason + ' → nouvelle version dans ' + s.rel + '.new');
         for (const k of p.keep) warn(k + ' : supprimé par la mise à jour mais modifié localement, conservé.');
 
+        // l'updater s'est mis à jour lui-même : on se relance pour charger le nouveau code
+        if (p.download.some(d => d.rel.startsWith('resources/[standalone]/updater/') && d.rel.endsWith('.js'))) {
+            log('updater mis à jour : redémarrage automatique dans 2 s…');
+            setTimeout(() => ExecuteCommand('restart ' + RES), 2000);
+        }
         if (res.touched.length) {
             if (doRestart) {
                 for (const r of res.touched) {

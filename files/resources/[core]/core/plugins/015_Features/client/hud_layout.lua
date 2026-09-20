@@ -544,6 +544,27 @@ function VFW.HudLayout.StartEditor(mode)
         data = layout,
         scope = editingServer and "server" or "player",
     })
+    CreateThread(function()
+        Wait(150)
+        if not editing then return end
+        SendNUIMessage({
+            action = "nui:speedometer:visible",
+            data = {
+                visible = true,
+                fuelState = 70,
+                speedState = 0,
+                motorState = 80,
+                HeadlightTop = false,
+                HeadlightBottom = true,
+                TursignalLeft = false,
+                TursignalRight = false,
+                isSiren = false,
+                isSirenSound = false,
+                is911 = false,
+            }
+        })
+        applyNui(layout)
+    end)
     openPreviewMenu()
     focusEditor()
     if VFW.PreviewNotificaions then

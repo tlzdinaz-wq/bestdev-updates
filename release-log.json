@@ -1,18 +1,16 @@
 {
- "version": "1.12.18",
- "date": "2026-09-20T01:52:52.378Z",
- "notes": "**Correctif updater**\n• `update` plantait avec « Access to this API has been restricted » : le serveur n'autorise l'accès disque qu'à l'intérieur de `resources/`. Les fichiers à la racine (README, SQL, patch notes) ne sont plus inclus dans les mises à jour, et un fichier inaccessible est ignoré et signalé au lieu de tout arrêter.\n\nCe correctif touche l'updater lui-même : après `update`, fais `restart updater` (ou `update restart`) une fois.",
+ "version": "1.12.19",
+ "date": "2026-09-20T01:54:52.144Z",
+ "notes": "**Updater** : se relance tout seul après s'être mis à jour (plus besoin de `restart updater` à la main).",
  "added": [],
  "changed": [
+  "resources/[core]/core/interface/build/index.html",
+  "resources/[core]/core/interface/build/skin/nui-fallbacks.css",
+  "resources/[core]/core/plugins/015_Features/client/hud_layout.lua",
+  "resources/[core]/core/plugins/015_Features/client/hud.lua",
   "resources/[standalone]/updater/server.js"
  ],
- "removed": [
-  "avrex.sql",
-  "install.sql",
-  "PATCHNOTES.md",
-  "README.md",
-  "sql/items-seed.sql"
- ],
- "total": 289288901,
+ "removed": [],
+ "total": 289291754,
  "fileCount": 3307
 }

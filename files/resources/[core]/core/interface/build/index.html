@@ -52,7 +52,7 @@
     <link rel="stylesheet" href="./skin/boss-panel.css?v=1">
     <link rel="stylesheet" href="./skin/notifications.css?v=7">
     <link rel="stylesheet" href="./skin/status-hud.css?v=5">
-    <link rel="stylesheet" href="./skin/nui-fallbacks.css?v=16">
+    <link rel="stylesheet" href="./skin/nui-fallbacks.css?v=18">
   </head>
   <body style="background: transparent !important;">
     <div id="root" style="background: transparent !important;"></div>
@@ -197,25 +197,55 @@
         }
         function pinSpeedo(box) {
           if (!box) return;
+          lastSpeedoBox = box;
           var tag = document.getElementById('hud-speedo-place');
           if (!tag) {
             tag = document.createElement('style');
             tag.id = 'hud-speedo-place';
             document.head.appendChild(tag);
           }
+          var left = Number(box.x);
+          var top = Number(box.y);
+          var w = Number(box.w || 20);
+          var h = Number(box.h || 12);
           tag.textContent =
-            '.Speedometer-container{' +
+            'html .hud .Speedometer-container,.Speedometer-container{' +
               'position:fixed!important;' +
-              'left:' + Number(box.x) + '%!important;' +
-              'top:' + Number(box.y) + '%!important;' +
+              'left:' + left + '%!important;' +
+              'top:' + top + '%!important;' +
               'right:auto!important;' +
               'bottom:auto!important;' +
               'transform:none!important;' +
-              'width:' + Number(box.w || 20) + '%!important;' +
-              'height:' + Number(box.h || 12) + '%!important;' +
+              '-webkit-transform:none!important;' +
+              'translate:none!important;' +
+              'width:' + w + '%!important;' +
+              'height:' + h + '%!important;' +
               'margin:0!important;' +
-              'z-index:20!important;' +
+              'z-index:30!important;' +
             '}';
+          var list = document.querySelectorAll('.Speedometer-container');
+          for (var i = 0; i < list.length; i++) {
+            var s = list[i].style;
+            s.setProperty('position', 'fixed', 'important');
+            s.setProperty('left', left + '%', 'important');
+            s.setProperty('top', top + '%', 'important');
+            s.setProperty('right', 'auto', 'important');
+            s.setProperty('bottom', 'auto', 'important');
+            s.setProperty('transform', 'none', 'important');
+            s.setProperty('-webkit-transform', 'none', 'important');
+            s.setProperty('width', w + '%', 'important');
+            s.setProperty('height', h + '%', 'important');
+            s.setProperty('margin', '0', 'important');
+            s.setProperty('z-index', '30', 'important');
+            s.setProperty('display', 'flex', 'important');
+          }
+        }
+        var lastSpeedoBox = null;
+        if (!window.__hudSpeedoWatch) {
+          window.__hudSpeedoWatch = true;
+          new MutationObserver(function () {
+            if (lastSpeedoBox) pinSpeedo(lastSpeedoBox);
+          }).observe(document.documentElement, { childList: true, subtree: true });
         }
         function applyVars(data) {
           var next = unwrap(data);

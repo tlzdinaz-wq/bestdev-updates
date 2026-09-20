@@ -210,10 +210,12 @@ local function Thread(veh, seat)
                     }
                 })
             else
-                SendNUIMessage({
-                    action = "nui:speedometer:visible",
-                    data = { visible = false }
-                })
+                if not (VFW.HudLayout and VFW.HudLayout.IsEditing and VFW.HudLayout.IsEditing()) then
+                    SendNUIMessage({
+                        action = "nui:speedometer:visible",
+                        data = { visible = false }
+                    })
+                end
             end
 
             Wait(100)
@@ -235,6 +237,9 @@ end)
 
 AddEventHandler("vfw:exitedVehicle", function()
     state = false
+    if VFW.HudLayout and VFW.HudLayout.IsEditing and VFW.HudLayout.IsEditing() then
+        return
+    end
     SendNUIMessage({
         action = "nui:speedometer:visible",
         data = { visible = false }
