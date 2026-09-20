@@ -1,34 +1,31 @@
 --[[
-    Updater — met la base à jour depuis la console serveur (Lua : le runtime Node de
-    FXServer n'autorise plus l'accès disque hors du dossier de la ressource).
+    Updater — vérifie depuis la console si la base est à jour.
 
-      update            vérifie puis applique (télécharge uniquement les fichiers modifiés)
-      update check      liste ce qui changerait, sans rien toucher
-      update force      applique en écrasant aussi les fichiers modifiés localement
-      update restart    applique puis redémarre les ressources touchées
+      update            liste ce qui a changé depuis la version installée (ne modifie rien)
       update version    version installée / disponible
+
+    L'application se fait HORS du serveur, à la racine (dossier qui contient server.cfg) :
+      Windows : update.bat            Linux : ./update.sh
+      (+ `check` pour voir sans appliquer, `force` pour écraser aussi les fichiers modifiés localement)
+    Le runtime de FXServer interdit à une ressource d'écrire en dehors de son propre dossier,
+    la console ne peut donc que vérifier ; les scripts téléchargent uniquement les fichiers
+    modifiés, gardent une sauvegarde dans backup/<version>/ et posent en `.new` la nouvelle
+    version des fichiers modifiés localement (configs, images de marque…).
 
     Hébergement (convar update_url) :
       <update_url>/manifest.json   { version, date, notes, protected, files = { [chemin] = { h = sha256, s = taille } } }
+      <update_url>/manifest.txt    même contenu, une ligne par fichier (lu par update.bat / update.sh)
       <update_url>/files/<chemin>  contenu de chaque fichier
-
-    Un fichier modifié localement (hash ≠ version installée, state.json) n'est jamais écrasé
-    sans `force` : la nouvelle version est posée à côté en `.new`. Les fichiers « protégés »
-    du manifest (configs, images) suivent la même règle quand l'état est inconnu et ne sont
-    jamais supprimés. Les fichiers remplacés sont copiés dans backup/<version>/.
-    server.cfg et permissions.cfg ne sont jamais touchés ; seul resources/ est géré.
 ]]
 
 local RES = GetCurrentResourceName()
 -- GetResourcePath peut renvoyer "…/resources//[standalone]/updater" : on normalise les slashs
 local RES_DIR = GetResourcePath(RES):gsub("\\", "/"):gsub("/+", "/"):gsub("/+$", "")
-local STATE_FILE = "state.json"
 local NEVER = { ["server.cfg"] = true, ["permissions.cfg"] = true }
-local NO_RESTART = { updater = true, oxmysql = true, ox_lib = true, monitor = true }
-local CONCURRENCY = 4
 -- pas de `package` dans le Lua de FXServer : on détecte Windows au chemin (lettre de lecteur / antislash)
 local RAW_DIR = GetResourcePath(RES)
 local IS_WINDOWS = RAW_DIR:match("^%a:") ~= nil or RAW_DIR:find("\\", 1, true) ~= nil
+local APPLY_HINT = IS_WINDOWS and "update.bat (double-clic à la racine du serveur)" or "./update.sh (à la racine du serveur)"
 
 local function log(msg) print("^5[update]^7 " .. msg) end
 local function warn(msg) print("^3[update]^7 " .. msg) end
@@ -95,7 +92,7 @@ local function sha256(data)
     return string.format("%08x%08x%08x%08x%08x%08x%08x%08x", h0, h1, h2, h3, h4, h5, h6, h7)
 end
 
--- ── fichiers ──────────────────────────────────────────────────────
+-- ── fichiers (lecture seule) ──────────────────────────────────────
 local function readFile(path)
     local f = io.open(path, "rb")
     if not f then return nil end
@@ -110,82 +107,6 @@ local function fileExists(path)
     return false
 end
 
-local function quote(path)
-    if IS_WINDOWS then return '"' .. path:gsub("/", "\\") .. '"' end
-    return "'" .. path:gsub("'", "'\\''") .. "'"
-end
-
-local function mkdirp(dir)
-    if not os.execute then return end
-    if IS_WINDOWS then
-        os.execute('if not exist ' .. quote(dir) .. ' mkdir ' .. quote(dir) .. ' >nul 2>&1')
-    else
-        os.execute("mkdir -p " .. quote(dir) .. " >/dev/null 2>&1")
-    end
-end
-
--- Ressource + chemin interne d'un fichier de resources/ ("resources/[grp]/res/a/b" → "res", "a/b")
-local function splitResource(path)
-    local root = serverRoot()
-    local rel = path:sub(#root + 2)
-    if rel:sub(1, 10) ~= "resources/" then return nil end
-    local rest = rel:sub(11)
-    local pos = 1
-    while true do
-        local s2, e2, seg = rest:find("([^/]+)/", pos)
-        if not s2 then return nil end
-        if seg:sub(1, 1) ~= "[" then return seg, rest:sub(e2 + 1) end
-        pos = e2 + 1
-    end
-end
-
-local function knownResource(name)
-    local ok, p = pcall(GetResourcePath, name)
-    return ok and type(p) == "string" and p ~= ""
-end
-
--- Écriture d'un fichier : via l'API FiveM (SaveResourceFile, chemin relatif à la
--- ressource — jamais bloquée par les sandboxes) quand la ressource est connue du serveur ;
--- sinon io.open (nouvelle ressource), puis `refresh` pour que le serveur la découvre et que
--- ses autres fichiers passent par SaveResourceFile. Les fxmanifest.lua sont écrits en premier.
-local refreshedFor = {}
-local function writeFile(path, data)
-    local dir = path:match("^(.*)/[^/]+$")
-    if dir then mkdirp(dir) end
-    local resName, inner = splitResource(path)
-    local apiTried = false
-    if resName and inner and knownResource(resName) then
-        apiTried = true
-        if SaveResourceFile(resName, inner, data, -1) then return true end
-    end
-    local tmp = path .. ".updtmp"
-    local f, openErr = io.open(tmp, "wb")
-    if not f then
-        return false, "écriture refusée (" .. tostring(openErr) .. (apiTried and " ; SaveResourceFile refusé aussi" or "") .. ") — le serveur n'a pas le droit d'écrire ici : droits/propriétaire des fichiers à corriger sur l'hébergement"
-    end
-    local ok = f:write(data)
-    f:close()
-    if not ok then os.remove(tmp) return false, "écriture impossible" end
-    os.remove(path)
-    local moved, mvErr = os.rename(tmp, path)
-    if not moved then
-        os.remove(tmp)
-        return false, tostring(mvErr) .. (tostring(mvErr):find("ermission") and " — le fichier n'appartient pas à l'utilisateur du serveur (chown -R)" or "")
-    end
-    if resName and not knownResource(resName) and not refreshedFor[resName] and path:match("/fxmanifest%.lua$") then
-        refreshedFor[resName] = true
-        ExecuteCommand("refresh")
-        if Wait then Wait(500) end
-    end
-    return true
-end
-
-local function copyFile(src, dst)
-    local data = readFile(src)
-    if not data then return false end
-    return (writeFile(dst, data))
-end
-
 local function safeRel(rel)
     if type(rel) ~= "string" then return nil end
     rel = rel:gsub("\\", "/")
@@ -195,14 +116,6 @@ local function safeRel(rel)
     end
     if rel:sub(1, 10) ~= "resources/" then return nil end
     return rel
-end
-
-local function resourceOf(rel)
-    local rest = rel:sub(11)
-    for seg in rest:gmatch("[^/]+") do
-        if seg:sub(1, 1) ~= "[" then return seg end
-    end
-    return nil
 end
 
 -- glob (`*` dans un segment, `**` = zéro ou plusieurs segments) contre un chemin
@@ -238,17 +151,26 @@ local function isProtected(rel, patterns)
     return false
 end
 
--- ── état installé ─────────────────────────────────────────────────
+-- ── état installé : state.txt (écrit par update.bat / update.sh) ou state.json (archive) ──
 local function readState()
-    local raw = LoadResourceFile(RES, STATE_FILE)
+    local txt = LoadResourceFile(RES, "state.txt")
+    if txt and txt ~= "" then
+        local state = { files = {} }
+        for line in txt:gmatch("[^\r\n]+") do
+            local a, b, c = line:match("^([^\t]*)\t([^\t]*)\t?(.*)$")
+            if a == "#version" then
+                state.version, state.date = b, c
+            elseif a and #a == 64 and b ~= "" then
+                state.files[b] = a
+            end
+        end
+        if state.version then return state end
+    end
+    local raw = LoadResourceFile(RES, "state.json")
     if not raw or raw == "" then return nil end
     local ok, data = pcall(json.decode, raw)
     if ok and type(data) == "table" then return data end
     return nil
-end
-
-local function writeState(state)
-    SaveResourceFile(RES, STATE_FILE, json.encode(state), -1)
 end
 
 -- ── HTTP ──────────────────────────────────────────────────────────
@@ -259,17 +181,13 @@ local function httpGet(url)
         if done then return end
         done = true
         p:resolve({ status = status, body = body })
-    end, "GET", "", { ["User-Agent"] = "bestdev-updater/2.0", ["Cache-Control"] = "no-cache" })
+    end, "GET", "", { ["User-Agent"] = "bestdev-updater/3.0", ["Cache-Control"] = "no-cache" })
     SetTimeout(120000, function()
         if done then return end
         done = true
         p:resolve({ status = 0, body = nil })
     end)
     return Citizen.Await(p)
-end
-
-local function encodePath(rel)
-    return (rel:gsub("[^%w%-%._~/]", function(c) return string.format("%%%02X", c:byte()) end))
 end
 
 -- GitHub : raw.githubusercontent.com met la branche en cache plusieurs minutes ; on lit
@@ -288,9 +206,18 @@ local function resolveBase(base)
     return base
 end
 
--- ── planification ─────────────────────────────────────────────────
-local function plan(manifest, state, force, root)
-    local out = { download = {}, skipped = {}, deleted = {}, keep = {}, same = {}, pendingNew = {}, unchanged = 0 }
+local function fetchManifest(configured)
+    local base = resolveBase(configured)
+    local r = httpGet(base .. "/manifest.json?t=" .. os.time())
+    if r.status ~= 200 or not r.body then return nil, "manifest introuvable (HTTP " .. tostring(r.status) .. ")." end
+    local ok, manifest = pcall(json.decode, r.body)
+    if not ok or type(manifest) ~= "table" or type(manifest.files) ~= "table" then return nil, "manifest invalide." end
+    return manifest
+end
+
+-- ── comparaison base installée / version publiée ──────────────────
+local function plan(manifest, state, root)
+    local out = { download = {}, skipped = {}, deleted = {}, keep = {}, pendingNew = {}, unchanged = 0 }
     local files = manifest.files or {}
     local known = (state and state.files) or {}
 
@@ -322,11 +249,10 @@ local function plan(manifest, state, force, root)
             end
             if localHash == remote.h then
                 out.unchanged = out.unchanged + 1
-                out.same[#out.same + 1] = { rel = safe, h = remote.h }
             else
                 local modified = localHash ~= nil and installed ~= nil and localHash ~= installed
                 local unknownProtected = localHash ~= nil and installed == nil and isProtected(safe, manifest.protected)
-                if not force and (modified or unknownProtected) then
+                if modified or unknownProtected then
                     local pending = false
                     if fileExists(abs .. ".new") then
                         local d = readFile(abs .. ".new")
@@ -353,7 +279,7 @@ local function plan(manifest, state, force, root)
                 if fileExists(abs) then
                     local data = readFile(abs)
                     local localHash = data and sha256(data) or nil
-                    if force or localHash == h then
+                    if localHash == h then
                         out.deleted[#out.deleted + 1] = safe
                     else
                         out.keep[#out.keep + 1] = safe
@@ -371,99 +297,10 @@ local function fmtSize(n)
     return n .. " o"
 end
 
--- exécute worker(item) sur la liste avec CONCURRENCY threads
-local function runPool(items, worker)
-    local errors = {}
-    local nextIdx, active = 1, 0
-    local p = promise.new()
-    local total = #items
-    if total == 0 then return errors end
-    local function launch()
-        while active < CONCURRENCY and nextIdx <= total do
-            local item = items[nextIdx]
-            nextIdx = nextIdx + 1
-            active = active + 1
-            CreateThread(function()
-                local ok, e = pcall(worker, item)
-                if not ok then errors[#errors + 1] = { item = item, error = tostring(e) } end
-                active = active - 1
-                if nextIdx > total and active == 0 then p:resolve(true) else launch() end
-            end)
-        end
-    end
-    launch()
-    Citizen.Await(p)
-    return errors
-end
-
-local function apply(manifest, p, state, base, root)
-    local version = tostring(manifest.version or "inconnue")
-    local backupRoot = RES_DIR .. "/backup/" .. version:gsub("[^%w%.%-]", "_")
-    local touched = {}
-    local newFiles = {}
-    if state and state.files then for k, v in pairs(state.files) do newFiles[k] = v end end
-    local done = 0
-
-    table.sort(p.download, function(a, b)
-        local am, bm = a.rel:match("/fxmanifest%.lua$") ~= nil, b.rel:match("/fxmanifest%.lua$") ~= nil
-        if am ~= bm then return am end
-        return a.rel < b.rel
-    end)
-    local errors = runPool(p.download, function(item)
-        local url = base .. "/files/" .. encodePath(item.rel)
-        local r = httpGet(url)
-        if r.status ~= 200 or not r.body then error("HTTP " .. tostring(r.status) .. " " .. item.rel) end
-        if sha256(r.body) ~= item.remote.h then error("hash différent après téléchargement (" .. item.rel .. ")") end
-        local abs = root .. "/" .. item.rel
-        if item.existed then copyFile(abs, backupRoot .. "/" .. item.rel) end
-        local ok, why = writeFile(abs, r.body)
-        if not ok then error((why or "écriture refusée") .. " (" .. item.rel .. ")") end
-        newFiles[item.rel] = item.remote.h
-        local r2 = resourceOf(item.rel)
-        if r2 then touched[r2] = true end
-        done = done + 1
-        if done % 25 == 0 then log(done .. "/" .. #p.download .. " fichiers…") end
-    end)
-
-    local sideErrors = runPool(p.skipped, function(item)
-        local r = httpGet(base .. "/files/" .. encodePath(item.rel))
-        if r.status ~= 200 or not r.body then error("HTTP " .. tostring(r.status) .. " " .. item.rel) end
-        local ok, why = writeFile(root .. "/" .. item.rel .. ".new", r.body)
-        if not ok then error((why or "écriture refusée") .. " (" .. item.rel .. ".new)") end
-    end)
-    for _, e in ipairs(sideErrors) do errors[#errors + 1] = e end
-
-    for _, rel in ipairs(p.deleted) do
-        local abs = root .. "/" .. rel
-        copyFile(abs, backupRoot .. "/" .. rel)
-        local ok, why = os.remove(abs)
-        if ok then
-            newFiles[rel] = nil
-            local r2 = resourceOf(rel)
-            if r2 then touched[r2] = true end
-        else
-            errors[#errors + 1] = { item = { rel = rel }, error = tostring(why) }
-        end
-    end
-    for _, s in ipairs(p.same) do newFiles[s.rel] = s.h end
-
-    writeState({
-        version = (#errors > 0) and ((state and state.version) or "partielle") or version,
-        date = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-        files = newFiles,
-    })
-
-    local list = {}
-    for r2 in pairs(touched) do if not NO_RESTART[r2] then list[#list + 1] = r2 end end
-    table.sort(list)
-    return { errors = errors, touched = list, backupRoot = backupRoot }
-end
-
 -- ── commande ──────────────────────────────────────────────────────
 local busy = false
-
 local function command(args)
-    if busy then warn("une mise à jour est déjà en cours.") return end
+    if busy then warn("une vérification est déjà en cours.") return end
     busy = true
     local ok, e = pcall(function()
         local mode = (args[1] or ""):lower()
@@ -471,116 +308,40 @@ local function command(args)
         local state = readState()
         local root = serverRoot()
 
+        if mode == "force" or mode == "restart" or mode == "apply" then
+            warn("la console ne peut que vérifier (FXServer interdit l'écriture hors de la ressource). Pour appliquer : " .. APPLY_HINT .. (mode == "force" and " avec l'argument `force`" or "") .. ".")
+            mode = "check"
+        end
         if mode == "version" then
             log("version installée : " .. ((state and state.version) or "inconnue") .. ((state and state.date) and (" (" .. state.date:sub(1, 10) .. ")") or ""))
-            if configured == "" then warn("update_url non défini dans server.cfg : impossible de vérifier la version disponible.") return end
         end
         if configured == "" then err('définis `set update_url "https://…"` dans server.cfg (racine contenant manifest.json).') return end
-        local base = resolveBase(configured)
 
-        local r = httpGet(base .. "/manifest.json?t=" .. os.time())
-        if r.status ~= 200 or not r.body then err("manifest introuvable (HTTP " .. tostring(r.status) .. ").") return end
-        local okj, manifest = pcall(json.decode, r.body)
-        if not okj or type(manifest) ~= "table" or type(manifest.files) ~= "table" then err("manifest invalide.") return end
-
+        local manifest, merr = fetchManifest(configured)
+        if not manifest then err(merr) return end
         if mode == "version" then
             log("version disponible : " .. tostring(manifest.version) .. (manifest.date and (" (" .. tostring(manifest.date):sub(1, 10) .. ")") or ""))
             return
         end
 
-        local force = mode == "force"
-        local doRestart = mode == "restart"
-        local p = plan(manifest, state, force, root)
+        local p = plan(manifest, state, root)
         local total = 0
         for _, d in ipairs(p.download) do total = total + (tonumber(d.remote.s) or 0) end
-
         log(("version %s → %s : %d fichier(s) à télécharger (%s), %d modifié(s) localement, %d à supprimer, %d à jour."):format(
             (state and state.version) or "?", tostring(manifest.version), #p.download, fmtSize(total), #p.skipped, #p.deleted, p.unchanged))
-        if manifest.notes and manifest.notes ~= "" and (mode == "check" or #p.download > 0 or #p.skipped > 0) then
+        if manifest.notes and manifest.notes ~= "" and (#p.download > 0 or #p.skipped > 0) then
             for line in tostring(manifest.notes):gmatch("[^\n]+") do print("  " .. line) end
         end
-
-        if mode == "check" then
-            for _, d in ipairs(p.download) do print("  ^2+^7 " .. d.rel .. (d.existed and "" or "  (nouveau)")) end
-            for _, s in ipairs(p.skipped) do print("  ^3~^7 " .. s.rel .. "  → " .. s.reason .. ", sera posé en .new") end
-            for _, d in ipairs(p.deleted) do print("  ^1-^7 " .. d) end
-            for _, k in ipairs(p.keep) do print("  ^3!^7 " .. k .. "  (supprimé par la mise à jour mais modifié localement : conservé)") end
-            for _, n in ipairs(p.pendingNew) do print("  ^3~^7 " .. n .. "  → modifié localement, nouvelle version déjà dans " .. n .. ".new") end
-            if #p.download == 0 and #p.skipped == 0 and #p.deleted == 0 then log("rien à faire, la base est à jour.") end
-            return
-        end
+        for _, d in ipairs(p.download) do print("  ^2+^7 " .. d.rel .. (d.existed and "" or "  (nouveau)")) end
+        for _, s in ipairs(p.skipped) do print("  ^3~^7 " .. s.rel .. "  → " .. s.reason .. ", sera posé en .new") end
+        for _, d in ipairs(p.deleted) do print("  ^1-^7 " .. d) end
+        for _, k in ipairs(p.keep) do print("  ^3!^7 " .. k .. "  (supprimé par la mise à jour mais modifié localement : conservé)") end
+        for _, n in ipairs(p.pendingNew) do print("  ^3~^7 " .. n .. "  → modifié localement, nouvelle version déjà dans " .. n .. ".new") end
 
         if #p.download == 0 and #p.skipped == 0 and #p.deleted == 0 then
             log("rien à faire, la base est à jour.")
-            for _, n in ipairs(p.pendingNew) do warn(n .. " : modifié localement, la nouvelle version t’attend dans " .. n .. ".new") end
-            local files = {}
-            for rel, info in pairs(manifest.files) do files[rel] = info.h end
-            writeState({ version = manifest.version, date = os.date("!%Y-%m-%dT%H:%M:%SZ"), files = files })
-            return
-        end
-
-        -- test d'écriture (droits) avant de tout télécharger
-        do
-            local probeRes = nil
-            for _, d in ipairs(p.download) do probeRes = splitResource(root .. "/" .. d.rel) if probeRes and knownResource(probeRes) then break end probeRes = nil end
-            if probeRes then
-                local resDir = GetResourcePath(probeRes):gsub("\\", "/"):gsub("/+", "/"):gsub("/+$", "")
-                local probePath = resDir .. "/updater_write_test.tmp"
-                local okProbe = SaveResourceFile(probeRes, "updater_write_test.tmp", "ok", -1)
-                local ioErr = nil
-                if not okProbe then
-                    local f
-                    f, ioErr = io.open(probePath, "wb")
-                    if f then f:write("ok") f:close() okProbe = true end
-                end
-                pcall(os.remove, probePath)
-                if not okProbe then
-                    err(("le serveur ne peut pas écrire dans %s (%s). Droits insuffisants pour le processus du serveur : sur Windows, donne le contrôle total du dossier resources à l'utilisateur qui lance FXServer (Propriétés → Sécurité) et retire l'attribut « lecture seule » ; sur Linux : chown -R <utilisateur> resources && chmod -R u+rwX resources. Puis relance `update`."):format(resDir, tostring(ioErr or "SaveResourceFile refusé")))
-                    return
-                end
-            end
-        end
-
-        local res = apply(manifest, p, state, base, root)
-        if #res.errors > 0 then
-            local perms = 0
-            for _, e2 in ipairs(res.errors) do
-                err("échec : " .. tostring(e2.item.rel or "?") .. " — " .. tostring(e2.error))
-                if tostring(e2.error):find("ermission") or tostring(e2.error):find("refusée") then perms = perms + 1 end
-            end
-            err(#res.errors .. " erreur(s). Relance `update` pour réessayer.")
-            if perms > 0 then
-                err("droits insuffisants sur " .. perms .. " fichier(s) : le serveur n'a pas le droit d'écrire dans resources/. Sur Linux : `chown -R <utilisateur-du-serveur> resources` puis `chmod -R u+rwX resources`.")
-            end
         else
-            log("mise à jour " .. tostring(manifest.version) .. " appliquée. Sauvegarde des anciens fichiers : " .. res.backupRoot:gsub("^" .. root:gsub("%p", "%%%0") .. "/", ""))
-        end
-        for _, s in ipairs(p.skipped) do warn(s.rel .. " : " .. s.reason .. " → nouvelle version dans " .. s.rel .. ".new") end
-        for _, k in ipairs(p.keep) do warn(k .. " : supprimé par la mise à jour mais modifié localement, conservé.") end
-
-        local selfUpdated = false
-        for _, d in ipairs(p.download) do
-            if d.rel:sub(1, #("resources/[standalone]/updater/")) == "resources/[standalone]/updater/" then selfUpdated = true end
-        end
-        if selfUpdated and #res.errors == 0 then
-            log("updater mis à jour : redémarrage automatique dans 2 s… (si « Access denied for command restart » : ajoute `add_ace resource.updater command.restart allow` dans server.cfg)")
-            SetTimeout(2000, function() ExecuteCommand("restart " .. RES) end)
-        end
-        if #res.touched > 0 then
-            if doRestart then
-                for _, r2 in ipairs(res.touched) do
-                    log("restart " .. r2)
-                    ExecuteCommand("restart " .. r2)
-                end
-            else
-                log("ressources à redémarrer : " .. table.concat(res.touched, ", ") .. "   (ou : update restart)")
-            end
-        end
-        for _, d in ipairs(p.download) do
-            if not d.existed and d.rel:match("/fxmanifest%.lua$") then
-                warn("une nouvelle ressource a été ajoutée : vérifie les `ensure` de server.cfg (voir les notes).")
-                break
-            end
+            log("pour appliquer : " .. APPLY_HINT .. ", puis redémarre le serveur.")
         end
     end)
     busy = false
@@ -595,6 +356,18 @@ end, true)
 AddEventHandler("onResourceStart", function(res)
     if res ~= RES then return end
     local state = readState()
-    log("version installée : " .. ((state and state.version) or "inconnue") .. ". Commandes : update, update check, update force, update restart, update version")
-    if GetConvar("update_url", "") == "" then warn("update_url non défini dans server.cfg.") end
+    log("version installée : " .. ((state and state.version) or "inconnue") .. ". `update` vérifie ; " .. APPLY_HINT .. " applique.")
+    local configured = GetConvar("update_url", ""):gsub("/+$", "")
+    if configured == "" then warn("update_url non défini dans server.cfg.") return end
+    -- au démarrage : un seul appel HTTP pour signaler une nouvelle version (pas de lecture des fichiers)
+    if GetConvar("update_check_on_start", "true") ~= "true" then return end
+    CreateThread(function()
+        Wait(5000)
+        local manifest = fetchManifest(configured)
+        if not manifest then return end
+        local installed = state and state.version
+        if manifest.version and manifest.version ~= installed then
+            warn(("nouvelle version disponible : %s (installée : %s). `update` pour le détail, %s pour l'appliquer."):format(tostring(manifest.version), tostring(installed or "inconnue"), APPLY_HINT))
+        end
+    end)
 end)

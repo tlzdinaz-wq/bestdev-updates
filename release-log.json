@@ -1,12 +1,18 @@
 {
- "version": "1.12.35",
- "date": "2026-09-20T13:50:56.095Z",
- "notes": "**Updater** : le test d'écriture affiche le chemin et la raison exacte du refus (Windows / Linux).",
- "added": [],
+ "version": "1.12.36",
+ "date": "2026-09-20T14:27:55.023Z",
+ "notes": "**Nouvelle méthode de mise à jour** — la commande `update` en console ne pouvait pas écrire les fichiers (FXServer interdit à une ressource d'écrire hors de son dossier, quels que soient les droits). Désormais :\n• **`update.bat`** (Windows, double-clic) ou **`./update.sh`** (Linux) à la racine du serveur : ne télécharge que les fichiers modifiés, sauvegarde dans `updater/backup/<version>/`, tes fichiers modifiés passent en `.new`. `update.bat check` pour voir, `update.bat force` pour écraser.\n• En console, `update` sert à **vérifier** ce qui a changé, `update version` affiche les versions ; au démarrage la console signale une nouvelle version.\n• Chaque annonce ici contient maintenant le **zip des fichiers modifiés**, à dézipper à la racine du serveur si tu préfères faire à la main.\n\n**Pour installer cette version (une seule fois)** : dézippe l'archive ci-jointe à la racine du serveur (elle remplace `resources/[standalone]/updater` et ajoute `update.bat` / `update.sh`), puis lance `update.bat`. Les prochaines fois : double-clic sur `update.bat`, c'est tout.",
+ "added": [
+  "resources/[standalone]/updater/tools/update.ps1",
+  "resources/[standalone]/updater/tools/update.sh",
+  "update.bat",
+  "update.sh"
+ ],
  "changed": [
+  "resources/[standalone]/updater/fxmanifest.lua",
   "resources/[standalone]/updater/server.lua"
  ],
  "removed": [],
- "total": 289321499,
- "fileCount": 3309
+ "total": 289334881,
+ "fileCount": 3313
 }
