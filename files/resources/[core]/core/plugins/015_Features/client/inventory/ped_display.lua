@@ -100,6 +100,14 @@ function VFW.CreatePedScreen()
             return
         end
 
+        -- Inventaire déjà refermé pendant le chargement du modèle → supprimer le clone.
+        if not isInventoryOpen then
+            SetEntityAsNoLongerNeeded(createdPed)
+            DeleteEntity(createdPed)
+            isCreatingClone = false
+            return
+        end
+
         clonedPed = createdPed
 
         SetEntityCollision(clonedPed, false, false)
@@ -116,8 +124,27 @@ function VFW.CreatePedScreen()
         ClonePedToTarget(playerPed, clonedPed)
 
         Wait(150)
+        if not isInventoryOpen or clonedPed ~= createdPed then
+            if DoesEntityExist(createdPed) then
+                SetEntityAsNoLongerNeeded(createdPed)
+                DeleteEntity(createdPed)
+            end
+            if clonedPed == createdPed then clonedPed = nil end
+            isCreatingClone = false
+            return
+        end
         VFW.SyncPedAppearance(true)
         Wait(50)
+
+        if not isInventoryOpen or clonedPed ~= createdPed then
+            if DoesEntityExist(createdPed) then
+                SetEntityAsNoLongerNeeded(createdPed)
+                DeleteEntity(createdPed)
+            end
+            if clonedPed == createdPed then clonedPed = nil end
+            isCreatingClone = false
+            return
+        end
 
         -- Reveal the ped now that appearance is applied
         ResetEntityAlpha(clonedPed)

@@ -10,10 +10,38 @@
     <style>
       html, body, #root { background: transparent !important; }
       .container-weather-manager { z-index: 10050 !important; pointer-events: auto !important; }
-      /* Inventaire au-dessus du dock staff (iframe hud z-index:10000) */
-      #root [class*="_inventory_"] { position: relative !important; z-index: 10050 !important; }
+      /* Inventaire : NE PAS mettre #root en position:fixed (casse le rendu CEF /
+         x-cfx-game-view → UI dans le DOM mais invisible). On fixe uniquement
+         le panneau inventaire, et on masque la boutique (iframe). */
+      html.inventory-open [class*="_inventory_"] {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 2147483000 !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        display: grid !important;
+        background: transparent !important;
+      }
+      html.inventory-open #boutique,
+      html.inventory-open #hud-overlay,
+      html.inventory-open #sirens-overlay,
+      html.inventory-open #documents,
+      html.inventory-open #pause-menu {
+        display: none !important;
+        pointer-events: none !important;
+        z-index: 0 !important;
+      }
       #nui-host, #t3d-host { display: contents; }
     </style>
+    <script>
+      // Classe inventory-open : masque les iframes overlays (boutique / HUD staff).
+      window.addEventListener('message', function (e) {
+        var d = e && e.data;
+        if (!d || d.action !== 'nui:inventory:visible') return;
+        document.documentElement.classList.toggle('inventory-open', !!d.data);
+      });
+    </script>
     <script>
       (function () {
         var proto = Node.prototype;
@@ -41,7 +69,7 @@
         };
       })();
     </script>
-    <script type="module" crossorigin src="./assets/index-CgLoM61l.js?v=img2"></script>
+    <script type="module" crossorigin src="./assets/index-CgLoM61l.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/vendor-react-BnE6Ax5j.js">
     <link rel="modulepreload" crossorigin href="./assets/vendor-misc-BH6L59Xb.js">
     <link rel="modulepreload" crossorigin href="./assets/vendor-mui-D9asGdTL.js">
@@ -715,10 +743,12 @@
       // Boutique premium : page dédiée (interface/boutique/) qui remplace l'écran du bundle.
       // Tous les messages paidshop:* lui sont transmis et ne parviennent plus au bundle
       // (stopImmediatePropagation : ce script est enregistré avant le module React).
+      // IMPORTANT: display:none par défaut. Un iframe plein écran en display:block (même
+      // transparent) passe AU-DESSUS de #root et masque l'inventaire / le HUD React.
       (function () {
-        var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;z-index:10010;display:block;';
-        var PASSIVE = BASE + 'pointer-events:none;';
-        var ACTIVE = BASE + 'pointer-events:auto;';
+        var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;z-index:10010;';
+        var PASSIVE = BASE + 'display:none;pointer-events:none;';
+        var ACTIVE = BASE + 'display:block;pointer-events:auto;';
         var ready = false;
         var pending = [];
         var frame = document.createElement('iframe');
@@ -752,13 +782,20 @@
           var d = e && e.data;
           if (!d || typeof d.action !== 'string') return;
           if (d.action === 'boutique:passive') { passive(); return; }
+          // Inventaire ouvert : ne jamais laisser la boutique recouvrir #root.
+          if (d.action === 'nui:inventory:visible') {
+            if (d.data) passive();
+            return;
+          }
           if (d.action.indexOf('paidshop:') !== 0 && d.action !== 'core:branding:apply') return;
           if (ready && frame.contentWindow) frame.contentWindow.postMessage(d, '*');
           else pending.push(d);
           if (d.action === 'core:branding:apply') return;
           e.stopImmediatePropagation();
-          if (d.action === 'paidshop:show' || d.action === 'paidshop:showPurchaseConfirm') activate();
-          else if (d.action === 'paidshop:hide') passive();
+          if (d.action === 'paidshop:show' || d.action === 'paidshop:showPurchaseConfirm') {
+            if (document.documentElement.classList.contains('inventory-open')) return;
+            activate();
+          } else if (d.action === 'paidshop:hide') passive();
         });
       })();
     </script>

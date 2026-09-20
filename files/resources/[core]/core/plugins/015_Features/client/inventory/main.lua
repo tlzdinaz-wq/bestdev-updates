@@ -286,24 +286,36 @@ function VFW.OpenInventory(target)
     VFW.Nui.HudVisible(false, true)
     VFW.DisableEscapeMenu(true)
     -- Ignore le Tab/Escape NUI de la même frappe qui vient d'ouvrir l'inventaire
-    VFW._inventoryIgnoreNuiCloseUntil = GetGameTimer() + 400
+    VFW._inventoryIgnoreNuiCloseUntil = GetGameTimer() + 750
     TriggerEvent("core:inventory:opened")
 
     -- Open effects
     SetTimecycleModifier("hud_def_blur")
     SetTimecycleModifierStrength(0.1)
 
-    -- Create the cloned ped
-    VFW.SetInventoryPedState(true)
-    --
-    --VFW.Screen.Create()
+    -- Focus NUI d'abord, puis message visible (sinon le web peut rater le 1er frame)
+    VFW.Nui.Focus(true, true)
+    SetCursorLocation(0.5, 0.5)
 
     SendNUIMessage({
         action = "nui:inventory:visible",
         data = true
     })
-    VFW.Nui.Focus(true, true)
-    SetCursorLocation(0.5, 0.5)
+    -- Second envoi : filet si le premier arrive avant le listener React
+    CreateThread(function()
+        Wait(50)
+        if open then
+            SendNUIMessage({
+                action = "nui:inventory:visible",
+                data = true
+            })
+        end
+    end)
+
+    -- Create the cloned ped
+    VFW.SetInventoryPedState(true)
+    --
+    --VFW.Screen.Create()
 
     -- keepInput=true laisse passer les inputs au jeu (nécessaire pour la voix /
     -- la radio), donc on bloque manuellement les controls de combat pour que
