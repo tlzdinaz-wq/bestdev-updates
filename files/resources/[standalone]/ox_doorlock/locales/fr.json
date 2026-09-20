@@ -1,0 +1,18 @@
+{
+  "unlocked_door": "Porte déverrouillée",
+  "locked_door": "Porte verrouillée",
+  "lock_door": "[E] Verrouiller",
+  "unlock_door": "[E] Déverrouiller",
+  "door_lock": "Serrure",
+  "passcode": "Code d'accès",
+  "lockpick_broke": "Ton crochet s'est cassé",
+  "pick_lock": "Crocheter",
+  "add_lock": "Ajouter une serrure",
+  "edit_lock": "Modifier la serrure",
+  "remove_lock": "Retirer la serrure",
+  "cannot_unlock": "Tu ne peux pas déverrouiller cette porte",
+  "cannot_lock": "Tu ne peux pas verrouiller cette porte",
+  "create_modify_lock": "Créer ou modifier une serrure",
+  "add_door_textui": "**Créer une porte**  \nCliquer [LMB]  \nAnnuler [RMB]",
+  "command_closest": "Ouvrir l'éditeur sur la porte la plus proche"
+}

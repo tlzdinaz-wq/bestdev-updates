@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="fr" x-cfx-game-view style="background: transparent !important;">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <title>EVE</title>
+    <style>
+      html, body, #root { background: transparent !important; }
+      .container-weather-manager { z-index: 10050 !important; pointer-events: auto !important; }
+      #nui-host, #t3d-host { display: contents; }
+    </style>
+    <script>
+      (function () {
+        var proto = Node.prototype;
+        var insertBefore = proto.insertBefore;
+        var removeChild = proto.removeChild;
+        proto.insertBefore = function (newNode, refNode) {
+          if (refNode && refNode.parentNode !== this) {
+            return this.appendChild(newNode);
+          }
+          try {
+            return insertBefore.call(this, newNode, refNode);
+          } catch (err) {
+            if (err && err.name === 'NotFoundError') return this.appendChild(newNode);
+            throw err;
+          }
+        };
+        proto.removeChild = function (child) {
+          if (!child || child.parentNode !== this) return child;
+          try {
+            return removeChild.call(this, child);
+          } catch (err) {
+            if (err && err.name === 'NotFoundError') return child;
+            throw err;
+          }
+        };
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-CgLoM61l.js?v=img2"></script>
+    <link rel="modulepreload" crossorigin href="./assets/vendor-react-BnE6Ax5j.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-misc-BH6L59Xb.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-mui-D9asGdTL.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-motion-CiJc9fqd.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-lucide-DRdRLwNR.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-charts-CIjIfHho.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-dnd-BcC72jcB.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-yMOrF4qJ.css?v=6">
+    <link rel="stylesheet" href="./tablet3d/tablet3d.css?v=3">
+    <link rel="stylesheet" href="./skin/boss-panel.css?v=1">
+    <link rel="stylesheet" href="./skin/notifications.css?v=7">
+    <link rel="stylesheet" href="./skin/nui-fallbacks.css?v=14">
+  </head>
+  <body style="background: transparent !important;">
+    <div id="root" style="background: transparent !important;"></div>
+    <div id="nui-host"></div>
+    <div id="t3d-host"></div>
+    <div id="hud-layout-editor" class="hud-layout-editor" aria-hidden="true">
+      <div class="hud-layout-editor__bar">
+        <p>Déplacer les interfaces</p>
+        <span>Les interfaces suivent le cadre · Entrée valider · Échap annuler</span>
+        <button type="button" id="hud-layout-save">Valider</button>
+        <button type="button" class="is-reset" id="hud-layout-reset">Réinitialiser</button>
+        <button type="button" class="is-ghost" id="hud-layout-cancel">Annuler</button>
+      </div>
+      <div id="hud-layout-notif-preview" class="hud-layout-notif-preview" aria-hidden="true">
+        <div class="hud-layout-notif-preview__card">
+          <b>Notifications</b>
+          <strong>Aperçu</strong>
+          <span>Les notifications s'affichent ici.</span>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var ITEM_PH = 'https://cfx-nui-core/interface/brand/items/placeholder.svg';
+        var OUTFIT_PH = 'https://cfx-nui-core/interface/brand/outfits_greenscreener/aucun.svg';
+        document.addEventListener('error', function (e) {
+          var t = e.target;
+          if (!t || t.tagName !== 'IMG') return;
+          if (t.dataset.nuiFallback) return;
+          var src = t.currentSrc || t.src || '';
+          if (!src) return;
+          if (src.indexOf('placeholder.svg') !== -1 || src.indexOf('aucun.svg') !== -1) return;
+          t.dataset.nuiFallback = '1';
+          t.src = src.indexOf('outfits_greenscreener') !== -1 ? OUTFIT_PH : ITEM_PH;
+        }, true);
+      })();
+    </script>
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var editor = document.getElementById('hud-layout-editor');
+        var layout = {};
+        var labels = {
+          minimap: 'Minimap',
+          status: 'Faim / soif',
+          health: 'Vie / armure',
+          speedo: 'Compteur',
+          logo: 'Logo',
+          vui: 'Menu VUI',
+          notif: 'Notifications'
+        };
+        function resourceName() {
+          return typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'core';
+        }
+        function post(name, payload) {
+          fetch('https://' + resourceName() + '/' + name, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify(payload || {})
+          }).catch(function () {});
+        }
+        var previewTimer = null;
+        var TARGETS = {
+          status: '.status-hud-wrapper',
+          health: '.health-armor-wrapper',
+          speedo: '.Speedometer-container',
+          logo: '.server-logo-wrapper, .server-logo-wrapper--left',
+          notif: '.notistack-SnackbarContainer'
+        };
+        function unwrap(data) {
+          if (!data) return null;
+          if (data.layout && (data.layout.minimap || data.layout.status || data.layout.vui || data.layout.notif)) return data.layout;
+          if (data.minimap || data.status || data.vui || data.notif) return data;
+          return null;
+        }
+        function pinNotifs(box) {
+          if (!box) return;
+          var left = box.x + '%';
+          var top = box.y + '%';
+          var width = (box.w || 22) + '%';
+          root.style.setProperty('--hud-notif-left', left);
+          root.style.setProperty('--hud-notif-top', top);
+          root.style.setProperty('--hud-notif-width', width);
+          root.style.setProperty('--hud-notif-height', (box.h || 28) + '%');
+          root.style.setProperty('--notification-left', left);
+          root.style.setProperty('--notification-bottom', 'auto');
+          var tag = document.getElementById('hud-notif-place');
+          if (!tag) {
+            tag = document.createElement('style');
+            tag.id = 'hud-notif-place';
+            document.head.appendChild(tag);
+          }
+          tag.textContent =
+            '.notistack-SnackbarContainer{' +
+              'position:fixed!important;' +
+              'left:' + Number(box.x) + '%!important;' +
+              'top:' + Number(box.y) + '%!important;' +
+              'right:auto!important;' +
+              'bottom:auto!important;' +
+            '}';
+          var preview = document.getElementById('hud-layout-notif-preview');
+          var hasReal = !!document.querySelector('.new-notification, .simple-notification, .notistack-Snackbar');
+          root.classList.toggle('hud-has-real-notifs', hasReal);
+          if (preview) {
+            preview.style.left = left;
+            preview.style.top = top;
+            preview.style.width = width;
+            preview.style.display = hasReal ? 'none' : '';
+          }
+        }
+        function applyVars(data) {
+          var next = unwrap(data);
+          if (!next) return;
+          layout = next;
+          if (data && data.custom === false && !editor.classList.contains('is-on')) {
+            root.classList.remove('hud-layout-on');
+            pinNotifs(next.notif);
+            return;
+          }
+          ['status', 'health', 'speedo', 'logo', 'notif'].forEach(function (key) {
+            var box = next[key];
+            if (!box) return;
+            root.style.setProperty('--hud-' + key + '-left', box.x + '%');
+            root.style.setProperty('--hud-' + key + '-top', box.y + '%');
+            if (box.w) root.style.setProperty('--hud-' + key + '-width', box.w + '%');
+            if (box.h) root.style.setProperty('--hud-' + key + '-height', box.h + '%');
+          });
+          root.classList.add('hud-layout-on');
+          pinNotifs(next.notif);
+        }
+        function previewSoon() {
+          if (previewTimer) return;
+          previewTimer = setTimeout(function () {
+            previewTimer = null;
+            post('nui:hudlayout:preview', { layout: layout });
+          }, 16);
+        }
+        function fitBoxToTarget(el, key) {
+          var sel = TARGETS[key];
+          if (!sel) return;
+          var target = document.querySelector(sel);
+          if (!target) return;
+          var r = target.getBoundingClientRect();
+          if (r.width < 8 || r.height < 8) return;
+          var w = (r.width / window.innerWidth) * 100;
+          var h = (r.height / window.innerHeight) * 100;
+          el.style.width = w + '%';
+          el.style.height = h + '%';
+          if (layout[key]) {
+            layout[key].w = w;
+            layout[key].h = h;
+          }
+        }
+        function renderBoxes() {
+          editor.querySelectorAll('.hud-layout-box').forEach(function (el) { el.remove(); });
+          Object.keys(labels).forEach(function (key) {
+            var box = layout[key];
+            if (!box) return;
+            var el = document.createElement('div');
+            el.className = 'hud-layout-box';
+            el.dataset.key = key;
+            el.style.left = box.x + '%';
+            el.style.top = box.y + '%';
+            el.style.width = box.w + '%';
+            el.style.height = box.h + '%';
+            el.innerHTML = '<b>' + labels[key] + '</b>';
+            bindDrag(el, key);
+            editor.appendChild(el);
+            if (key !== 'notif') fitBoxToTarget(el, key);
+          });
+        }
+        function bindDrag(el, key) {
+          var startX = 0;
+          var startY = 0;
+          var origin = null;
+          el.addEventListener('mousedown', function (ev) {
+            ev.preventDefault();
+            origin = {
+              x: layout[key].x,
+              y: layout[key].y,
+              w: layout[key].w,
+              h: layout[key].h
+            };
+            startX = ev.clientX;
+            startY = ev.clientY;
+            function move(e2) {
+              var dx = ((e2.clientX - startX) / window.innerWidth) * 100;
+              var dy = ((e2.clientY - startY) / window.innerHeight) * 100;
+              var next = {
+                x: Math.max(0, Math.min(100 - origin.w, origin.x + dx)),
+                y: Math.max(0, Math.min(100 - origin.h, origin.y + dy)),
+                w: origin.w,
+                h: origin.h
+              };
+              layout[key] = next;
+              el.style.left = next.x + '%';
+              el.style.top = next.y + '%';
+              applyVars(layout);
+              previewSoon();
+            }
+            function up() {
+              window.removeEventListener('mousemove', move);
+              window.removeEventListener('mouseup', up);
+              post('nui:hudlayout:preview', { layout: layout });
+            }
+            window.addEventListener('mousemove', move);
+            window.addEventListener('mouseup', up);
+          });
+        }
+        function openEditor(data) {
+          applyVars(data);
+          editor.classList.add('is-on');
+          root.classList.add('hud-layout-edit');
+          editor.setAttribute('aria-hidden', 'false');
+          var preview = document.getElementById('hud-layout-notif-preview');
+          if (preview) preview.setAttribute('aria-hidden', 'false');
+          renderBoxes();
+          setTimeout(renderBoxes, 180);
+        }
+        function closeEditor() {
+          editor.classList.remove('is-on');
+          root.classList.remove('hud-layout-edit');
+          editor.setAttribute('aria-hidden', 'true');
+          var preview = document.getElementById('hud-layout-notif-preview');
+          if (preview) preview.setAttribute('aria-hidden', 'true');
+          editor.querySelectorAll('.hud-layout-box').forEach(function (el) { el.remove(); });
+        }
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || !d.action) return;
+          if (d.action === 'nui:hudlayout:apply' && d.data) applyVars(d.data);
+          if (d.action === 'nui:hudlayout:edit' && d.data) {
+            openEditor(d.data);
+            var hint = document.querySelector('.hud-layout-editor__bar span');
+            var title = document.querySelector('.hud-layout-editor__bar p');
+            if (title) title.textContent = d.scope === 'server' ? 'Positions serveur' : 'Déplacer les interfaces';
+            if (hint) {
+              hint.textContent = d.scope === 'server'
+                ? 'Pour tous les joueurs · Entrée valider · Réinitialiser défaut · Échap annuler'
+                : 'Tes positions · Entrée valider · Réinitialiser = layout serveur · Échap annuler';
+            }
+          }
+          if (d.action === 'nui:hudlayout:set' && d.data) {
+            applyVars(d.data);
+            renderBoxes();
+          }
+          if (d.action === 'nui:hudlayout:close') closeEditor();
+        });
+        document.getElementById('hud-layout-save').addEventListener('click', function () {
+          post('nui:hudlayout:save', { layout: layout });
+          closeEditor();
+        });
+        document.getElementById('hud-layout-reset').addEventListener('click', function () {
+          post('nui:hudlayout:reset', {});
+        });
+        document.getElementById('hud-layout-cancel').addEventListener('click', function () {
+          post('nui:hudlayout:cancel', {});
+          closeEditor();
+        });
+        window.addEventListener('keydown', function (e) {
+          if (!editor.classList.contains('is-on')) return;
+          if (e.key === 'Enter') {
+            post('nui:hudlayout:save', { layout: layout });
+            closeEditor();
+          }
+          if (e.key === 'Escape') {
+            post('nui:hudlayout:cancel', {});
+            closeEditor();
+          }
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        function applyOrientation(data) {
+          if (!data) return;
+          var root = document.documentElement;
+          root.classList.toggle('ui-orient-hud-h', data.hud === 'horizontal');
+          root.classList.toggle('ui-orient-menu-h', data.menu === 'horizontal');
+          root.classList.toggle('ui-orient-notif-h', data.notif === 'horizontal');
+        }
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (d && d.action === 'nui:ui:orientation') applyOrientation(d.data);
+        });
+      })();
+    </script>
+    <script>
+      window.__nuiAppend = function (node) {
+        var host = document.getElementById('nui-host');
+        (host || document.body).appendChild(node);
+      };
+    </script>
+    <script>
+      (function () {
+        // Marqueur lu par les pages embarquées (shared/nui.js) : « ton parent sait relayer les fetch NUI ».
+        window.__nuiBridge = true;
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || d.type !== 'nui-bridge' || !d.endpoint) return;
+          var resource = d.resource || (typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'core');
+          fetch('https://' + resource + '/' + d.endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+            body: d.body || '{}'
+          }).then(function (r) {
+            return r.text().then(function (text) {
+              if (e.source) e.source.postMessage({ type: 'nui-bridge:result', id: d.id, ok: r.ok, text: text }, '*');
+            });
+          }).catch(function () {
+            if (e.source) e.source.postMessage({ type: 'nui-bridge:result', id: d.id, ok: false, text: '' }, '*');
+          });
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        var GREEN_MIN = 120;
+        function resourceName() {
+          return (typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'core');
+        }
+        function loadCanvas(src) {
+          return new Promise(function (resolve, reject) {
+            var img = new Image();
+            img.onload = function () {
+              var canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+              var ctx = canvas.getContext('2d');
+              if (!ctx) {
+                reject(new Error('canvas'));
+                return;
+              }
+              ctx.drawImage(img, 0, 0);
+              resolve(canvas);
+            };
+            img.onerror = reject;
+            img.src = src;
+          });
+        }
+        function chromaKey(canvas, threshold) {
+          threshold = threshold || 50;
+          var ctx = canvas.getContext('2d');
+          if (!ctx) return canvas;
+          var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          var px = imageData.data;
+          for (var i = 0; i < px.length; i += 4) {
+            var r = px[i];
+            var g = px[i + 1];
+            var b = px[i + 2];
+            if (g > GREEN_MIN && g > r + threshold && g > b + threshold) px[i + 3] = 0;
+          }
+          ctx.putImageData(imageData, 0, 0);
+          return canvas;
+        }
+        function toPng(canvas, maxW) {
+          maxW = maxW || 512;
+          if (canvas.width <= maxW) return canvas.toDataURL('image/png', 0.92);
+          var scale = maxW / canvas.width;
+          var out = document.createElement('canvas');
+          out.width = maxW;
+          out.height = Math.round(canvas.height * scale);
+          var ctx = out.getContext('2d');
+          if (ctx) ctx.drawImage(canvas, 0, 0, out.width, out.height);
+          return out.toDataURL('image/png', 0.92);
+        }
+        function postUploaded(url) {
+          fetch('https://' + resourceName() + '/nui:mugshotUploaded', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify({ url: url || '' })
+          }).catch(function () {});
+        }
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || d.action !== 'nui:uploadMugshotFm') return;
+          var src = d.data;
+          if (!src) {
+            postUploaded('');
+            return;
+          }
+          loadCanvas(src).then(function (canvas) {
+            return toPng(chromaKey(canvas));
+          }).then(function (png) {
+            return fetch('https://' + resourceName() + '/nui:uploadMugshotProcessed', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+              body: JSON.stringify({ data: png })
+            }).then(function (r) { return r.json(); });
+          }).then(function (json) {
+            postUploaded(json && json.url);
+          }).catch(function (err) {
+            console.error('Mugshot FiveManage', err);
+            postUploaded('');
+          });
+        });
+      })();
+    </script>
+    <script>
+      // Mode développement des interfaces : /uidev http://localhost:5173 (serveur Vite, HMR)
+      // recharge les iframes depuis le serveur de dev ; /uidev off revient aux builds ;
+      // /uireload recharge les iframes. Chaque script d'iframe s'enregistre ici.
+      (function () {
+        var reg = window.__uiDev = {
+          url: '',
+          frames: [],
+          register: function (frame, page, onReset) {
+            var f = { frame: frame, page: page, onReset: onReset };
+            reg.frames.push(f);
+            if (reg.url) reg.applyTo(f);
+          },
+          applyTo: function (f) {
+            if (f.onReset) f.onReset();
+            f.frame.src = reg.url ? reg.url.replace(/\/$/, '') + '/' + f.page + '/index.html?nui=1' : '../' + f.page + '/index.html';
+          },
+          apply: function () { reg.frames.forEach(reg.applyTo); }
+        };
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || typeof d.action !== 'string') return;
+          if (d.action === 'core:uidev') {
+            reg.url = (d.data && d.data.url) || '';
+            reg.apply();
+          } else if (d.action === 'core:uireload') {
+            reg.frames.forEach(function (f) {
+              if (f.onReset) f.onReset();
+              f.frame.src = f.frame.src;
+            });
+          }
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        var SIREN_TYPES = ['visible', 'clickSound', 'siren', 'flashingLight', 'lightHouse', 'nightSiren', 'banisterLeft', 'banisterCenter', 'banisterRight', 'projector'];
+        var frame = document.createElement('iframe');
+        frame.id = 'sirens-overlay';
+        frame.src = '../../modules/sirens/web/build/index.html';
+        frame.setAttribute('scrolling', 'no');
+        frame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;pointer-events:none;z-index:9998;';
+        window.__nuiAppend(frame);
+
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || typeof d.type !== 'string' || SIREN_TYPES.indexOf(d.type) === -1) return;
+          var win = frame.contentWindow;
+          if (win) win.postMessage(d, '*');
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        var SCAM_ACTIONS = ['scamComputer:visible', 'scamComputer:loadData'];
+        var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;z-index:9999;';
+        var HIDDEN = BASE + 'display:none;pointer-events:none;';
+        var SHOWN = BASE + 'display:block;pointer-events:auto;';
+        var FADING = BASE + 'display:block;pointer-events:none;';
+        var FADE_MS = 400;
+        var hideTimer = null;
+        var frame = document.createElement('iframe');
+        frame.id = 'scam-computer-terminal';
+        frame.src = '../../plugins/015_Features/scam_computer/html/index.html';
+        frame.setAttribute('scrolling', 'no');
+        frame.style.cssText = HIDDEN;
+        window.__nuiAppend(frame);
+
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || typeof d.action !== 'string' || SCAM_ACTIONS.indexOf(d.action) === -1) return;
+          var win = frame.contentWindow;
+          if (win) win.postMessage(d, '*');
+          if (d.action !== 'scamComputer:visible') return;
+          if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+          }
+          if (d.data && d.data.status) {
+            frame.style.cssText = SHOWN;
+            setTimeout(function () {
+              if (frame.contentWindow) frame.contentWindow.focus();
+            }, 0);
+            return;
+          }
+          frame.style.cssText = FADING;
+          frame.blur();
+          window.focus();
+          hideTimer = setTimeout(function () {
+            frame.style.cssText = HIDDEN;
+            hideTimer = null;
+          }, FADE_MS);
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        var GESTION_ACTIONS = ['gestion:open', 'gestion:close', 'gestion:cover', 'gestion:uncover', 'gestion:minimize', 'gestion:restore', 'gestion:vui', 'gestion:policeAlerts:sync', 'gestion:images:sync', 'gestion:images:capture', 'gestion:images:progress', 'gestion:images:generateDone', 'gestion:notifs:sync', 'core:branding:apply'];
+        var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;z-index:9999;';
+        var HIDDEN = BASE + 'display:none;pointer-events:none;';
+        var SHOWN = BASE + 'display:block;pointer-events:auto;';
+        var WALK = BASE + 'display:block;pointer-events:none;';
+        var ready = false;
+        var pending = [];
+        var frame = document.createElement('iframe');
+        frame.id = 'gestion-hub';
+        frame.src = '../gestion/index.html';
+        frame.setAttribute('scrolling', 'no');
+        frame.style.cssText = HIDDEN;
+        frame.addEventListener('load', function () {
+          ready = true;
+          while (pending.length) {
+            var queued = pending.shift();
+            if (frame.contentWindow) frame.contentWindow.postMessage(queued, '*');
+          }
+        });
+        window.__nuiAppend(frame);
+        window.__uiDev.register(frame, 'gestion', function () { ready = false; });
+
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || typeof d.action !== 'string' || GESTION_ACTIONS.indexOf(d.action) === -1) return;
+          if (ready && frame.contentWindow) frame.contentWindow.postMessage(d, '*');
+          else pending.push(d);
+          if (d.action === 'gestion:open' || d.action === 'gestion:uncover' || d.action === 'gestion:restore') {
+            frame.style.cssText = SHOWN;
+            setTimeout(function () {
+              if (frame.contentWindow) frame.contentWindow.focus();
+            }, 0);
+          } else if (d.action === 'gestion:minimize') {
+            frame.style.cssText = WALK;
+            frame.blur();
+            window.focus();
+          } else if (d.action === 'gestion:close' || d.action === 'gestion:cover') {
+            frame.style.cssText = HIDDEN;
+            frame.blur();
+            window.focus();
+          }
+        });
+      })();
+    </script>
+    <script>
+      // Boutique premium : page dédiée (interface/boutique/) qui remplace l'écran du bundle.
+      // Tous les messages paidshop:* lui sont transmis et ne parviennent plus au bundle
+      // (stopImmediatePropagation : ce script est enregistré avant le module React).
+      (function () {
+        var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;z-index:10010;display:block;';
+        var PASSIVE = BASE + 'pointer-events:none;';
+        var ACTIVE = BASE + 'pointer-events:auto;';
+        var ready = false;
+        var pending = [];
+        var frame = document.createElement('iframe');
+        frame.id = 'boutique';
+        frame.src = '../boutique/index.html';
+        frame.setAttribute('scrolling', 'no');
+        frame.style.cssText = PASSIVE;
+        frame.addEventListener('load', function () {
+          ready = true;
+          while (pending.length) {
+            var queued = pending.shift();
+            if (frame.contentWindow) frame.contentWindow.postMessage(queued, '*');
+          }
+        });
+        window.__nuiAppend(frame);
+        window.__uiDev.register(frame, 'boutique', function () { ready = false; });
+
+        function activate() {
+          frame.style.cssText = ACTIVE;
+          setTimeout(function () {
+            if (frame.contentWindow) frame.contentWindow.focus();
+          }, 0);
+        }
+        function passive() {
+          frame.style.cssText = PASSIVE;
+          frame.blur();
+          window.focus();
+        }
+
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || typeof d.action !== 'string') return;
+          if (d.action === 'boutique:passive') { passive(); return; }
+          if (d.action.indexOf('paidshop:') !== 0 && d.action !== 'core:branding:apply') return;
+          if (ready && frame.contentWindow) frame.contentWindow.postMessage(d, '*');
+          else pending.push(d);
+          if (d.action === 'core:branding:apply') return;
+          e.stopImmediatePropagation();
+          if (d.action === 'paidshop:show' || d.action === 'paidshop:showPurchaseConfirm') activate();
+          else if (d.action === 'paidshop:hide') passive();
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        var PAUSE_ACTIONS = ['pausemenu:open', 'pausemenu:close', 'pausemenu:reportResult', 'core:branding:apply'];
+        var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;z-index:10020;';
+        var HIDDEN = BASE + 'display:none;pointer-events:none;';
+        var SHOWN = BASE + 'display:block;pointer-events:auto;';
+        var ready = false;
+        var pending = [];
+        var frame = document.createElement('iframe');
+        frame.id = 'pause-menu';
+        frame.src = '../pausemenu/index.html';
+        frame.setAttribute('scrolling', 'no');
+        frame.style.cssText = HIDDEN;
+        frame.addEventListener('load', function () {
+          ready = true;
+          while (pending.length) {
+            var queued = pending.shift();
+            if (frame.contentWindow) frame.contentWindow.postMessage(queued, '*');
+          }
+        });
+        window.__nuiAppend(frame);
+        window.__uiDev.register(frame, 'pausemenu', function () { ready = false; });
+
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || typeof d.action !== 'string') return;
+          if (d.action === 'pausemenu:openUrl' && d.url && typeof window.invokeNative === 'function') {
+            window.invokeNative('openUrl', d.url);
+            return;
+          }
+          if (PAUSE_ACTIONS.indexOf(d.action) === -1) return;
+          if (ready && frame.contentWindow) frame.contentWindow.postMessage(d, '*');
+          else pending.push(d);
+          if (d.action === 'pausemenu:open') {
+            frame.style.cssText = SHOWN;
+            setTimeout(function () {
+              if (frame.contentWindow) frame.contentWindow.focus();
+            }, 0);
+          } else if (d.action === 'pausemenu:close') {
+            frame.style.cssText = HIDDEN;
+            frame.blur();
+            window.focus();
+          }
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        var ACTIONS = ['bossAnnounces:attach', 'bossAnnounces:open', 'bossAnnounces:wake', 'bossAnnounces:close', 'bossPanel:close', 'bossPanel:open'];
+        var HIDDEN = 'position:fixed;inset:0;width:0;height:0;border:0;display:none;pointer-events:none;';
+        var ready = false;
+        var pending = [];
+        var overlayOn = false;
+        var pageOn = false;
+        var placeTimer = null;
+        var frame = document.createElement('iframe');
+        frame.id = 'boss-announces';
+        frame.src = '../boss-announces/index.html';
+        frame.setAttribute('scrolling', 'no');
+        frame.style.cssText = HIDDEN;
+        frame.addEventListener('load', function () {
+          ready = true;
+          while (pending.length) {
+            var queued = pending.shift();
+            if (frame.contentWindow) frame.contentWindow.postMessage(queued, '*');
+          }
+        });
+        window.__nuiAppend(frame);
+        window.__uiDev.register(frame, 'boss-announces', function () { ready = false; });
+
+        function send(d) {
+          if (ready && frame.contentWindow) frame.contentWindow.postMessage(d, '*');
+          else pending.push(d);
+        }
+
+        function hide() {
+          overlayOn = false;
+          pageOn = false;
+          if (placeTimer) {
+            clearInterval(placeTimer);
+            placeTimer = null;
+          }
+          frame.style.cssText = HIDDEN;
+          frame.blur();
+          send({ action: 'bossAnnounces:close' });
+        }
+
+        function findHost() {
+          return document.getElementById('boss-announces-page')
+            || document.querySelector('.container-boss-panel .boss-panel-layout > .main-content')
+            || document.querySelector('.container-boss-panel .main-content')
+            || document.querySelector('.boss-panel-layout .main-content');
+        }
+
+        function placeOverHost() {
+          var host = findHost();
+          if (!host) return false;
+          var r = host.getBoundingClientRect();
+          if (r.width < 20 || r.height < 20) return false;
+          frame.style.cssText = 'position:fixed;left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px;border:0;margin:0;padding:0;background:#0e1117;z-index:5002;display:block;pointer-events:auto;border-top-right-radius:2rem;border-bottom-right-radius:2rem;';
+          overlayOn = true;
+          return true;
+        }
+
+        function resourceName() {
+          return typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'core';
+        }
+
+        function requestOpen() {
+          fetch('https://' + resourceName() + '/bossPanel:announces:open', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+            body: '{}'
+          }).then(function (r) { return r.json(); }).then(function (res) {
+            if (!pageOn) return;
+            var data = (res && (res.announces || (res.ok && res))) || null;
+            if (data && typeof data === 'object' && !data.error) {
+              send({ action: 'bossAnnounces:open', data: data });
+              return;
+            }
+            send({
+              action: 'bossAnnounces:open',
+              data: { error: (res && (res.error || res.message)) || 'Impossible de charger les annonces.' }
+            });
+          }).catch(function () {
+            if (!pageOn) return;
+            send({ action: 'bossAnnounces:open', data: { error: 'Impossible de charger les annonces.' } });
+          });
+        }
+
+        function showPage() {
+          pageOn = true;
+          placeOverHost();
+          send({ action: 'bossAnnounces:wake' });
+          requestOpen();
+          if (!placeTimer) {
+            placeTimer = setInterval(function () {
+              if (pageOn) placeOverHost();
+            }, 250);
+          }
+        }
+
+        function syncPage() {
+          var on = !!document.getElementById('boss-announces-page');
+          if (on && !pageOn) showPage();
+          else if (!on && pageOn) hide();
+        }
+
+        var obs = new MutationObserver(syncPage);
+        window.addEventListener('load', function () {
+          setTimeout(function () {
+            obs.observe(document.getElementById('root') || document.body, { childList: true, subtree: true });
+            syncPage();
+          }, 800);
+        });
+        window.addEventListener('resize', function () {
+          if (pageOn) placeOverHost();
+        });
+
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || typeof d.action !== 'string' || ACTIONS.indexOf(d.action) === -1) return;
+          if (d.action === 'bossAnnounces:open' || d.action === 'bossAnnounces:wake') {
+            if (pageOn || document.getElementById('boss-announces-page')) {
+              pageOn = true;
+              placeOverHost();
+            }
+            send(d);
+            return;
+          }
+          if (d.action === 'bossAnnounces:close' || d.action === 'bossPanel:close') {
+            hide();
+            return;
+          }
+          if (d.action === 'bossPanel:open' || d.action === 'bossAnnounces:attach') {
+            setTimeout(syncPage, 50);
+            setTimeout(syncPage, 300);
+          }
+        });
+      })();
+    </script>
+    <script>
+      // Documents du joueur (carte d'identité, permis, PPA, carte pro, badges, visa) :
+      // page dédiée interface/documents/ ; les messages playerDocuments:* ne parviennent
+      // plus au bundle (stopImmediatePropagation : script enregistré avant le module React).
+      (function () {
+        var DOC_ACTIONS = ['playerDocuments:toggle', 'playerDocuments:close', 'core:branding:apply'];
+        var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;pointer-events:none;z-index:10001;';
+        var HIDDEN = BASE + 'display:none;';
+        var SHOWN = BASE + 'display:block;';
+        var ready = false;
+        var pending = [];
+        var frame = document.createElement('iframe');
+        frame.id = 'documents';
+        frame.src = '../documents/index.html';
+        frame.setAttribute('scrolling', 'no');
+        frame.style.cssText = HIDDEN;
+        frame.addEventListener('load', function () {
+          ready = true;
+          while (pending.length) {
+            var queued = pending.shift();
+            if (frame.contentWindow) frame.contentWindow.postMessage(queued, '*');
+          }
+        });
+        window.__nuiAppend(frame);
+        window.__uiDev.register(frame, 'documents', function () { ready = false; });
+
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || typeof d.action !== 'string' || DOC_ACTIONS.indexOf(d.action) === -1) return;
+          if (ready && frame.contentWindow) frame.contentWindow.postMessage(d, '*');
+          else if (pending.length < 16) pending.push(d);
+          if (d.action === 'core:branding:apply') return;
+          e.stopImmediatePropagation();
+          frame.style.cssText = d.action === 'playerDocuments:toggle' ? SHOWN : HIDDEN;
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        var HUD_ACTIONS = [
+          'hud:warn:show', 'hud:warn:progress', 'hud:warn:hide',
+          'hud:orbital:show', 'hud:orbital:markers', 'hud:orbital:countdown', 'hud:orbital:hide',
+          'hud:megaphone:show', 'hud:megaphone:update', 'hud:megaphone:selector', 'hud:megaphone:hide',
+          'hud:crosshair:show', 'hud:crosshair:hide',
+          'hud:hack:show', 'hud:hack:state', 'hud:hack:hide',
+          // dock staff / animateurs (remplace la barre du bundle : messages bloqués pour lui)
+          'staffHud:update', 'staffHud:toggle', 'animatorHud:update', 'animatorHud:toggle',
+          'core:branding:apply', 'nui:ui:orientation'
+        ];
+        var DOCK_ACTIONS = ['staffHud:update', 'staffHud:toggle', 'animatorHud:update', 'animatorHud:toggle'];
+        var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;pointer-events:none;z-index:10000;';
+        var HIDDEN = BASE + 'display:none;';
+        var SHOWN = BASE + 'display:block;';
+        var QUEUE_MAX = 64;
+        var open = {};
+        var pending = [];
+        var ready = false;
+        var frame = document.createElement('iframe');
+        frame.id = 'hud-overlay';
+        frame.src = '../hud/index.html';
+        frame.setAttribute('scrolling', 'no');
+        frame.style.cssText = HIDDEN;
+        frame.addEventListener('load', function () {
+          ready = true;
+          while (pending.length) {
+            var queued = pending.shift();
+            if (frame.contentWindow) frame.contentWindow.postMessage(queued, '*');
+          }
+        });
+        window.__nuiAppend(frame);
+        window.__uiDev.register(frame, 'hud', function () { ready = false; });
+
+        function anyOpen() {
+          for (var key in open) {
+            if (open[key]) return true;
+          }
+          return false;
+        }
+
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || typeof d.action !== 'string' || HUD_ACTIONS.indexOf(d.action) === -1) return;
+          if (ready && frame.contentWindow) {
+            frame.contentWindow.postMessage(d, '*');
+          } else if (pending.length < QUEUE_MAX) {
+            pending.push(d);
+          }
+          if (DOCK_ACTIONS.indexOf(d.action) !== -1) {
+            e.stopImmediatePropagation();
+            var key = d.action.split(':')[0];
+            if (d.action.indexOf(':toggle') !== -1) open[key] = d.data === true;
+            else if (d.data && typeof d.data.visible === 'boolean') open[key] = d.data.visible;
+            frame.style.cssText = anyOpen() ? SHOWN : HIDDEN;
+            return;
+          }
+          if (d.action === 'core:branding:apply') return;
+          var parts = d.action.split(':');
+          if (parts[2] === 'show') open[parts[1]] = true;
+          else if (parts[2] === 'hide') open[parts[1]] = false;
+          else return;
+          frame.style.cssText = anyOpen() ? SHOWN : HIDDEN;
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        var sent = false;
+        function ping() {
+          if (sent) return;
+          var root = document.getElementById('root');
+          if (!root || !root.firstChild) return;
+          sent = true;
+          var name = typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'core';
+          fetch('https://' + name + '/nui:frameReady', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+            body: '{}'
+          }).catch(function () {});
+        }
+        var root = document.getElementById('root');
+        if (root) {
+          var obs = new MutationObserver(function () {
+            ping();
+            if (sent) obs.disconnect();
+          });
+          obs.observe(root, { childList: true });
+        }
+        window.addEventListener('load', function () { setTimeout(ping, 80); });
+        setTimeout(ping, 2500);
+      })();
+    </script>
+    <!-- Châssis 3D des tablettes (voir interface/build/tablet3d/) -->
+    <script src="./tablet3d/tablet3d.js?v=3" defer></script>
+  </body>
+</html>

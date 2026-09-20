@@ -1,0 +1,50 @@
+html.ui-orient-hud-h .sd-dock {
+  top: auto;
+  bottom: 2.4vh;
+  left: 50%;
+  right: auto;
+  width: auto;
+  max-width: 92vw;
+  transform: translateX(-50%);
+  flex-direction: row;
+  align-items: stretch;
+  animation: none;
+}
+
+html.ui-orient-hud-h .sd-brand {
+  width: 64px;
+  height: auto;
+  min-height: 64px;
+  flex-shrink: 0;
+}
+
+html.ui-orient-hud-h .sd-group {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+html.ui-orient-hud-h .sd-group header {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  border-bottom: 0;
+  border-right: 1px solid rgba(var(--sd-ac-rgb), .45);
+  padding: 10px 6px;
+  letter-spacing: .18em;
+}
+
+html.ui-orient-hud-h .sd-stat {
+  flex-direction: row;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 0;
+  border-right: 1px solid rgba(255, 255, 255, .07);
+  min-width: 92px;
+}
+
+html.ui-orient-hud-h .sd-stat:last-child {
+  border-right: 0;
+}
+
+html.ui-orient-hud-h .sd-stat-ic {
+  margin-bottom: 0;
+}

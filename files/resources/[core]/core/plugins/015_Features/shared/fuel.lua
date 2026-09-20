@@ -1,0 +1,4 @@
+---@meta _
+-- Configuration centralisée dans config/fuel/config.lua
+-- Ce fichier est conservé pour la compatibilité de chargement du fxmanifest.
+-- Toute modification doit être faite dans config/fuel/config.lua

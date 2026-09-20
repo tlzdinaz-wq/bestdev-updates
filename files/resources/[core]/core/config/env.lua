@@ -1,0 +1,1 @@
+IS_DEV = GetConvar("dev", "false") == "true"

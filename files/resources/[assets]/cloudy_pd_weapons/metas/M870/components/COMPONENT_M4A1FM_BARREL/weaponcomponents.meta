@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF - 8"?>
+
+<CWeaponComponentInfoBlob>
+	<Infos>
+		<Item type="CWeaponComponentInfo">
+			<Name>COMPONENT_M4A1FM_BARREL_01</Name>
+			<Model>M4A1Barrel1_FluffysMods</Model>
+			<LocName>WCT_SUPP</LocName>
+			<LocDesc>WCD_AR_SUPP2</LocDesc>
+			<AttachBone>AAPSupp</AttachBone>
+			<WeaponAttachBone>WAPSupp</WeaponAttachBone>
+			<AccuracyModifier type="NULL"/>
+			<bShownOnWheel value="true"/>
+			<CreateObject value="true"/>
+			<HudDamage value="-5"/>
+			<HudSpeed value="0"/>
+			<HudCapacity value="0"/>
+			<HudAccuracy value="0"/>
+			<HudRange value="-5"/>
+			<MuzzleBone>Gun_SuMuzzle</MuzzleBone>
+		</Item>
+		<Item type="CWeaponComponentInfo">
+			<Name>COMPONENT_M4A1FM_BARREL_02</Name>
+			<Model>M4A1Barrel2_FluffysMods</Model>
+			<LocName>WCT_SUPP</LocName>
+			<LocDesc>WCD_AR_SUPP2</LocDesc>
+			<AttachBone>AAPSupp</AttachBone>
+			<WeaponAttachBone>WAPSupp</WeaponAttachBone>
+			<AccuracyModifier type="NULL"/>
+			<bShownOnWheel value="true"/>
+			<CreateObject value="true"/>
+			<HudDamage value="-5"/>
+			<HudSpeed value="0"/>
+			<HudCapacity value="0"/>
+			<HudAccuracy value="0"/>
+			<HudRange value="-5"/>
+			<MuzzleBone>Gun_SuMuzzle</MuzzleBone>
+		</Item>		
+		<Item type="CWeaponComponentSuppressorInfo">
+			<Name>COMPONENT_M4A1FM_BARREL_03</Name>
+			<Model>M4A1Barrel3_FluffysMods</Model>
+			<LocName>WCT_SUPP</LocName>
+			<LocDesc>WCD_AR_SUPP2</LocDesc>
+			<AttachBone>AAPSupp</AttachBone>
+			<WeaponAttachBone>WAPSupp</WeaponAttachBone>
+			<AccuracyModifier type="NULL"/>
+			<bShownOnWheel value="true"/>
+			<CreateObject value="true"/>
+			<HudDamage value="-5"/>
+			<HudSpeed value="0"/>
+			<HudCapacity value="0"/>
+			<HudAccuracy value="0"/>
+			<HudRange value="-5"/>
+			<MuzzleBone>Gun_SuMuzzle</MuzzleBone>
+			<FlashFx>muz_pistol_silencer</FlashFx>			
+		</Item>
+		<Item type="CWeaponComponentSuppressorInfo">
+			<Name>COMPONENT_M4A1FM_BARREL_04</Name>
+			<Model>M4A1Barrel4_FluffysMods</Model>
+			<LocName>WCT_SUPP</LocName>
+			<LocDesc>WCD_AR_SUPP2</LocDesc>
+			<AttachBone>AAPSupp</AttachBone>
+			<WeaponAttachBone>WAPSupp</WeaponAttachBone>
+			<AccuracyModifier type="NULL"/>
+			<bShownOnWheel value="true"/>
+			<CreateObject value="true"/>
+			<HudDamage value="-5"/>
+			<HudSpeed value="0"/>
+			<HudCapacity value="0"/>
+			<HudAccuracy value="0"/>
+			<HudRange value="-5"/>
+			<MuzzleBone>Gun_SuMuzzle</MuzzleBone>
+			<FlashFx>muz_pistol_silencer</FlashFx>
+		</Item>		
+	</Infos>	
+	<InfoBlobName/>
+</CWeaponComponentInfoBlob>
+

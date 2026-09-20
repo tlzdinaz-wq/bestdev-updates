@@ -1,0 +1,45 @@
+TaxiJob = TaxiJob or {}
+
+TaxiJob.Config = {
+    NpcModels = {
+        "a_f_y_tourist_01", "a_m_y_business_01", "a_f_m_bevhills_01",
+        "a_m_m_business_01", "a_f_y_business_01", "a_m_y_vinewood_01",
+        "a_f_y_hipster_01", "a_m_m_tourist_01"
+    },
+    NpcSpawnMinDistance = 80.0,
+    NpcSpawnMaxDistance = 250.0,
+    NpcDespawnDelay = 30000,
+    DestinationMinDistance = 500.0,
+    DestinationMaxDistance = 3000.0,
+    PickupRadius = 10.0,
+    PickupTimeout = 120000,
+    ArrivalRadius = 20.0,
+    DropoffZoneLength = 6.0,
+    DropoffZoneWidth = 3.0,
+    DropoffWaitTime = 5000,
+    DistanceTrackInterval = 500,
+    NewNpcCooldown = 10000,
+    SpawnRetryDelay = 10000,
+    SpawnMaxAttempts = 20,
+    DefaultTarifPerMeter = 0.50,
+    DefaultPlayerPercent = 80,
+    MaxDistanceBuffer = 1.20,
+    DefaultCommandTimeout = 10,
+    BlipSprite = 198,
+    BlipColor = 5,
+    DamagePenaltyMax = 70,
+    DamagePenaltyThreshold = 20,
+    DefaultZoneRadius = 1000.0,
+    BaseZones = {
+        { key = "centre_sud_ls", label = "Centre-Sud LS", desc = "Downtown, Vespucci, Little Seoul, Aéroport", x = -140.50, y = -437.29, z = 33.05, radius = 2000.0 },
+        { key = "nord_ls",       label = "Paleto Bay",    desc = "Paleto Bay, Grapeseed",                      x = -141.75, y = 6398.40, z = 30.37, radius = 800.0 },
+        { key = "blaine_county", label = "Sandy Shores",  desc = "Sandy Shores, Grand Senora Desert",          x = 1785.55, y = 3796.64, z = 32.96, radius = 800.0 },
+    },
+    AllowedVehicles = {
+        "dlrhinetaxi",
+        "dlbuffalo4taxi",
+        "dljugulartaxi",
+        "dlballer8taxi",
+        "dlcinqtaxi",
+    },
+}

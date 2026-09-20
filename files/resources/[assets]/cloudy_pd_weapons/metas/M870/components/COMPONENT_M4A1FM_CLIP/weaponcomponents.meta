@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF - 8"?>
+
+<CWeaponComponentInfoBlob>
+	<Infos>
+		<Item type="CWeaponComponentClipInfo">
+			<Name>COMPONENT_M4A1FM_CLIP_01</Name>
+			<Model>M4A1CLIP1_FluffysMods</Model>
+			<LocName>WCT_CLIP1</LocName>
+			<LocDesc>WCD_CR_CLIP1</LocDesc>
+			<AttachBone>AAPClip</AttachBone>
+			<WeaponAttachBone>WAPClip</WeaponAttachBone>
+			<AccuracyModifier type="NULL"/>
+			<DamageModifier type="NULL"/>
+			<bShownOnWheel value="false"/>
+			<CreateObject value="true"/>
+			<HudDamage value="0"/>
+			<HudSpeed value="0"/>
+			<HudCapacity value="0"/>
+			<HudAccuracy value="0"/>
+			<HudRange value="0"/>
+			<ClipSize value="30"/>
+			<AmmoInfo/>
+			<ReloadData ref="RELOAD_DEFAULT"/>
+		</Item>
+		<Item type="CWeaponComponentClipInfo">
+			<Name>COMPONENT_M4A1FM_CLIP_02</Name>
+			<Model>M4A1CLIP2_FluffysMods</Model>
+			<LocName>WCT_CLIP1</LocName>
+			<LocDesc>WCD_CR_CLIP1</LocDesc>
+			<AttachBone>AAPClip</AttachBone>
+			<WeaponAttachBone>WAPClip</WeaponAttachBone>
+			<AccuracyModifier type="NULL"/>
+			<DamageModifier type="NULL"/>
+			<bShownOnWheel value="false"/>
+			<CreateObject value="true"/>
+			<HudDamage value="0"/>
+			<HudSpeed value="0"/>
+			<HudCapacity value="0"/>
+			<HudAccuracy value="0"/>
+			<HudRange value="0"/>
+			<ClipSize value="30"/>
+			<AmmoInfo/>
+			<ReloadData ref="RELOAD_DEFAULT"/>
+		</Item>
+		<Item type="CWeaponComponentClipInfo">
+			<Name>COMPONENT_M4A1FM_CLIP_03</Name>
+			<Model>M4A1CLIP3_FluffysMods</Model>
+			<LocName>WCT_CLIP1</LocName>
+			<LocDesc>WCD_CR_CLIP1</LocDesc>
+			<AttachBone>AAPClip</AttachBone>
+			<WeaponAttachBone>WAPClip</WeaponAttachBone>
+			<AccuracyModifier type="NULL"/>
+			<DamageModifier type="NULL"/>
+			<bShownOnWheel value="false"/>
+			<CreateObject value="true"/>
+			<HudDamage value="0"/>
+			<HudSpeed value="0"/>
+			<HudCapacity value="0"/>
+			<HudAccuracy value="0"/>
+			<HudRange value="0"/>
+			<ClipSize value="60"/>
+			<AmmoInfo/>
+			<ReloadData ref="RELOAD_DEFAULT"/>
+		</Item>
+		<Item type="CWeaponComponentClipInfo">
+			<Name>COMPONENT_M4A1FM_CLIP_04</Name>
+			<Model>M4A1CLIP4_FluffysMods</Model>
+			<LocName>WCT_CLIP1</LocName>
+			<LocDesc>WCD_CR_CLIP1</LocDesc>
+			<AttachBone>AAPClip</AttachBone>
+			<WeaponAttachBone>WAPClip</WeaponAttachBone>
+			<AccuracyModifier type="NULL"/>
+			<DamageModifier type="NULL"/>
+			<bShownOnWheel value="false"/>
+			<CreateObject value="true"/>
+			<HudDamage value="0"/>
+			<HudSpeed value="0"/>
+			<HudCapacity value="0"/>
+			<HudAccuracy value="0"/>
+			<HudRange value="0"/>
+			<ClipSize value="60"/>
+			<AmmoInfo/>
+			<ReloadData ref="RELOAD_DEFAULT"/>
+		</Item>		
+	</Infos>
+	<InfoBlobName/>
+</CWeaponComponentInfoBlob>
+

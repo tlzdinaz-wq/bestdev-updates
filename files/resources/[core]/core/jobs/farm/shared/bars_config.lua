@@ -1,0 +1,245 @@
+---
+--- Configuration des bars du serveur
+--- Utilisee par le systeme de gestion des cartes de bars
+---
+
+BarsConfig = {
+    { jobName = "unicorn", label = "Vanilla Unicorn" },
+    { jobName = "yellowjack", label = "Yellow Jack" },
+    { jobName = "irishpub", label = "Irish Pub" },
+    { jobName = "asgard", label = "Asgard Bar" },
+    { jobName = "henhouse", label = "Hen House" },
+
+    { jobName = "billard", label = "Bar Billard" },
+    { jobName = "cayo_lagoon", label = "Cayo Lagoon" },
+    { jobName = "burgershot_mirrorpark", label = "BurgerShot Mirror Park" },
+    { jobName = "burgershot_muriettaheights", label = "BurgerShot Murietta Heights" },
+    { jobName = "burgershot_paletobay", label = "BurgerShot Paleto Bay" },
+    { jobName = "burgershot_vespucci", label = "BurgerShot Vespucci" },
+    { jobName = "pizzeria", label = "Pizzeria" },
+    { jobName = "pearls", label = "Pearls" },
+    { jobName = "noodle", label = "Noodle Exchange" },
+    { jobName = "bean_coffee", label = "Bean Machine Coffee" },
+    { jobName = "uwu_cafe", label = "UwU Cafe" }
+}
+
+-- Items par defaut a inserer pour chaque bar (migration initiale)
+BarsDefaultItems = {
+    unicorn = {
+        { item = "biere_brune", section = "BOISSONS" },
+        { item = "biere_ambree", section = "BOISSONS" },
+        { item = "biere_blonde_generique", section = "BOISSONS" },
+        { item = "whisky_sec", section = "BOISSONS" },
+        { item = "vodka", section = "BOISSONS" },
+        { item = "cola", section = "BOISSONS" },
+        { item = "chocolat_bar", section = "SNACKS" },
+        { item = "chips_bowl", section = "SNACKS" }
+    },
+    yellowjack = {
+        { item = "biere_noire", section = "BOISSONS" },
+        { item = "biere_brune", section = "BOISSONS" },
+        { item = "biere_ambree", section = "BOISSONS" },
+        { item = "whisky_sec", section = "BOISSONS" },
+        { item = "bourbon", section = "BOISSONS" },
+        { item = "tequila", section = "BOISSONS" },
+        { item = "vodka", section = "BOISSONS" },
+        { item = "cola", section = "BOISSONS" },
+        { item = "chocolat_bar", section = "SNACKS" },
+        { item = "chips_bowl", section = "SNACKS" }
+    },
+    asgard = {
+        { item = "biere_brune", section = "BOISSONS" },
+        { item = "biere_ambree", section = "BOISSONS" },
+        { item = "biere_blonde_generique", section = "BOISSONS" },
+        { item = "hydromel", section = "BOISSONS" },
+        { item = "whisky_sec", section = "BOISSONS" },
+        { item = "vodka", section = "BOISSONS" },
+        { item = "cola", section = "BOISSONS" },
+        { item = "chocolat_bar", section = "SNACKS" },
+        { item = "chips_bowl", section = "SNACKS" }
+    },
+    irishpub = {
+        { item = "biere_brune", section = "BOISSONS" },
+        { item = "biere_ambree", section = "BOISSONS" },
+        { item = "biere_blonde_generique", section = "BOISSONS" },
+        { item = "whisky_sec", section = "BOISSONS" },
+        { item = "vodka", section = "BOISSONS" },
+        { item = "cola", section = "BOISSONS" },
+        { item = "chocolat_bar", section = "SNACKS" },
+        { item = "chips_bowl", section = "SNACKS" }
+    },
+    henhouse = {
+        { item = "biere_brune", section = "BOISSONS" },
+        { item = "biere_ambree", section = "BOISSONS" },
+        { item = "biere_blonde_generique", section = "BOISSONS" },
+        { item = "whisky_sec", section = "BOISSONS" },
+        { item = "vodka", section = "BOISSONS" },
+        { item = "cola", section = "BOISSONS" },
+        { item = "chocolat_bar", section = "SNACKS" },
+        { item = "chips_bowl", section = "SNACKS" }
+    },
+    billard = {
+        { item = "biere_brune", section = "BOISSONS" },
+        { item = "biere_ambree", section = "BOISSONS" },
+        { item = "biere_blonde_generique", section = "BOISSONS" },
+        { item = "whisky_sec", section = "BOISSONS" },
+        { item = "vodka", section = "BOISSONS" },
+        { item = "cola", section = "BOISSONS" },
+        { item = "chocolat_bar", section = "SNACKS" },
+        { item = "chips_bowl", section = "SNACKS" }
+    },
+    cayo_lagoon = {
+        { item = "biere_blonde_generique", section = "BOISSONS" },
+        { item = "biere_ambree", section = "BOISSONS" },
+        { item = "rhum_pur", section = "BOISSONS" },
+        { item = "tequila", section = "BOISSONS" },
+        { item = "mojito", section = "COCKTAILS" },
+        { item = "pina_colada", section = "COCKTAILS" },
+        { item = "margarita", section = "COCKTAILS" },
+        { item = "cola", section = "BOISSONS" },
+        { item = "chocolat_bar", section = "SNACKS" },
+        { item = "chips_bowl", section = "SNACKS" }
+    },
+    burgershot = {
+        { item = "burger_classic", section = "BURGERS" },
+        { item = "burger_epice", section = "BURGERS" },
+        { item = "burger_veggie", section = "BURGERS" },
+        { item = "frite", section = "SIDES" },
+        { item = "cola_25cl", section = "BOISSONS" },
+        { item = "cola_33cl", section = "BOISSONS" },
+        { item = "cola_50cl", section = "BOISSONS" },
+        { item = "sprunk_25cl", section = "BOISSONS" },
+        { item = "sprunk_33cl", section = "BOISSONS" },
+        { item = "sprunk_50cl", section = "BOISSONS" }
+    },
+    burgershot_mirrorpark = {
+        { item = "burger_classic", section = "BURGERS" },
+        { item = "burger_epice", section = "BURGERS" },
+        { item = "burger_veggie", section = "BURGERS" },
+        { item = "frite", section = "SIDES" },
+        { item = "cola_25cl", section = "BOISSONS" },
+        { item = "cola_33cl", section = "BOISSONS" },
+        { item = "cola_50cl", section = "BOISSONS" },
+        { item = "sprunk_25cl", section = "BOISSONS" },
+        { item = "sprunk_33cl", section = "BOISSONS" },
+        { item = "sprunk_50cl", section = "BOISSONS" }
+    },
+    burgershot_muriettaheights = {
+        { item = "burger_classic", section = "BURGERS" },
+        { item = "burger_epice", section = "BURGERS" },
+        { item = "burger_veggie", section = "BURGERS" },
+        { item = "frite", section = "SIDES" },
+        { item = "cola_25cl", section = "BOISSONS" },
+        { item = "cola_33cl", section = "BOISSONS" },
+        { item = "cola_50cl", section = "BOISSONS" },
+        { item = "sprunk_25cl", section = "BOISSONS" },
+        { item = "sprunk_33cl", section = "BOISSONS" },
+        { item = "sprunk_50cl", section = "BOISSONS" }
+    },
+    burgershot_paletobay = {
+        { item = "burger_classic", section = "BURGERS" },
+        { item = "burger_epice", section = "BURGERS" },
+        { item = "burger_veggie", section = "BURGERS" },
+        { item = "frite", section = "SIDES" },
+        { item = "cola_25cl", section = "BOISSONS" },
+        { item = "cola_33cl", section = "BOISSONS" },
+        { item = "cola_50cl", section = "BOISSONS" },
+        { item = "sprunk_25cl", section = "BOISSONS" },
+        { item = "sprunk_33cl", section = "BOISSONS" },
+        { item = "sprunk_50cl", section = "BOISSONS" }
+    },
+    burgershot_vespucci = {
+        { item = "burger_classic", section = "BURGERS" },
+        { item = "burger_epice", section = "BURGERS" },
+        { item = "burger_veggie", section = "BURGERS" },
+        { item = "frite", section = "SIDES" },
+        { item = "cola_25cl", section = "BOISSONS" },
+        { item = "cola_33cl", section = "BOISSONS" },
+        { item = "cola_50cl", section = "BOISSONS" },
+        { item = "sprunk_25cl", section = "BOISSONS" },
+        { item = "sprunk_33cl", section = "BOISSONS" },
+        { item = "sprunk_50cl", section = "BOISSONS" }
+    },
+    pizzeria = {
+        { item = "pizza_margherita", section = "PIZZAS" },
+        { item = "pizza_pepperoni", section = "PIZZAS" },
+        { item = "pizza_champignon", section = "PIZZAS" },
+        { item = "frite", section = "SIDES" },
+        { item = "cola_25cl", section = "BOISSONS" },
+        { item = "cola_33cl", section = "BOISSONS" },
+        { item = "cola_50cl", section = "BOISSONS" },
+        { item = "sprunk_25cl", section = "BOISSONS" },
+        { item = "sprunk_33cl", section = "BOISSONS" },
+        { item = "sprunk_50cl", section = "BOISSONS" },
+        { item = "milkshake_vanille", section = "MILKSHAKES" },
+        { item = "milkshake_chocolat", section = "MILKSHAKES" },
+        { item = "milkshake_cafe", section = "MILKSHAKES" }
+    },
+    pearls = {
+        { item = "truite_fumee", section = "FRUITS DE MER" },
+        { item = "homard_bleu_cuit", section = "FRUITS DE MER" },
+        { item = "homard_orange_cuit", section = "FRUITS DE MER" },
+        { item = "frite", section = "SIDES" },
+        { item = "cola_25cl", section = "BOISSONS" },
+        { item = "cola_33cl", section = "BOISSONS" },
+        { item = "cola_50cl", section = "BOISSONS" },
+        { item = "sprunk_25cl", section = "BOISSONS" },
+        { item = "sprunk_33cl", section = "BOISSONS" },
+        { item = "sprunk_50cl", section = "BOISSONS" },
+        { item = "milkshake_vanille", section = "MILKSHAKES" },
+        { item = "milkshake_chocolat", section = "MILKSHAKES" },
+        { item = "milkshake_cafe", section = "MILKSHAKES" }
+    },
+    noodle = {
+        { item = "ramen", section = "PLATS" },
+        { item = "sushi", section = "PLATS" },
+        { item = "pho", section = "PLATS" },
+        { item = "cola_25cl", section = "BOISSONS" },
+        { item = "cola_33cl", section = "BOISSONS" },
+        { item = "cola_50cl", section = "BOISSONS" },
+        { item = "sprunk_25cl", section = "BOISSONS" },
+        { item = "sprunk_33cl", section = "BOISSONS" },
+        { item = "sprunk_50cl", section = "BOISSONS" },
+        { item = "milkshake_vanille", section = "MILKSHAKES" },
+        { item = "milkshake_chocolat", section = "MILKSHAKES" },
+        { item = "milkshake_cafe", section = "MILKSHAKES" }
+    },
+    bean_coffee = {
+        { item = "beignet", section = "VIENNOISERIES" },
+        { item = "croissant", section = "VIENNOISERIES" },
+        { item = "donut_chocolat", section = "VIENNOISERIES" },
+        { item = "donut_framboise", section = "VIENNOISERIES" },
+        { item = "espresso_petit", section = "CAFES" },
+        { item = "espresso_moyen", section = "CAFES" },
+        { item = "espresso_grand", section = "CAFES" },
+        { item = "latte_petit", section = "CAFES" },
+        { item = "latte_moyen", section = "CAFES" },
+        { item = "latte_grand", section = "CAFES" },
+        { item = "cappuccino_petit", section = "CAFES" },
+        { item = "cappuccino_moyen", section = "CAFES" },
+        { item = "cappuccino_grand", section = "CAFES" },
+        { item = "granita_citron", section = "GRANITA" },
+        { item = "granita_tropical", section = "GRANITA" },
+        { item = "granita_menthe", section = "GRANITA" },
+        { item = "granita_lagoon", section = "GRANITA" }
+    },
+    uwu_cafe = {
+        { item = "beignet", section = "VIENNOISERIES" },
+        { item = "croissant", section = "VIENNOISERIES" },
+        { item = "donut_chocolat", section = "VIENNOISERIES" },
+        { item = "donut_framboise", section = "VIENNOISERIES" },
+        { item = "espresso_petit", section = "CAFES" },
+        { item = "espresso_moyen", section = "CAFES" },
+        { item = "espresso_grand", section = "CAFES" },
+        { item = "latte_petit", section = "CAFES" },
+        { item = "latte_moyen", section = "CAFES" },
+        { item = "latte_grand", section = "CAFES" },
+        { item = "cappuccino_petit", section = "CAFES" },
+        { item = "cappuccino_moyen", section = "CAFES" },
+        { item = "cappuccino_grand", section = "CAFES" },
+        { item = "granita_citron", section = "GRANITA" },
+        { item = "granita_tropical", section = "GRANITA" },
+        { item = "granita_menthe", section = "GRANITA" },
+        { item = "granita_lagoon", section = "GRANITA" }
+    }
+}

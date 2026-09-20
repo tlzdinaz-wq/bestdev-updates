@@ -1,0 +1,1 @@
+-- Example notification usage with enhanced structure

@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<CVehicleModelInfoVariation>
+  <variationData>
+     <Item>
+      <modelName>owlbelair</modelName>
+      <colors>
+        <Item>
+          <indices content="char_array"> <!-- Onyx Black / India Ivory -->
+            0
+            111 
+            0
+            2
+            0
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Pinecrest Green / Sherwood Green -->
+            157
+            54
+            0
+            2
+            157
+            54
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Sherwood Green / India Ivory -->
+            54
+            111
+            0
+            111
+            54
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Pinecrest Green / India Ivory -->
+            157
+            111
+            0
+            2
+            157
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Laurel Green / Crocus Yellow -->
+            102
+            162
+            122
+            2
+            102
+            162
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Harbor Blue / Nassau Blue -->
+            73
+            127
+            0
+            2
+            73
+            127
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Nassau Blue / India Ivory -->
+            127
+            111
+            0
+            2
+            127
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Dusk Plum / India Ivory -->
+            34
+            111
+            5
+            2
+            34
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Sierra Gold / Adobe Beige -->
+            36
+            107
+            37
+            2
+            36
+            107
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Dawn Gray / India Ivory -->
+            4
+            111
+            122
+            2
+            4
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Crocus Yellow / Onyx Black -->
+            162
+            0
+            0
+            2
+            162
+            0
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Matador Red / India Ivory -->
+            28
+            111
+            0
+            2
+            28
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Matador Red / Adobe Beige -->
+            28
+            107
+            0
+            2
+            28
+            107
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Twilight Turquoise / India Ivory -->
+            140
+            111
+            0
+            2
+            140
+            111
+          </indices>
+        </Item>
+      </colors>
+      <kits>
+        <Item>0_default_modkit</Item>
+      </kits>
+      <windowsWithExposedEdges />
+      <plateProbabilities>
+        <Probabilities>
+          <Item>
+            <Name>Yellow Plate</Name>
+            <Value value="100" />
+          </Item>
+        </Probabilities>
+      </plateProbabilities>
+      <lightSettings value="2" />
+      <sirenSettings value="0" />
+    </Item>
+     <Item>
+      <modelName>owlbelair2</modelName>
+      <colors>
+        <Item>
+          <indices content="char_array"> <!-- Onyx Black / India Ivory -->
+            0
+            111 
+            0
+            2
+            0
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Pinecrest Green / Sherwood Green -->
+            157
+            54
+            0
+            2
+            157
+            54
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Sherwood Green / India Ivory -->
+            54
+            111
+            0
+            111
+            54
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Pinecrest Green / India Ivory -->
+            157
+            111
+            0
+            2
+            157
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Laurel Green / Crocus Yellow -->
+            102
+            162
+            122
+            2
+            102
+            162
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Harbor Blue / Nassau Blue -->
+            73
+            127
+            0
+            2
+            73
+            127
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Nassau Blue / India Ivory -->
+            127
+            111
+            0
+            2
+            127
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Dusk Plum / India Ivory -->
+            34
+            111
+            5
+            2
+            34
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Sierra Gold / Adobe Beige -->
+            36
+            107
+            37
+            2
+            36
+            107
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Dawn Gray / India Ivory -->
+            4
+            111
+            122
+            2
+            4
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Crocus Yellow / Onyx Black -->
+            162
+            0
+            0
+            2
+            162
+            0
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Matador Red / India Ivory -->
+            28
+            111
+            0
+            2
+            28
+            111
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Matador Red / Adobe Beige -->
+            28
+            107
+            0
+            2
+            28
+            107
+          </indices>
+        </Item>
+        <Item>
+          <indices content="char_array"> <!-- Twilight Turquoise / India Ivory -->
+            140
+            111
+            0
+            2
+            140
+            111
+          </indices>
+        </Item>
+      </colors>
+      <kits>
+        <Item>0_default_modkit</Item>
+      </kits>
+      <windowsWithExposedEdges />
+      <plateProbabilities>
+        <Probabilities>
+          <Item>
+            <Name>Yellow Plate</Name>
+            <Value value="100" />
+          </Item>
+        </Probabilities>
+      </plateProbabilities>
+      <lightSettings value="2" />
+      <sirenSettings value="0" />
+    </Item>
+  </variationData>
+</CVehicleModelInfoVariation>

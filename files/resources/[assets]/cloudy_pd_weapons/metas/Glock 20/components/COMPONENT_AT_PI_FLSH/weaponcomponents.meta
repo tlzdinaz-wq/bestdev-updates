@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF - 8"?>
+
+<CWeaponComponentInfoBlob>
+	<Infos>
+		<Item type="CWeaponComponentFlashLightInfo">
+			<Name>COMPONENT_GLOCK20_FLSH_01</Name>
+			<Model>glock20_flsh_01</Model>
+			<LocName></LocName>
+			<LocDesc></LocDesc>
+			<AttachBone>AAPFlsh</AttachBone>
+            <AccuracyModifier type="NULL" />
+            <DamageModifier type="NULL" />
+            <bShownOnWheel value="true" />
+            <CreateObject value="true" />
+            <HudDamage value="0" />
+            <HudSpeed value="0" />
+            <HudCapacity value="0" />
+            <HudAccuracy value="0" />
+            <HudRange value="0" />
+            <MainLightIntensity value="5.000000" />
+            <MainLightColor value="0x00FFFFFF" />
+            <MainLightRange value="68.000000" />
+            <MainLightFalloffExponent value="16.000000" />
+            <MainLightInnerAngle value="0.0" />
+            <MainLightOuterAngle value="40.0" />
+            <MainLightCoronaIntensity value="10.000000" />
+            <MainLightCoronaSize value="0.15000" />
+            <MainLightVolumeIntensity value="0.0010000" />
+            <MainLightVolumeSize value="0.0001000" />
+            <MainLightVolumeExponent value="0.00000" />
+            <MainLightVolumeOuterColor value="0x00FFFFFF" />
+            <MainLightShadowFadeDistance value="15.000000" />
+            <MainLightSpecularFadeDistance value="15.000000" />
+            <SecondaryLightIntensity value="0.000000" />
+            <SecondaryLightColor value="0x00FFFFFF" />
+            <SecondaryLightRange value="60.000000" />
+            <SecondaryLightFalloffExponent value="64.000000" />
+            <SecondaryLightInnerAngle value="12.000000" />
+            <SecondaryLightOuterAngle value="12.000000" />
+            <SecondaryLightVolumeIntensity value="0.300000" />
+            <SecondaryLightVolumeSize value="0.400000" />
+            <SecondaryLightVolumeExponent value="24.000000" />
+            <SecondaryLightVolumeOuterColor value="0x00FFFFFF" />
+            <SecondaryLightFadeDistance value="10.000000" />
+            <fTargetDistalongAimCamera value="8.000000" />
+            <FlashLightBone>Gun_FLMuzzle</FlashLightBone>
+            <FlashLightBoneBulbOn>Bulb_On</FlashLightBoneBulbOn>
+            <FlashLightBoneBulbOff>Bulb_Off</FlashLightBoneBulbOff>
+		</Item>				
+	</Infos>
+	<InfoBlobName/>
+</CWeaponComponentInfoBlob>
+

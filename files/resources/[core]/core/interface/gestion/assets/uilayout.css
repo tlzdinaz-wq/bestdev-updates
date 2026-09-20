@@ -1,0 +1,94 @@
+.ul-page {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  padding: 1.4rem 1.6rem 1.8rem;
+  overflow: auto;
+  background: linear-gradient(180deg, #10131cf5, #0a0c12f8);
+}
+
+.ul-page.is-on {
+  display: block;
+}
+
+.ul-page h2 {
+  margin: 0 0 .35rem;
+  font: 800 1.35rem Montserrat, sans-serif;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.ul-page p {
+  margin: 0 0 1.1rem;
+  color: #ffffff99;
+  font: 500 .82rem Montserrat, sans-serif;
+}
+
+.ul-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.ul-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #ffffff0a;
+  border: 1px solid #ffffff14;
+}
+
+.ul-card strong {
+  display: block;
+  color: #fff;
+  font: 700 .92rem Montserrat, sans-serif;
+}
+
+.ul-card span {
+  color: #ffffff8c;
+  font: 500 .75rem Montserrat, sans-serif;
+}
+
+.ul-card select {
+  min-width: 160px;
+  border: 1px solid #ffffff22;
+  border-radius: 10px;
+  background: #0e1018;
+  color: #fff;
+  padding: 8px 10px;
+  font: 600 .8rem Montserrat, sans-serif;
+}
+
+.ul-bar {
+  display: flex;
+  gap: 10px;
+  margin-top: 1.1rem;
+}
+
+.ul-bar button {
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font: 700 .78rem Montserrat, sans-serif;
+  cursor: pointer;
+  color: #fff;
+  background: #7263ee;
+}
+
+.ul-bar button.is-ghost {
+  background: #ffffff14;
+}
+
+.ul-msg {
+  margin-top: .8rem;
+  color: #9ef0c6;
+  font: 600 .78rem Montserrat, sans-serif;
+}
+
+.ul-msg.is-err {
+  color: #ffb4b4;
+}

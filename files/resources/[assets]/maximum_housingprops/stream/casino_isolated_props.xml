@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TextureDictionary>
+ <Item>
+  <Name>prop_ratan_01b</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X32, X64, X128</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="256" />
+  <MipLevels value="7" />
+  <Format>D3DFMT_DXT1</Format>
+  <FileName>prop_ratan_01b.dds</FileName>
+ </Item>
+ <Item>
+  <Name>prop_ratan_01_n</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X32, X64, X128</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="256" />
+  <MipLevels value="7" />
+  <Format>D3DFMT_DXT1</Format>
+  <FileName>prop_ratan_01_n.dds</FileName>
+ </Item>
+ <Item>
+  <Name>prop_base_white_full</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X32</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="4" />
+  <Height value="4" />
+  <MipLevels value="1" />
+  <Format>D3DFMT_DXT1</Format>
+  <FileName>prop_base_white_full.dds</FileName>
+ </Item>
+ <Item>
+  <Name>prop_ratan_01_s</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X32, X64, X128</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="256" />
+  <MipLevels value="7" />
+  <Format>D3DFMT_DXT1</Format>
+  <FileName>prop_ratan_01_s.dds</FileName>
+ </Item>
+ <Item>
+  <Name>ls_dlc_vw_seatpillow_n</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X32, X64, X128</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="256" />
+  <MipLevels value="7" />
+  <Format>D3DFMT_DXT1</Format>
+  <FileName>ls_dlc_vw_seatpillow_n.dds</FileName>
+ </Item>
+ <Item>
+  <Name>ls_dlc_vw_woodcanopy_dls_dlc_vw_wood_alpha</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X512</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="512" />
+  <MipLevels value="1" />
+  <Format>D3DFMT_DXT5</Format>
+  <FileName>ls_dlc_vw_woodcanopy_dls_dlc_vw_wood_alpha.dds</FileName>
+ </Item>
+ <Item>
+  <Name>ls_dlc_vw_woodcanopy_d</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X512</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="512" />
+  <MipLevels value="1" />
+  <Format>D3DFMT_DXT5</Format>
+  <FileName>ls_dlc_vw_woodcanopy_d.dds</FileName>
+ </Item>
+ <Item>
+  <Name>ch3_12_casino_new_terrace_pal</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X32</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="4" />
+  <MipLevels value="1" />
+  <Format>D3DFMT_A8R8G8B8</Format>
+  <FileName>ch3_12_casino_new_terrace_pal.dds</FileName>
+ </Item>
+ <Item>
+  <Name>ls_dlc_vw_seatpillow_s</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X32, X64, X128</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="256" />
+  <MipLevels value="7" />
+  <Format>D3DFMT_DXT1</Format>
+  <FileName>ls_dlc_vw_seatpillow_s.dds</FileName>
+ </Item>
+ <Item>
+  <Name>ls_dlc_vw_seatpillow_d</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X32, X64, X128</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="256" />
+  <MipLevels value="7" />
+  <Format>D3DFMT_DXT1</Format>
+  <FileName>ls_dlc_vw_seatpillow_d.dds</FileName>
+ </Item>
+ <Item>
+  <Name>ls_dlc_vw_woodcanopy_n</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X512</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="512" />
+  <MipLevels value="1" />
+  <Format>D3DFMT_DXT5</Format>
+  <FileName>ls_dlc_vw_woodcanopy_n.dds</FileName>
+ </Item>
+ <Item>
+  <Name>ch3_12_casino_new_terrace_wood_pal</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X32</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="4" />
+  <MipLevels value="1" />
+  <Format>D3DFMT_A8R8G8B8</Format>
+  <FileName>ch3_12_casino_new_terrace_wood_pal.dds</FileName>
+ </Item>
+ <Item>
+  <Name>prop_green_glassprop_green_glass_a</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X64, Y64</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="128" />
+  <Height value="128" />
+  <MipLevels value="6" />
+  <Format>D3DFMT_DXT5</Format>
+  <FileName>prop_green_glassprop_green_glass_a.dds</FileName>
+ </Item>
+ <Item>
+  <Name>ls_dlc_vw_woodcanopy_s</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X512</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="512" />
+  <MipLevels value="1" />
+  <Format>D3DFMT_DXT5</Format>
+  <FileName>ls_dlc_vw_woodcanopy_s.dds</FileName>
+ </Item>
+ <Item>
+  <Name>ch3_12_casino_terrace_seating_pal</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X64</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="256" />
+  <Height value="4" />
+  <MipLevels value="9" />
+  <Format>D3DFMT_A8R8G8B8</Format>
+  <FileName>ch3_12_casino_terrace_seating_pal.dds</FileName>
+ </Item>
+ <Item>
+  <Name>tl_v_bank2_glass_n</Name>
+  <Unk32 value="0" />
+  <Usage>UNKNOWN</Usage>
+  <UsageFlags>X32, X64</UsageFlags>
+  <ExtraFlags value="0" />
+  <Width value="128" />
+  <Height value="128" />
+  <MipLevels value="6" />
+  <Format>D3DFMT_DXT1</Format>
+  <FileName>tl_v_bank2_glass_n.dds</FileName>
+ </Item>
+</TextureDictionary>

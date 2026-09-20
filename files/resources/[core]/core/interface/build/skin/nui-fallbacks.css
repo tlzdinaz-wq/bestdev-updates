@@ -1,0 +1,304 @@
+/* Fonds opaques + repli d’images : évite le monde GTA visible à travers
+   les cartes boutique / slots inventaire quand un webp 404 ou est transparent. */
+
+.cs2 {
+  --cs-bg: #101218;
+  --cs-bg-soft: #181c24;
+}
+
+.cs2 .cs2-catalog,
+.cs2 .cs2-rail,
+.cs2 .cs2-panel,
+.cs2 .cs2-brand,
+.cs2 .cs2-wallet,
+.cs2 .cs2-buybar {
+  background: #101218 !important;
+}
+
+.cs2 .cs2-card {
+  background: #181c24 !important;
+}
+
+.cs2 .cs2-card__img {
+  background: #161a22 !important;
+}
+
+.cs2 .cs2-img-fallback {
+  background: #161a22;
+}
+
+.clothing-shop__main,
+.clothing-shop__sidebar {
+  background: #0c121c !important;
+}
+
+.clothing-shop__content {
+  background: #0c121c;
+}
+
+.slot,
+.clothes-slot,
+._gridItems_17z2w_1 .slot,
+._gridItems_17z2w_1 .clothes-slot {
+  background-color: #14161c;
+}
+
+.nui-inv-crash {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: #0e1016;
+  color: #ffffffa6;
+  display: grid;
+  place-items: center;
+  font: 600 14px Montserrat, Segoe UI, sans-serif;
+  pointer-events: none;
+}
+
+:root {
+  --hud-status-left: 17%;
+  --hud-status-top: 85%;
+  --hud-health-left: 2%;
+  --hud-health-top: 96.4%;
+  --hud-speedo-left: 78%;
+  --hud-speedo-top: 86%;
+  --hud-speedo-width: 20%;
+  --hud-speedo-height: 12%;
+  --hud-logo-left: 86%;
+  --hud-logo-top: 1.2%;
+  --hud-notif-left: 1.2%;
+  --hud-notif-top: 28%;
+  --hud-notif-width: 22%;
+  --hud-notif-height: 28%;
+}
+
+html.hud-layout-on .status-hud-wrapper,
+html.hud-layout-on .health-armor-wrapper,
+html.hud-layout-on .Speedometer-container,
+html.hud-layout-on .server-logo-wrapper,
+html.hud-layout-on .server-logo-wrapper--left {
+  right: auto !important;
+  bottom: auto !important;
+}
+
+html.hud-layout-edit .status-hud-wrapper,
+html.hud-layout-edit .health-armor-wrapper,
+html.hud-layout-edit .Speedometer-container,
+html.hud-layout-edit .server-logo-wrapper,
+html.hud-layout-edit .server-logo-wrapper--left,
+html.hud-layout-edit .notistack-SnackbarContainer {
+  pointer-events: none !important;
+}
+
+html.hud-layout-on .status-hud-wrapper {
+  left: var(--hud-status-left) !important;
+  top: var(--hud-status-top) !important;
+}
+
+html.hud-layout-on .health-armor-wrapper {
+  left: var(--hud-health-left) !important;
+  top: var(--hud-health-top) !important;
+}
+
+html.hud-layout-on .Speedometer-container {
+  left: var(--hud-speedo-left) !important;
+  top: var(--hud-speedo-top) !important;
+  width: var(--hud-speedo-width, 20%) !important;
+  height: var(--hud-speedo-height, 12%) !important;
+}
+
+html.hud-layout-on .server-logo-wrapper,
+html.hud-layout-on .server-logo-wrapper--left {
+  left: var(--hud-logo-left) !important;
+  top: var(--hud-logo-top) !important;
+}
+
+html.hud-layout-on {
+  --notification-left: var(--hud-notif-left);
+  --notification-bottom: auto;
+}
+
+html.hud-layout-on .notistack-SnackbarContainer {
+  position: fixed !important;
+  left: var(--hud-notif-left) !important;
+  top: var(--hud-notif-top) !important;
+  right: auto !important;
+  bottom: auto !important;
+}
+
+.hud-layout-notif-preview {
+  display: none;
+  position: absolute;
+  left: var(--hud-notif-left);
+  top: var(--hud-notif-top);
+  width: var(--hud-notif-width, 22%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.hud-layout-editor.is-on .hud-layout-notif-preview,
+.hud-layout-notif-preview[aria-hidden="false"] {
+  display: block;
+}
+
+html.hud-has-real-notifs .hud-layout-notif-preview {
+  display: none !important;
+}
+
+.hud-layout-notif-preview__card {
+  --n3d-accent: var(--brand-primary-rgb, 114, 99, 238);
+  min-height: 86px;
+  padding: 14px 16px 16px 18px;
+  border-radius: 16px;
+  color: #fff;
+  font-family: Montserrat, Segoe UI, sans-serif;
+  background: linear-gradient(155deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,.03) 22%, transparent 46%), linear-gradient(180deg, #161422f0, #08080ef5);
+  box-shadow: inset 0 1px #ffffff47, inset 3px 0 rgb(var(--n3d-accent)), 5px 7px #443e62f2, 10px 14px #12101efa, 18px 26px 36px #0009;
+}
+
+.hud-layout-notif-preview__card b {
+  display: block;
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  opacity: .62;
+}
+
+.hud-layout-notif-preview__card strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+.hud-layout-notif-preview__card span {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #ffffffd4;
+  line-height: 1.4;
+}
+
+html.hud-layout-edit .status-hud-wrapper,
+html.hud-layout-edit .health-armor-wrapper,
+html.hud-layout-edit .Speedometer-container,
+html.hud-layout-edit .server-logo-wrapper,
+html.hud-layout-edit .server-logo-wrapper--left,
+html.hud-layout-edit .notistack-SnackbarContainer {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.hud-layout-editor {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  pointer-events: none;
+  font-family: Montserrat, Segoe UI, sans-serif;
+}
+
+.hud-layout-editor.is-on {
+  display: block;
+}
+
+.hud-layout-editor__bar {
+  pointer-events: auto;
+  position: fixed;
+  left: 50%;
+  top: 1.4vh;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #101218f2;
+  border: 1px solid #ffffff1f;
+  color: #fff;
+  box-shadow: 0 16px 40px #0008;
+}
+
+.hud-layout-editor__bar p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hud-layout-editor__bar span {
+  color: #ffffff8c;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.hud-layout-editor__bar button {
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font: 600 12px Montserrat, sans-serif;
+  cursor: pointer;
+  color: #fff;
+  background: #7263ee;
+}
+
+.hud-layout-editor__bar button.is-reset {
+  background: #3d2a12;
+  color: #ffd39a;
+}
+
+.hud-layout-editor__bar button.is-ghost {
+  background: #ffffff14;
+}
+
+.hud-layout-box {
+  pointer-events: auto;
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed #9b91f3;
+  background: transparent !important;
+  box-shadow: none;
+  border-radius: 10px;
+  color: #fff;
+  cursor: grab;
+  user-select: none;
+  display: flex;
+  align-items: flex-start;
+  padding: 6px 8px;
+}
+
+.hud-layout-box:active {
+  cursor: grabbing;
+}
+
+.hud-layout-box b {
+  font-size: 11px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  background: #101218cc;
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+
+html.ui-orient-hud-h .status-grid,
+html.ui-orient-hud-h .health-armor-wrapper {
+  flex-direction: row !important;
+}
+
+html.ui-orient-notif-h .notificationContainer {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  width: 78% !important;
+  height: auto !important;
+  max-height: 30%;
+  gap: 10px;
+}
+
+html.ui-orient-notif-h .notifications {
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  left: 50%;
+  right: auto !important;
+  transform: translateX(-50%);
+}

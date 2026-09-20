@@ -1,0 +1,28 @@
+/* CUSTOM CSS */
+/* Réduire la taille de la police */
+body {
+    font-size: 24px !important;
+}
+
+/* Style du texte du label */
+.ui-dial .ui-label,
+.linear-progress-label {
+    font-size: 18px !important;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+/* Style de l'indicateur */
+.ui-dial .ui-indicator {
+    font-size: 16px !important;
+    font-weight: 600;
+}
+
+/* Amélioration visuelle générale */
+.ui-dial {
+    filter: drop-shadow(0 2px 8px rgba(114, 99, 238, 0.3));
+}
+
+.linear-progress {
+    filter: drop-shadow(0 1px 4px rgba(114, 99, 238, 0.2));
+}

@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<CPedInventoryLoadOutManager>
+  <LoadOuts>
+		
+    <Item>
+      <Name>LOADOUT_CHEAT_0</Name>
+      <Items>
+        <Item type="CLoadOutWeapon">
+          <WeaponName>WEAPON_LESSLAUNCHER</WeaponName>
+          <Ammo value="20" />
+          <Flags />
+          <ComponentNames>
+          </ComponentNames>
+      </Items>
+    </Item>
+    <Item>
+      <Name>LOADOUT_CHEAT_1</Name>
+      <Items>
+        <Item type="CLoadOutWeapon">
+          <WeaponName>WEAPON_LESSLAUNCHER</WeaponName>
+          <Ammo value="20" />
+          <Flags />
+          <ComponentNames>
+          </ComponentNames>
+        </Item>
+      </Items>
+    </Item>
+		
+  </LoadOuts>
+</CPedInventoryLoadOutManager>

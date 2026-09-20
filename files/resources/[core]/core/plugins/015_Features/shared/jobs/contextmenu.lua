@@ -1,0 +1,75 @@
+---@meta _
+---@diagnostic disable: duplicate-doc-field
+
+VFW.Jobs.ContextMenu = {
+    --bennys = {
+    --    veh = {
+    --        { label = "Nettoyer", callback = function(vehicle)  CleanVehicle() end },
+    --        { label = "Réparer la Carrosserie", callback = function(vehicle) RepairCarroserieVehicle() end },
+    --        { label = "Réparer le Moteur", callback = function(vehicle) RepairVehicle() end },
+    --        { label = "Crocheter", callback = function(vehicle) CrochetVehicle() end },
+    --        { label = "Ouvrir les customs du véhicule", callback = function(vehicle) OpenCurrentCustom(vehicle) end },
+    --        { label = "Mettre en fourrière", callback = function(vehicle) PoundVehicle() end, style = { color = { 255, 100, 100 }} },
+    --    },
+    --    ped = {
+    --        { label = "Facture", callback = function(ped) console.debug("Facture to :"..ped) end },
+    --    }
+    --},
+    --
+    --autoexotic = {
+    --    veh = {
+    --        { label = "Nettoyer", callback = function(vehicle)  CleanVehicle() end },
+    --        { label = "Réparer la Carrosserie", callback = function(vehicle) RepairCarroserieVehicle() end },
+    --        { label = "Réparer le Moteur", callback = function(vehicle) RepairVehicle() end },
+    --        { label = "Crocheter", callback = function(vehicle) CrochetVehicle() end },
+    --        { label = "Ouvrir les customs du véhicule", callback = function(vehicle) OpenCurrentCustom(vehicle) end },
+    --        { label = "Mettre en fourrière", callback = function(vehicle) PoundVehicle() end, style = { color = { 255, 100, 100 }} },
+    --    },
+    --    ped = {
+    --        { label = "Facture", callback = function(ped) console.debug("Facture to :"..ped) end },
+    --    }
+    --},
+    --
+    --beekers = {
+    --    veh = {
+    --        { label = "Nettoyer", callback = function(vehicle)  CleanVehicle() end },
+    --        { label = "Réparer la Carrosserie", callback = function(vehicle) RepairCarroserieVehicle() end },
+    --        { label = "Réparer le Moteur", callback = function(vehicle) RepairVehicle() end },
+    --        { label = "Crocheter", callback = function(vehicle) CrochetVehicle() end },
+    --        { label = "Ouvrir les customs du véhicule", callback = function(vehicle) OpenCurrentCustom(vehicle) end },
+    --        { label = "Mettre en fourrière", callback = function(vehicle) PoundVehicle() end, style = { color = { 255, 100, 100 }} },
+    --    },
+    --    ped = {
+    --        { label = "Facture", callback = function(ped) console.debug("Facture to :"..ped) end },
+    --    }
+    --},
+    --
+    --harmony = {
+    --    veh = {
+    --        { label = "Nettoyer", callback = function(vehicle)  CleanVehicle() end },
+    --        { label = "Réparer la Carrosserie", callback = function(vehicle) RepairCarroserieVehicle() end },
+    --        { label = "Réparer le Moteur", callback = function(vehicle) RepairVehicle() end },
+    --        { label = "Crocheter", callback = function(vehicle) CrochetVehicle() end },
+    --        { label = "Ouvrir les customs du véhicule", callback = function(vehicle) OpenCurrentCustom(vehicle) end },
+    --        { label = "Mettre en fourrière", callback = function(vehicle) PoundVehicle() end, style = { color = { 255, 100, 100 }} },
+    --    },
+    --    ped = {
+    --        { label = "Facture", callback = function(ped) console.debug("Facture to :"..ped) end },
+    --    }
+    --},
+    --
+    --hayes = {
+    --    veh = {
+    --        { label = "Nettoyer", callback = function(vehicle)  CleanVehicle() end },
+    --        { label = "Réparer la Carrosserie", callback = function(vehicle) RepairCarroserieVehicle() end },
+    --        { label = "Réparer le Moteur", callback = function(vehicle) RepairVehicle() end },
+    --        { label = "Crocheter", callback = function(vehicle) CrochetVehicle() end },
+    --        { label = "Ouvrir les customs du véhicule", callback = function(vehicle) OpenCurrentCustom(vehicle) end },
+    --        { label = "Mettre en fourrière", callback = function(vehicle) PoundVehicle() end, style = { color = { 255, 100, 100 }} },
+    --    },
+    --    ped = {
+    --        { label = "Facture", callback = function(ped) console.debug("Facture to :"..ped) end },
+    --    }
+    --},
+
+}

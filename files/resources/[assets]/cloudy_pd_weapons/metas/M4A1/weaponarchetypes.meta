@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF - 8"?>
+
+<CWeaponModelInfo__InitDataList>
+	<InitDatas>
+		<Item>
+			<modelName>M4A1_CloudyDev</modelName>
+			<txdName>M4A1</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1SCOPE4_CloudyDev</modelName>
+			<txdName>M4A1</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1SCOPE3_CloudyDev</modelName>
+			<txdName>M4A1</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1SCOPE2_CloudyDev</modelName>
+			<txdName>M4A1</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1SCOPE1_CloudyDev</modelName>
+			<txdName>M4A1</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1FLSH6_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1FLSH5_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1FLSH4_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1FLSH3_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1FLSH2_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1FLSH1_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1CLIP4_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1CLIP3_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1CLIP2_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1CLIP1_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1Barrel4_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1Barrel3_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1Barrel2_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+		<Item>
+			<modelName>M4A1Barrel1_CloudyDev</modelName>
+			<txdName>EXT</txdName>
+			<ptfxAssetName>NULL</ptfxAssetName>
+			<lodDist value="500"/>
+		</Item>
+	</InitDatas>
+</CWeaponModelInfo__InitDataList>
+

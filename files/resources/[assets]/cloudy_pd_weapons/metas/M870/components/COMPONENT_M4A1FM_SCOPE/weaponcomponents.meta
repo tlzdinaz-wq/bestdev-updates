@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF - 8"?>
+
+<CWeaponComponentInfoBlob>
+	<Infos>
+		<Item type="CWeaponComponentScopeInfo">
+			<Name>COMPONENT_M4A1FM_SCOPE_01</Name>
+			<Model>M4A1SCOPE1_FluffysMods</Model>
+			<LocName>WCT_SCOPE_MAC</LocName>
+			<LocDesc>WCD_SCOPE_MAC</LocDesc>
+			<AttachBone>AAPScop</AttachBone>
+			<WeaponAttachBone>WAPScop</WeaponAttachBone>
+			<AccuracyModifier type="NULL"/>
+			<DamageModifier type="NULL"/>
+			<bShownOnWheel value="true"/>
+			<CreateObject value="true"/>
+			<HudDamage value="0"/>
+			<HudSpeed value="0"/>
+			<HudCapacity value="0"/>
+			<HudAccuracy value="5"/>
+			<HudRange value="0"/>
+			<CameraHash/>
+			<RecoilShakeAmplitude value="0.280000"/>
+			<ExtraZoomFactorForAccurateMode value="1.200000"/>
+			<Reticule value="0"/>
+			<ReticuleHash/>
+		</Item>
+		<Item type="CWeaponComponentScopeInfo">
+			<Name>COMPONENT_M4A1FM_SCOPE_02</Name>
+			<Model>M4A1SCOPE2_FluffysMods</Model>
+			<LocName>WCT_SCOPE_MAC</LocName>
+			<LocDesc>WCD_SCOPE_MAC</LocDesc>
+			<AttachBone>AAPScop</AttachBone>
+			<WeaponAttachBone>WAPScop</WeaponAttachBone>
+			<AccuracyModifier type="NULL"/>
+			<DamageModifier type="NULL"/>
+			<bShownOnWheel value="true"/>
+			<CreateObject value="true"/>
+			<HudDamage value="0"/>
+			<HudSpeed value="0"/>
+			<HudCapacity value="0"/>
+			<HudAccuracy value="5"/>
+			<HudRange value="0"/>
+			<CameraHash/>
+			<RecoilShakeAmplitude value="0.280000"/>
+			<ExtraZoomFactorForAccurateMode value="1.200000"/>
+			<Reticule value="0"/>
+			<ReticuleHash/>
+		</Item>
+		<Item type="CWeaponComponentScopeInfo">
+			<Name>COMPONENT_M4A1FM_SCOPE_03</Name>
+			<Model>M4A1SCOPE3_FluffysMods</Model>
+			<LocName>WCT_SCOPE_MAC</LocName>
+			<LocDesc>WCD_SCOPE_MAC</LocDesc>
+			<AttachBone>AAPScop</AttachBone>
+			<WeaponAttachBone>WAPScop</WeaponAttachBone>
+			<AccuracyModifier type="NULL"/>
+			<DamageModifier type="NULL"/>
+			<bShownOnWheel value="true"/>
+			<CreateObject value="true"/>
+			<HudDamage value="0"/>
+			<HudSpeed value="0"/>
+			<HudCapacity value="0"/>
+			<HudAccuracy value="5"/>
+			<HudRange value="0"/>
+			<CameraHash/>
+			<RecoilShakeAmplitude value="0.280000"/>
+			<ExtraZoomFactorForAccurateMode value="1.200000"/>
+			<Reticule value="0"/>
+			<ReticuleHash/>
+		</Item>
+		<Item type="CWeaponComponentScopeInfo">
+			<Name>COMPONENT_M4A1FM_SCOPE_04</Name>
+			<Model>M4A1SCOPE4_FluffysMods</Model>
+			<LocName>WCT_SCOPE_MAC</LocName>
+			<LocDesc>WCD_SCOPE_MAC</LocDesc>
+			<AttachBone>AAPScop</AttachBone>
+			<WeaponAttachBone>WAPScop</WeaponAttachBone>
+			<AccuracyModifier type="NULL"/>
+			<DamageModifier type="NULL"/>
+			<bShownOnWheel value="true"/>
+			<CreateObject value="true"/>
+			<HudDamage value="0"/>
+			<HudSpeed value="0"/>
+			<HudCapacity value="0"/>
+			<HudAccuracy value="5"/>
+			<HudRange value="0"/>
+			<CameraHash/>
+			<RecoilShakeAmplitude value="0.280000"/>
+			<ExtraZoomFactorForAccurateMode value="1.200000"/>
+			<Reticule value="0"/>
+			<ReticuleHash/>
+		</Item>		
+	</Infos>
+	<InfoBlobName/>
+</CWeaponComponentInfoBlob>
+
