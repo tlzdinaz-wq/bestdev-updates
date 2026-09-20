@@ -348,6 +348,81 @@ RegisterNUICallback("vui:getOffset", function(_, cb)
     cb({ enabled = false })
 end)
 
+-- Position libre de la fiche joueur (Gestion serveur uniquement).
+local runtimePreview = nil
+
+---@return table|nil
+local function GetPreviewOffset()
+    if type(runtimePreview) == "table" then
+        return runtimePreview
+    end
+    local raw = GetResourceKvpString("vui_preview_offset")
+    if type(raw) ~= "string" or raw == "" then
+        return nil
+    end
+    local ok, decoded = pcall(json.decode, raw)
+    if ok and type(decoded) == "table" then
+        return decoded
+    end
+    return nil
+end
+
+---@param x number|nil
+---@param y number|nil
+---@param persist? boolean
+---@param w? number
+---@param h? number
+local function SetPreviewOffset(x, y, persist, w, h)
+    if persist == nil then persist = true end
+    if x == nil then
+        runtimePreview = nil
+        if persist then
+            DeleteResourceKvp("vui_preview_offset")
+        end
+        SendNUIMessage({
+            action = "vui:setPreviewOffset",
+            data = { enabled = false }
+        })
+        return
+    end
+    local ox = tonumber(x) or 29.5
+    local oy = tonumber(y) or 2.2
+    runtimePreview = {
+        x = ox,
+        y = oy,
+        w = tonumber(w) or 22.0,
+        h = tonumber(h) or 70.0,
+    }
+    if persist then
+        SetResourceKvp("vui_preview_offset", json.encode(runtimePreview))
+    end
+    SendNUIMessage({
+        action = "vui:setPreviewOffset",
+        data = {
+            enabled = true,
+            x = runtimePreview.x,
+            y = runtimePreview.y,
+            w = runtimePreview.w,
+            h = runtimePreview.h,
+        }
+    })
+end
+
+RegisterNUICallback("vui:getPreviewOffset", function(_, cb)
+    local off = GetPreviewOffset()
+    if off and tonumber(off.x) then
+        cb({
+            enabled = true,
+            x = tonumber(off.x),
+            y = tonumber(off.y) or 2.2,
+            w = tonumber(off.w) or 22.0,
+            h = tonumber(off.h) or 70.0,
+        })
+        return
+    end
+    cb({ enabled = false })
+end)
+
 -- Nombre maximum d'items visibles dans un menu VUI (slider personnalisable)
 local VUI_MAX_ITEMS_MIN = 4
 local VUI_MAX_ITEMS_MAX = 15
@@ -397,6 +472,10 @@ AddEventHandler("onClientResourceStart", function(resourceName)
         if off then
             SetMenuOffset(off.x, off.y, false, off.w)
         end
+        local preview = GetPreviewOffset()
+        if preview then
+            SetPreviewOffset(preview.x, preview.y, false, preview.w, preview.h)
+        end
     end)
 end)
 
@@ -418,6 +497,8 @@ exports("SetMenuPosition", SetMenuPosition)
 exports("GetMenuPosition", GetMenuPosition)
 exports("SetMenuOffset", SetMenuOffset)
 exports("GetMenuOffset", GetMenuOffset)
+exports("SetPreviewOffset", SetPreviewOffset)
+exports("GetPreviewOffset", GetPreviewOffset)
 
 ---@param dir "horizontal"|"vertical"|nil
 local function SetMenuOrientation(dir)
@@ -1444,6 +1525,8 @@ exports("GetMenuPosition", GetMenuPosition)
 exports("SetMenuPosition", SetMenuPosition)
 exports("GetMenuOffset", GetMenuOffset)
 exports("SetMenuOffset", SetMenuOffset)
+exports("GetPreviewOffset", GetPreviewOffset)
+exports("SetPreviewOffset", SetPreviewOffset)
 exports("SetMenuOrientation", SetMenuOrientation)
 exports("GetMaxItems", GetMaxItems)
 exports("SetMaxItems", SetMaxItems)

@@ -39,6 +39,8 @@ exports {
     'SetMenuPosition',
     'GetMenuOffset',
     'SetMenuOffset',
+    'GetPreviewOffset',
+    'SetPreviewOffset',
     'SetMenuOrientation',
     'GetMaxItems',
     'SetMaxItems',

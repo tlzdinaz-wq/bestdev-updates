@@ -8,7 +8,8 @@ VFW.UiLayout = VFW.UiLayout or {}
 
 local JSON_FILE = "config/ui_layout.json"
 local KEYS = { "hud", "menu", "notif" }
-local POS_KEYS = { "minimap", "status", "health", "speedo", "logo", "vui", "notif" }
+local POS_KEYS = { "minimap", "status", "health", "speedo", "logo", "vui", "notif", "preview" }
+local PERSONAL_SKIP = { preview = true }
 local cache = nil
 
 local function norm(value, fallback)
@@ -62,6 +63,9 @@ local function playerOverride(data)
     local positions = sanitizePositions(data)
     if not positions or positions.custom ~= true then
         return nil
+    end
+    for key in pairs(PERSONAL_SKIP) do
+        positions[key] = nil
     end
     return positions
 end
@@ -186,6 +190,9 @@ RegisterServerCallback("hudLayout:saveMine", function(source, data)
         return { ok = false, error = "Données invalides." }
     end
     positions.custom = true
+    for key in pairs(PERSONAL_SKIP) do
+        positions[key] = nil
+    end
     xPlayer.setMeta("hudLayout", positions)
     persistMetadata(xPlayer)
     return { ok = true }

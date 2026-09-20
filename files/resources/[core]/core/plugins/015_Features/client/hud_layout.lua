@@ -331,6 +331,22 @@ local function applyVuiOffset(persist)
     end)
 end
 
+local function applyPreviewOffset(persist)
+    pcall(function()
+        local box
+        if editing and editingServer and layout and layout.preview then
+            box = layout.preview
+        elseif serverLayout and serverLayout.preview then
+            box = serverLayout.preview
+        end
+        if box then
+            exports["VUI"]:SetPreviewOffset(box.x, box.y, persist ~= false, box.w, box.h)
+        else
+            exports["VUI"]:SetPreviewOffset(nil)
+        end
+    end)
+end
+
 local function applyAll(refreshMinimap, reload)
     if reload then
         layout = loadLayout()
@@ -340,6 +356,7 @@ local function applyAll(refreshMinimap, reload)
     applyMinimap(layout.minimap, refreshMinimap ~= false)
     applyNui(layout)
     applyVuiOffset()
+    applyPreviewOffset()
     pushStatusAnchor()
 end
 
@@ -366,6 +383,7 @@ local function ensurePreviewMenu()
             Wait(80)
             if editing and previewMenu and not previewMenu.opened then
                 previewMenu.open()
+                showFichePreview()
                 focusEditor()
             end
         end)
@@ -373,13 +391,49 @@ local function ensurePreviewMenu()
     return previewMenu
 end
 
+local function showFichePreview()
+    if not editingServer or not previewMenu then return end
+    local payload = {
+        { type = "header", iconUrl = "people.png", label = "", value = "Aperçu fiche" },
+        { type = "body", iconUrl = "people.png", label = "ID Session", value = "2" },
+        { type = "body", iconUrl = "data.png", label = "UUID", value = "—" },
+        { type = "body", iconUrl = "shield.png", label = "Rôle", value = "Staff" },
+        { type = "body", iconUrl = "time.png", label = "Temps de jeu", value = "00:00:00" },
+        { type = "body", iconUrl = "people.png", label = "Nom Prénom RP", value = "Aperçu" },
+        { type = "body", iconUrl = "time.png", label = "Date de naissance", value = "—" },
+        { type = "body", iconUrl = "people.png", label = "Taille", value = "—" },
+        { type = "body", iconUrl = "people.png", label = "Sexe", value = "—" },
+        { type = "body", iconUrl = "job.png", label = "Job 1", value = "—" },
+        { type = "body", iconUrl = "crew.png", label = "Job 2 (Faction)", value = "—" },
+        { type = "body", iconUrl = "time.png", label = "TIG", value = "Aucun" },
+        { type = "body", iconUrl = "data.png", label = "Instance", value = "Aucune instance" },
+    }
+    local stats = {
+        { "ID Discord", "—" },
+        { "Nombre de sanctions reçues", 0 },
+    }
+    local function send()
+        if not editing or not editingServer or not previewMenu then return end
+        previewMenu.PlayerPreview(nil, 0xFFFFFF, payload, stats)
+    end
+    send()
+    CreateThread(function()
+        Wait(120)
+        send()
+        Wait(250)
+        send()
+    end)
+end
+
 local function openPreviewMenu()
     pcall(function()
         local menu = ensurePreviewMenu()
         applyVuiOffset(false)
+        applyPreviewOffset(false)
         if menu and not menu.opened then
             menu.open()
         end
+        showFichePreview()
     end)
     CreateThread(function()
         Wait(50)
@@ -435,6 +489,7 @@ end
 function VFW.HudLayout.SetServer(data, _force)
     if type(data) ~= "table" or not hasBoxes(data) then return end
     rememberServer(data)
+    applyPreviewOffset()
     if editing or hasCustom() then return end
     layout = copy(serverLayout)
     applyAll(true)
@@ -445,9 +500,9 @@ function VFW.HudLayout.StartEditor(mode)
     editingServer = mode == "server"
     if editingServer then
         serverLayout = serverLayout or readServerCache()
-        layout = copy(serverLayout or loadLayout())
+        layout = ensureServerPreview(copy(serverLayout or loadLayout()))
     else
-        layout = loadLayout()
+        layout = stripServerOnly(loadLayout())
     end
     backup = copy(layout)
     skipPersonalSave = false
@@ -482,6 +537,8 @@ function VFW.HudLayout.StartEditor(mode)
     })
     applyNui(layout)
     applyMinimap(layout.minimap, true)
+    applyVuiOffset(false)
+    applyPreviewOffset(false)
     SendNUIMessage({
         action = "nui:hudlayout:edit",
         data = layout,
@@ -585,6 +642,7 @@ local function snapToServer()
     applyMinimap(layout.minimap, true)
     applyNui(layout)
     applyVuiOffset()
+    applyPreviewOffset()
     pushStatusAnchor()
     return layout
 end
@@ -594,12 +652,16 @@ function VFW.HudLayout.Reset()
     snapToServer()
     backup = copy(layout)
     if editing then
+        if editingServer then
+            layout = ensureServerPreview(layout)
+        end
         SendNUIMessage({
             action = "nui:hudlayout:set",
             data = layout,
             scope = editingServer and "server" or "player",
         })
         applyVuiOffset(false)
+        applyPreviewOffset(false)
     else
         applyAll(true)
     end
@@ -614,8 +676,14 @@ RegisterNUICallback("nui:hudlayout:preview", function(data, cb)
     if not editing or type(data) ~= "table" then return end
     skipPersonalSave = false
     layout = mergeDefaults(data.layout or data)
+    if editingServer then
+        ensureServerPreview(layout)
+    else
+        stripServerOnly(layout)
+    end
     applyMinimap(layout.minimap, true)
     applyVuiOffset(false)
+    applyPreviewOffset(false)
 end)
 
 RegisterNUICallback("nui:hudlayout:save", function(data, cb)

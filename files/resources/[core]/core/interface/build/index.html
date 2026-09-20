@@ -51,7 +51,7 @@
     <link rel="stylesheet" href="./tablet3d/tablet3d.css?v=3">
     <link rel="stylesheet" href="./skin/boss-panel.css?v=1">
     <link rel="stylesheet" href="./skin/notifications.css?v=7">
-    <link rel="stylesheet" href="./skin/nui-fallbacks.css?v=14">
+    <link rel="stylesheet" href="./skin/nui-fallbacks.css?v=15">
   </head>
   <body style="background: transparent !important;">
     <div id="root" style="background: transparent !important;"></div>
@@ -70,6 +70,19 @@
           <b>Notifications</b>
           <strong>Aperçu</strong>
           <span>Les notifications s'affichent ici.</span>
+        </div>
+      </div>
+      <div id="hud-layout-fiche-preview" class="hud-layout-fiche-preview" aria-hidden="true">
+        <div class="hud-layout-fiche-preview__card">
+          <div class="hud-layout-fiche-preview__name">Aperçu fiche</div>
+          <div class="hud-layout-fiche-preview__grid">
+            <div><span>ID Session</span><b>2</b></div>
+            <div><span>UUID</span><b>—</b></div>
+            <div><span>Rôle</span><b>Staff</b></div>
+            <div><span>Temps de jeu</span><b>00:00:00</b></div>
+            <div><span>Nom Prénom RP</span><b>Aperçu</b></div>
+            <div><span>Job 1</span><b>—</b></div>
+          </div>
         </div>
       </div>
     </div>
@@ -101,8 +114,11 @@
           speedo: 'Compteur',
           logo: 'Logo',
           vui: 'Menu VUI',
-          notif: 'Notifications'
+          notif: 'Notifications',
+          preview: 'Fiche joueur'
         };
+        var editorScope = 'player';
+        var serverOnly = { preview: true };
         function resourceName() {
           return typeof GetParentResourceName === 'function' ? GetParentResourceName() : 'core';
         }
@@ -123,9 +139,25 @@
         };
         function unwrap(data) {
           if (!data) return null;
-          if (data.layout && (data.layout.minimap || data.layout.status || data.layout.vui || data.layout.notif)) return data.layout;
-          if (data.minimap || data.status || data.vui || data.notif) return data;
+          if (data.layout && (data.layout.minimap || data.layout.status || data.layout.vui || data.layout.notif || data.layout.preview)) return data.layout;
+          if (data.minimap || data.status || data.vui || data.notif || data.preview) return data;
           return null;
+        }
+        function defaultFicheBox() {
+          return { x: 29.5, y: 2.2, w: 22, h: 70 };
+        }
+        function pinFiche(box) {
+          var el = document.getElementById('hud-layout-fiche-preview');
+          if (!el) return;
+          var show = !!(box && editorScope === 'server' && editor.classList.contains('is-on'));
+          el.setAttribute('aria-hidden', show ? 'false' : 'true');
+          if (!box) return;
+          el.style.left = box.x + '%';
+          el.style.top = box.y + '%';
+          el.style.width = (box.w || 22) + '%';
+          root.style.setProperty('--hud-preview-left', box.x + '%');
+          root.style.setProperty('--hud-preview-top', box.y + '%');
+          root.style.setProperty('--hud-preview-width', (box.w || 22) + '%');
         }
         function pinNotifs(box) {
           if (!box) return;
@@ -181,6 +213,7 @@
           });
           root.classList.add('hud-layout-on');
           pinNotifs(next.notif);
+          pinFiche(next.preview);
         }
         function previewSoon() {
           if (previewTimer) return;
@@ -207,7 +240,11 @@
         }
         function renderBoxes() {
           editor.querySelectorAll('.hud-layout-box').forEach(function (el) { el.remove(); });
+          if (editorScope === 'server' && (!layout.preview || layout.preview.x == null)) {
+            layout.preview = defaultFicheBox();
+          }
           Object.keys(labels).forEach(function (key) {
+            if (serverOnly[key] && editorScope !== 'server') return;
             var box = layout[key];
             if (!box) return;
             var el = document.createElement('div');
@@ -220,7 +257,7 @@
             el.innerHTML = '<b>' + labels[key] + '</b>';
             bindDrag(el, key);
             editor.appendChild(el);
-            if (key !== 'notif') fitBoxToTarget(el, key);
+            if (key !== 'notif' && key !== 'preview') fitBoxToTarget(el, key);
           });
         }
         function bindDrag(el, key) {
@@ -268,8 +305,12 @@
           editor.setAttribute('aria-hidden', 'false');
           var preview = document.getElementById('hud-layout-notif-preview');
           if (preview) preview.setAttribute('aria-hidden', 'false');
+          pinFiche(layout.preview);
           renderBoxes();
-          setTimeout(renderBoxes, 180);
+          setTimeout(function () {
+            renderBoxes();
+            pinFiche(layout.preview);
+          }, 180);
         }
         function closeEditor() {
           editor.classList.remove('is-on');
@@ -277,6 +318,7 @@
           editor.setAttribute('aria-hidden', 'true');
           var preview = document.getElementById('hud-layout-notif-preview');
           if (preview) preview.setAttribute('aria-hidden', 'true');
+          pinFiche(null);
           editor.querySelectorAll('.hud-layout-box').forEach(function (el) { el.remove(); });
         }
         window.addEventListener('message', function (e) {
@@ -284,21 +326,26 @@
           if (!d || !d.action) return;
           if (d.action === 'nui:hudlayout:apply' && d.data) applyVars(d.data);
           if (d.action === 'nui:hudlayout:edit' && d.data) {
+            editorScope = d.scope === 'server' ? 'server' : 'player';
             openEditor(d.data);
             var hint = document.querySelector('.hud-layout-editor__bar span');
             var title = document.querySelector('.hud-layout-editor__bar p');
             if (title) title.textContent = d.scope === 'server' ? 'Positions serveur' : 'Déplacer les interfaces';
             if (hint) {
               hint.textContent = d.scope === 'server'
-                ? 'Pour tous les joueurs · Entrée valider · Réinitialiser défaut · Échap annuler'
+                ? 'Pour tous · fiche joueur comprise · Entrée valider · Réinitialiser défaut · Échap annuler'
                 : 'Tes positions · Entrée valider · Réinitialiser = layout serveur · Échap annuler';
             }
           }
           if (d.action === 'nui:hudlayout:set' && d.data) {
+            if (d.scope) editorScope = d.scope === 'server' ? 'server' : 'player';
             applyVars(d.data);
             renderBoxes();
           }
-          if (d.action === 'nui:hudlayout:close') closeEditor();
+          if (d.action === 'nui:hudlayout:close') {
+            editorScope = 'player';
+            closeEditor();
+          }
         });
         document.getElementById('hud-layout-save').addEventListener('click', function () {
           post('nui:hudlayout:save', { layout: layout });

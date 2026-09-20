@@ -145,6 +145,57 @@ html.hud-has-real-notifs .hud-layout-notif-preview {
   display: none !important;
 }
 
+.hud-layout-fiche-preview {
+  display: none;
+  position: absolute;
+  left: var(--hud-preview-left, 29.5%);
+  top: var(--hud-preview-top, 2.2%);
+  width: var(--hud-preview-width, 22%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.hud-layout-editor.is-on .hud-layout-fiche-preview[aria-hidden="false"] {
+  display: block;
+}
+
+.hud-layout-fiche-preview__card {
+  padding: 14px 16px 16px;
+  border-radius: 16px;
+  color: #fff;
+  font-family: Inter, Montserrat, Segoe UI, sans-serif;
+  background: linear-gradient(180deg, rgba(20, 23, 32, .96), rgba(11, 13, 19, .97));
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: 0 30px 70px -24px rgba(0, 0, 0, .85);
+}
+
+.hud-layout-fiche-preview__name {
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.hud-layout-fiche-preview__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+
+.hud-layout-fiche-preview__grid > div span {
+  display: block;
+  font-size: 10px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  opacity: .55;
+}
+
+.hud-layout-fiche-preview__grid > div b {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .hud-layout-notif-preview__card {
   --n3d-accent: var(--brand-primary-rgb, 114, 99, 238);
   min-height: 86px;
