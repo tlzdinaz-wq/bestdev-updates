@@ -1,12 +1,15 @@
 {
- "version": "1.12.15",
- "date": "2026-09-20T01:30:03.661Z",
- "notes": "**Interfaces**\n• 🧭 Le menu VUI suit vraiment le cadre (F5 / Gestion). Placée à droite, le logo HUD bascule de l’autre côté.\n• 🔔 Les notifications se posent à l’endroit exact du cadre, sans casser le HUD (échelle, boussole, faim / vie).\n• 👤 Gestion → Positions des interfaces : cadre **Fiche joueur** (carte staff) pour tout le serveur. Pas dans le F5.\n• 🆔 L’ID en haut à droite est l’ID de session, plus l’identifiant unique de compte.\n\n**À faire en jeu**\nRelance `core` et `VUI`, ou `/uireload`, pour vider le cache NUI. Aucune ligne `server.cfg` à ajouter.",
- "added": [],
+ "version": "1.12.16",
+ "date": "2026-09-20T01:49:02.573Z",
+ "notes": "**HUD statut**\n• ❤️ Vie / armure : barres fines sans cadre, pastille ronde avec icône (cœur / bouclier) cerclée de la couleur, remplissage lumineux avec halo.\n• 🍴💧 Faim / soif / oxygène : anneaux plus épais à bouts arrondis avec halo, disque sombre, icône dans une pastille centrale — le pourcentage n'est plus affiché.\n• Thèmes Néon / Cercles / Minimal, couleurs du F5 et éditeur de positions conservés.\n\nRedémarrage de `core` après la mise à jour (`update restart` le fait).",
+ "added": [
+  "resources/[core]/core/interface/build/skin/status-hud.css"
+ ],
  "changed": [
-  "PATCHNOTES.md"
+  "resources/[core]/core/interface/build/index.html",
+  "resources/[core]/core/interface/build/skin/README.md"
  ],
  "removed": [],
- "total": 289548293,
- "fileCount": 3311
+ "total": 289552190,
+ "fileCount": 3312
 }
