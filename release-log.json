@@ -1,16 +1,17 @@
 {
- "version": "1.12.38",
- "date": "2026-09-20T15:09:42.365Z",
- "notes": "**Correction builder concessionnaire (hub)** — case MODE AUTO, listes (voiture/bateau/avion, job), saisie du nom, et surtout **ajout des points** (catalogue / preview / spawn / showcase) qui restaient à 0 : le refresh menu fermait/rouvrait et annulait l’affichage. Rebuild sans fermer. Points aussi miroirés dans `config/concess_points.json`.\n\nPour appliquer : `update.bat` / `./update.sh`, ou l’archive ci-jointe.",
+ "version": "1.12.39",
+ "date": "2026-09-20T16:00:11.148Z",
+ "notes": "**Builder concessionnaire (hub)** — nom, jobs et points se mettent enfin à jour à l’écran (plus de « Non défini » / « Chargement… » / 0 point alors que la notif était bonne).\n\nSaisie avec **l’ancien clavier NUI** : le hub se masque le temps d’écrire, puis revient.\n\nPour appliquer : `update.bat` / `./update.sh`, puis `ensure VUI` et `ensure core` (ou restart). L’archive des fichiers modifiés est jointe.",
  "added": [],
  "changed": [
+  "resources/[core]/core/interface/build/index.html",
   "resources/[core]/core/interface/gestion/assets/index.js",
-  "resources/[core]/core/jobs/concess/server/320_concess_store.lua",
-  "resources/[core]/core/plugins/015_Features/client/inventory/ped_display.lua",
+  "resources/[core]/core/plugins/000_framework/client/010_nui.lua",
   "resources/[core]/core/plugins/015_Features/client/staff/menu/builderConcess.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_hub.lua",
   "resources/[core]/VUI/vui.lua"
  ],
  "removed": [],
- "total": 289342736,
+ "total": 289347186,
  "fileCount": 3313
 }

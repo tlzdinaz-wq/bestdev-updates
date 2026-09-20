@@ -10,6 +10,18 @@
     <style>
       html, body, #root { background: transparent !important; }
       .container-weather-manager { z-index: 10050 !important; pointer-events: auto !important; }
+      /* Clavier NUI au-dessus du hub gestion (iframe z-index 9999) */
+      html.kbd-open #gestion-hub {
+        display: none !important;
+        pointer-events: none !important;
+      }
+      html.kbd-open #root {
+        position: relative !important;
+        z-index: 100000 !important;
+      }
+      html.kbd-open .KeyboardInput {
+        z-index: 2147483646 !important;
+      }
       /* Inventaire : NE PAS mettre #root en position:fixed (casse le rendu CEF /
          x-cfx-game-view → UI dans le DOM mais invisible). On fixe uniquement
          le panneau inventaire, et on masque la boutique (iframe). */
@@ -40,6 +52,12 @@
         var d = e && e.data;
         if (!d || d.action !== 'nui:inventory:visible') return;
         document.documentElement.classList.toggle('inventory-open', !!d.data);
+      });
+      // Clavier ouvert : remonte #root et cache le hub (sinon saisie impossible).
+      window.addEventListener('message', function (e) {
+        var d = e && e.data;
+        if (!d || d.action !== 'nui:keyboardinput:visible') return;
+        document.documentElement.classList.toggle('kbd-open', !!d.data);
       });
     </script>
     <script>
@@ -695,7 +713,7 @@
     </script>
     <script>
       (function () {
-        var GESTION_ACTIONS = ['gestion:open', 'gestion:close', 'gestion:cover', 'gestion:uncover', 'gestion:minimize', 'gestion:restore', 'gestion:vui', 'gestion:policeAlerts:sync', 'gestion:images:sync', 'gestion:images:capture', 'gestion:images:progress', 'gestion:images:generateDone', 'gestion:notifs:sync', 'core:branding:apply'];
+        var GESTION_ACTIONS = ['gestion:open', 'gestion:close', 'gestion:cover', 'gestion:uncover', 'gestion:minimize', 'gestion:restore', 'gestion:vui', 'gestion:textInput', 'gestion:policeAlerts:sync', 'gestion:images:sync', 'gestion:images:capture', 'gestion:images:progress', 'gestion:images:generateDone', 'gestion:notifs:sync', 'core:branding:apply'];
         var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;z-index:9999;';
         var HIDDEN = BASE + 'display:none;pointer-events:none;';
         var SHOWN = BASE + 'display:block;pointer-events:auto;';
@@ -732,6 +750,18 @@
             frame.blur();
             window.focus();
           } else if (d.action === 'gestion:close' || d.action === 'gestion:cover') {
+            frame.style.cssText = HIDDEN;
+            frame.blur();
+            window.focus();
+          }
+        });
+
+        // Clavier NUI (#root) : son z-index est piégé sous l'iframe hub (9999).
+        // Masquer le hub dès l'ouverture du clavier (filet de sécurité en plus de CoverGestionHub).
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || d.action !== 'nui:keyboardinput:visible') return;
+          if (d.data) {
             frame.style.cssText = HIDDEN;
             frame.blur();
             window.focus();

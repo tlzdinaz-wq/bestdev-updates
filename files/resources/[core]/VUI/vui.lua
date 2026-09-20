@@ -1208,9 +1208,11 @@ function CreateMenu(title, banner, autoRefresh)
         end)
     end
 
-    --- Rebuild le menu ouvert sans close/open (pas de flash, pas de course hub/OnClose).
-    --- Toujours précéder d'un `if menu.opened then` côté appelant.
-    menu.refresh = function(resetIndex)
+    --- Rebuild sans close/open (hub-safe) : OnOpen ne doit pas yield.
+    --- _openFn est souvent une funcref `core` : l'appeler depuis un clic NUI VUI
+    --- (VUI → core callback → VUI softRefresh → core OnOpen) casse FiveM.
+    --- Même schéma que open() : CreateThread + _openGen.
+    menu.softRefresh = function(resetIndex)
         if not menu.opened or VUI_CurrentMenu ~= menu then
             return
         end
@@ -1218,9 +1220,9 @@ function CreateMenu(title, banner, autoRefresh)
             VUI_LastMenuIndex[menu.title] = menu.index
         end
 
-        menu.ClearItems()
         menu._openGen = (menu._openGen or 0) + 1
         local openGen = menu._openGen
+        menu.ClearItems()
 
         CreateThread(function()
             if menu._openFn then
@@ -1281,6 +1283,20 @@ function CreateMenu(title, banner, autoRefresh)
                 }
             })
         end)
+    end
+
+    --- Rebuild le menu : ferme puis rouvre.
+    --- ⚠️ En hub, préférer softRefresh (évite courses OnClose / iframe).
+    menu.refresh = function(resetIndex)
+        if not resetIndex then
+            VUI_LastMenuIndex[menu.title] = menu.index
+        end
+        local stack = VUI_MenuStack
+        VUI_Switching = true
+        menu.close()
+        VUI_Switching = false
+        VUI_MenuStack = stack
+        menu.open()
     end
 
     menu.toggle = function()

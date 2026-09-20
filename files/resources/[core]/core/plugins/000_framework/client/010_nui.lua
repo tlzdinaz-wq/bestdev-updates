@@ -683,6 +683,9 @@ function VFW.Nui.KeyboardInput(visible, text, defaultValue, keepInput, options)
     kbd_input = nil
 
     VFW.Nui.KeyboardInputVisible(visible, keepInput)
+    -- Laisser le parent appliquer gestion:cover (iframe display:none) avant le clavier.
+    Wait(0)
+    Wait(0)
 
     if text then
         local data = {
@@ -711,10 +714,12 @@ function VFW.Nui.KeyboardInput(visible, text, defaultValue, keepInput, options)
 end
 
 RegisterNUICallback('nui:keyboardinput:response', function(data, cb)
-    if not data.value then
+    -- Accepter aussi une chaîne vide explicite comme annulation.
+    local value = data and data.value
+    if value == nil or value == false then
         kbd_input = "KBD_CANCEL"
     else
-        kbd_input = data.value
+        kbd_input = tostring(value)
     end
 
     VFW.Nui.KeyboardInputVisible(false)

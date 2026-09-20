@@ -32,6 +32,7 @@ end
 local hubOpen = false
 local hubMinimized = false
 local hubData = nil
+local hubTextInput = nil
 
 local function HasPerm(perms, need)
     if VFW.HasStaffPerm then
@@ -245,6 +246,9 @@ function StaffMenu.CloseGestionHub()
     if not hubOpen then return end
     hubOpen = false
     hubMinimized = false
+    if hubTextInput == nil then
+        hubTextInput = false
+    end
     -- Nettoyage des outils natifs (previews, freecam, skin...) — gestion_dev.lua
     TriggerEvent("gestion:hub:closed")
     -- Coupe un éventuel menu VUI encore rendu dans le hub
@@ -490,6 +494,40 @@ end)
 RegisterNuiCallback("gestion:restore", function(_, cb)
     cb({})
     StaffMenu.RestoreGestionHub()
+end)
+
+-- Saisie texte DANS le hub (évite le clavier NUI coincé sous l'iframe).
+function StaffMenu.HubTextInput(title, defaultValue)
+    if not hubOpen then
+        return VFW.Nui.KeyboardInput(true, title, defaultValue or "")
+    end
+    hubTextInput = nil
+    -- S'assurer que l'iframe est visible (pas couverte)
+    SendNUIMessage({ action = "gestion:uncover" })
+    SendNUIMessage({
+        action = "gestion:textInput",
+        data = {
+            title = title or "Saisie",
+            defaultValue = defaultValue or "",
+        },
+    })
+    VFW.Nui.Focus(true)
+    while hubTextInput == nil do
+        Wait(50)
+    end
+    if hubTextInput == false then
+        return ""
+    end
+    return tostring(hubTextInput)
+end
+
+RegisterNuiCallback("gestion:textInput:response", function(data, cb)
+    cb({})
+    if type(data) ~= "table" or data.cancel or data.value == nil then
+        hubTextInput = false
+    else
+        hubTextInput = tostring(data.value)
+    end
 end)
 
 RegisterNuiCallback("gestion:select", function(data, cb)
