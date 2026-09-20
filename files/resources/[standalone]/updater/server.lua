@@ -124,18 +124,52 @@ local function mkdirp(dir)
     end
 end
 
+-- Ressource + chemin interne d'un fichier de resources/ ("resources/[grp]/res/a/b" → "res", "a/b")
+local function splitResource(path)
+    local root = serverRoot()
+    local rel = path:sub(#root + 2)
+    if rel:sub(1, 10) ~= "resources/" then return nil end
+    local rest = rel:sub(11)
+    local pos = 1
+    while true do
+        local s2, e2, seg = rest:find("([^/]+)/", pos)
+        if not s2 then return nil end
+        if seg:sub(1, 1) ~= "[" then return seg, rest:sub(e2 + 1) end
+        pos = e2 + 1
+    end
+end
+
+local function knownResource(name)
+    local ok, p = pcall(GetResourcePath, name)
+    return ok and type(p) == "string" and p ~= ""
+end
+
+-- Écriture d'un fichier : via l'API FiveM (SaveResourceFile, chemin relatif à la
+-- ressource — jamais bloquée par les sandboxes) quand la ressource est connue du serveur ;
+-- sinon io.open (nouvelle ressource), puis `refresh` pour que le serveur la découvre et que
+-- ses autres fichiers passent par SaveResourceFile. Les fxmanifest.lua sont écrits en premier.
+local refreshedFor = {}
 local function writeFile(path, data)
     local dir = path:match("^(.*)/[^/]+$")
     if dir then mkdirp(dir) end
+    local resName, inner = splitResource(path)
+    if resName and inner and knownResource(resName) then
+        if SaveResourceFile(resName, inner, data, -1) then return true end
+    end
     local tmp = path .. ".updtmp"
-    local f = io.open(tmp, "wb")
-    if not f then return false, "ouverture impossible" end
+    local f, openErr = io.open(tmp, "wb")
+    if not f then return false, "écriture refusée (" .. tostring(openErr) .. ")" end
     local ok = f:write(data)
     f:close()
     if not ok then os.remove(tmp) return false, "écriture impossible" end
     os.remove(path)
     local moved, mvErr = os.rename(tmp, path)
     if not moved then os.remove(tmp) return false, tostring(mvErr) end
+    if resName and not knownResource(resName) and not refreshedFor[resName] and path:match("/fxmanifest%.lua$") then
+        refreshedFor[resName] = true
+        ExecuteCommand("refresh")
+        if Wait then Wait(500) end
+    end
     return true
 end
 
@@ -363,6 +397,11 @@ local function apply(manifest, p, state, base, root)
     if state and state.files then for k, v in pairs(state.files) do newFiles[k] = v end end
     local done = 0
 
+    table.sort(p.download, function(a, b)
+        local am, bm = a.rel:match("/fxmanifest%.lua$") ~= nil, b.rel:match("/fxmanifest%.lua$") ~= nil
+        if am ~= bm then return am end
+        return a.rel < b.rel
+    end)
     local errors = runPool(p.download, function(item)
         local url = base .. "/files/" .. encodePath(item.rel)
         local r = httpGet(url)
