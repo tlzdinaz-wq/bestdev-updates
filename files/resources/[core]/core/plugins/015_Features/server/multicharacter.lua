@@ -34,11 +34,38 @@ local function buildSelectionEntry(row)
     }
 end
 
+-- Chargement des personnages avec nouvelle tentative : une erreur SQL passagère ne doit
+-- jamais se traduire par « aucun personnage » (le joueur serait envoyé au créateur).
+local function loadCharactersSafe(account)
+    for attempt = 1, 3 do
+        local ok, rows = pcall(VFW.DB.LoadCharacters, account.id)
+        if ok and type(rows) == "table" then return rows end
+        console.warn(("[multichar] chargement des personnages de %s échoué (essai %d) : %s"):format(tostring(account.identifier), attempt, tostring(rows)))
+        Wait(400 * attempt)
+    end
+    return nil
+end
+
 local function sendSelection(source)
     local account = VFW.GetPendingAccount(source)
-    if not account then return end
+    if not account then
+        -- compte pas encore prêt (reconnexion rapide) : on laisse un peu de temps
+        for _ = 1, 10 do
+            Wait(200)
+            account = VFW.GetPendingAccount(source)
+            if account then break end
+        end
+        if not account then
+            DropPlayer(source, "Votre compte n'a pas pu être chargé. Reconnectez-vous.")
+            return
+        end
+    end
 
-    local rows = VFW.DB.LoadCharacters(account.id)
+    local rows = loadCharactersSafe(account)
+    if not rows then
+        DropPlayer(source, "Erreur de base de données lors du chargement de vos personnages. Reconnectez-vous dans quelques secondes.")
+        return
+    end
 
     local characters = {}
     for i = 1, #rows do
@@ -157,8 +184,22 @@ RegisterNetEvent("core:server:createIdentity", function(data)
     local identifier = VFW.GetCharIdentifier(source, slot)
     if not identifier then return end
 
-    if VFW.DB.LoadCharacter(identifier) then
-        console.warn(("[multichar] tentative de recréation du slot %d de %s"):format(slot, account.identifier))
+    local existing = VFW.DB.LoadCharacter(identifier)
+    if existing then
+        -- Le personnage existe déjà (créateur rouvert après une apparence non enregistrée,
+        -- ou reconnexion pendant la création) : on complète l'apparence et on le charge,
+        -- au lieu de laisser le joueur sans interface.
+        console.warn(("[multichar] slot %d de %s existe déjà : apparence mise à jour et personnage chargé"):format(slot, account.identifier))
+        local skin = type(data.skin) == "table" and next(data.skin) ~= nil and data.skin or nil
+        if skin then
+            pcall(MySQL.update.await, "UPDATE characters SET skin = ?, tattoos = ? WHERE identifier = ?", {
+                json.encode(skin), json.encode(data.tattoos or existing.tattoos or {}), identifier,
+            })
+            existing.skin = skin
+            if type(data.tattoos) == "table" then existing.tattoos = data.tattoos end
+        end
+        pendingSlot[source] = nil
+        VFW.LoadCharacterForSource(source, existing, account, false)
         return
     end
 

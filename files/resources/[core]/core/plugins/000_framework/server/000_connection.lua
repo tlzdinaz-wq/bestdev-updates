@@ -96,8 +96,10 @@ function VFW.LogoutPlayer(source, keepConnected)
     xPlayer.save()
 
     VFW.Players[source] = nil
-    VFW.PlayersByIdentifier[xPlayer.identifier] = nil
-    VFW.PlayersByCharId[xPlayer.charId] = nil
+    -- Reconnexion rapide : une nouvelle session a pu charger le même personnage avant que
+    -- l'ancienne soit détectée comme déconnectée — on ne retire que nos propres entrées.
+    if VFW.PlayersByIdentifier[xPlayer.identifier] == xPlayer then VFW.PlayersByIdentifier[xPlayer.identifier] = nil end
+    if VFW.PlayersByCharId[xPlayer.charId] == xPlayer then VFW.PlayersByCharId[xPlayer.charId] = nil end
     VFW.SetGlobalPlayerCount()
 
     TriggerEvent("vfw:playerDropped", source, xPlayer)
@@ -115,7 +117,15 @@ AddEventHandler("playerDropped", function(reason)
 
     local identifier = VFW.GetIdentifier(source)
     if identifier then
-        pendingAccounts[identifier] = nil
+        -- ne pas effacer le compte d'une nouvelle session du même joueur (reconnexion rapide)
+        local otherSession = false
+        for _, other in ipairs(GetPlayers()) do
+            if tonumber(other) ~= tonumber(source) and VFW.GetIdentifier(other) == identifier then
+                otherSession = true
+                break
+            end
+        end
+        if not otherSession then pendingAccounts[identifier] = nil end
     end
 
     if xPlayer then
