@@ -74,6 +74,23 @@ function fetchBuffer(url, redirects = 5) {
     });
 }
 
+// GitHub : raw.githubusercontent.com met la branche en cache plusieurs minutes (manifest ou
+// fichiers périmés → hash différent). On demande le commit courant à l'API et on lit tout
+// depuis ce commit précis (URL immuable, jamais en cache).
+async function resolveBase(base) {
+    const m = base.match(/^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/?$/);
+    if (!m) return base;
+    try {
+        const info = JSON.parse((await fetchBuffer('https://api.github.com/repos/' + m[1] + '/' + m[2] + '/commits/' + m[3])).toString('utf8'));
+        if (info && typeof info.sha === 'string' && /^[0-9a-f]{40}$/.test(info.sha)) {
+            return 'https://raw.githubusercontent.com/' + m[1] + '/' + m[2] + '/' + info.sha;
+        }
+    } catch (e) {
+        warn('API GitHub indisponible (' + e.message + ') : lecture directe de la branche, un cache de quelques minutes est possible.');
+    }
+    return base;
+}
+
 function safeRel(rel) {
     const norm = rel.replace(/\\/g, '/');
     if (!norm || norm.startsWith('/') || /^[a-zA-Z]:/.test(norm) || norm.split('/').includes('..')) return null;
@@ -164,11 +181,10 @@ async function runPool(items, worker) {
     return errors;
 }
 
-async function apply(manifest, p, state) {
+async function apply(manifest, p, state, base) {
     const root = serverRoot();
     const version = String(manifest.version || 'inconnue');
     const backupRoot = path.join(BACKUP_DIR, version.replace(/[^\w.-]/g, '_'));
-    const base = String(GetConvar('update_url', '')).replace(/\/+$/, '');
     const touched = new Set();
     const newFiles = state && state.files ? { ...state.files } : {};
     let done = 0;
@@ -234,14 +250,15 @@ async function command(args) {
     busy = true;
     try {
         const mode = (args[0] || '').toLowerCase();
-        const base = String(GetConvar('update_url', '')).replace(/\/+$/, '');
+        const configured = String(GetConvar('update_url', '')).replace(/\/+$/, '');
         const state = readState();
 
         if (mode === 'version') {
             log('version installée : ' + ((state && state.version) || 'inconnue') + (state && state.date ? ' (' + state.date.slice(0, 10) + ')' : ''));
-            if (!base) { warn('update_url non défini dans server.cfg : impossible de vérifier la version disponible.'); return; }
+            if (!configured) { warn('update_url non défini dans server.cfg : impossible de vérifier la version disponible.'); return; }
         }
-        if (!base) { err('définis `set update_url "https://…"` dans server.cfg (racine contenant manifest.json).'); return; }
+        if (!configured) { err('définis `set update_url "https://…"` dans server.cfg (racine contenant manifest.json).'); return; }
+        const base = await resolveBase(configured);
 
         let manifest;
         try {
@@ -283,7 +300,7 @@ async function command(args) {
             return;
         }
 
-        const res = await apply(manifest, p, state);
+        const res = await apply(manifest, p, state, base);
         if (res.errors.length) {
             for (const e of res.errors) err('échec : ' + (e.item.rel || '?') + ' — ' + e.error.message);
             err(res.errors.length + ' erreur(s). Relance `update` pour réessayer.');
