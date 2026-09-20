@@ -152,7 +152,11 @@ RegisterNetEvent("vfw:multicharacter:CharacterChosen", function(id, isNew)
         return
     end
 
-    local rows = VFW.DB.LoadCharacters(account.id)
+    local rows = loadCharactersSafe(account)
+    if not rows then
+        DropPlayer(source, "Erreur de base de données lors du chargement de votre personnage. Reconnectez-vous.")
+        return
+    end
     local wanted = tonumber(id)
     local row
     for i = 1, #rows do
@@ -161,8 +165,13 @@ RegisterNetEvent("vfw:multicharacter:CharacterChosen", function(id, isNew)
             break
         end
     end
+    if not row and wanted and rows[wanted] then
+        -- secours : un client qui envoie encore l'index de la liste (1, 2, 3…)
+        row = rows[wanted]
+    end
     if not row then
-        console.warn(("[multichar] slot %s introuvable pour %s"):format(tostring(id), account.identifier))
+        console.warn(("[multichar] personnage %s introuvable pour %s (%d personnage(s))"):format(tostring(id), account.identifier, #rows))
+        VFW.ShowNotification(source, { type = "ROUGE", content = "Personnage introuvable, sélection rechargée." })
         sendSelection(source)
         return
     end

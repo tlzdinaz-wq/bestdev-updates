@@ -546,6 +546,15 @@ RegisterNuiCallback("multicharacter:PlayerSelected", function(id)
     if not id or not Multicharacter.inSelection then
         return
     end
+    -- La NUI renvoie l'index dans la liste (1, 2, 3…) ; le serveur attend l'id du
+    -- personnage en base. Les deux ne coïncident que sur un serveur tout neuf : ailleurs
+    -- « Entrer en jeu » renvoyait simplement à la sélection.
+    local entry = Multicharacter.Characters[id]
+    if not entry then
+        console.warn("[Multicharacter] personnage introuvable pour l'index " .. tostring(id))
+        return
+    end
+    local charId = entry.id or entry.charId or id
     Multicharacter.inSelection = false
 
     -- Instant fade to black to hide time change
@@ -564,7 +573,7 @@ RegisterNuiCallback("multicharacter:PlayerSelected", function(id)
     VFW.Cam:Destroy("multichar")
     -- ClearFocus() moved to after spawn completes in VFW.SpawnPlayer
     Multicharacter:Cleanup()
-    TriggerServerEvent("vfw:multicharacter:CharacterChosen", id, false)
+    TriggerServerEvent("vfw:multicharacter:CharacterChosen", charId, false)
 
 end)
 

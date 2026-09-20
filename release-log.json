@@ -1,13 +1,13 @@
 {
- "version": "1.12.33",
- "date": "2026-09-20T13:40:26.195Z",
- "notes": "**Connexion & updater**\n• Connexion : un joueur ne peut plus rester bloqué sur « chargement de votre compte… » — si la base de données ne répond pas en 20 s, il reçoit un message et peut réessayer.\n• Updater : test d'écriture avant téléchargement avec un message clair quand l'hébergement n'autorise pas l'écriture (droits/propriétaire des fichiers, fréquent sur Linux : `chown -R <utilisateur> resources`), et aide en cas de « Access denied for command restart ».\n\n**`server.cfg` — lignes à ajouter (redémarrage automatique des ressources par l'updater)**\n```\nadd_ace resource.updater command.restart allow\nadd_ace resource.updater command.refresh allow\n```",
+ "version": "1.12.34",
+ "date": "2026-09-20T13:49:50.161Z",
+ "notes": "**Correctif — « Entrer en jeu » qui renvoie à la sélection**\n• Sur la sélection de personnage, cliquer « Entrer en jeu » ramenait à la sélection au lieu de faire apparaître le joueur (sauf sur un serveur tout neuf). L'interface envoyait la position dans la liste au lieu de l'identifiant du personnage. Corrigé, avec un message clair si un personnage est vraiment introuvable.\n\n`update` puis `restart core` (ou `update restart`).",
  "added": [],
  "changed": [
-  "resources/[core]/core/plugins/000_framework/server/000_connection.lua",
-  "resources/[standalone]/updater/server.lua"
+  "resources/[core]/core/plugins/015_Features/client/multicharacter/modules/multicharacter.lua",
+  "resources/[core]/core/plugins/015_Features/server/multicharacter.lua"
  ],
  "removed": [],
- "total": 289320063,
+ "total": 289321013,
  "fileCount": 3309
 }
