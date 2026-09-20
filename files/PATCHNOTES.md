@@ -1,3 +1,67 @@
+# Patch notes — Best Dev (core v1.12.15) — 20/09/2026
+
+## Interfaces
+
+### Positions (F5 et Gestion)
+- Le **menu VUI** suit vraiment le cadre : plus seulement un rectangle vide. Si tu le places à droite, le logo HUD passe de l’autre côté.
+- Les **notifications** se placent à l’endroit exact du cadre (pile Best Dev), sans casser le reste du HUD (échelle, boussole, faim / vie).
+- **Gestion → Positions des interfaces** : un cadre **Fiche joueur** (carte staff : ID session, UUID, etc.) pour tout le serveur. Il n’apparaît **pas** dans le F5 : un joueur ne peut pas l’écraser avec son HUD perso.
+- Les positions serveur restent après reboot (`config/ui_layout.json`). Tant qu’un joueur n’a pas validé un layout F5, il suit Gestion. **Réinitialiser** le ramène au layout serveur.
+
+### HUD
+- L’ID affiché en haut à droite est l’**ID de session** (celui du serveur), plus l’identifiant unique de compte.
+
+## Corrections
+- Déplacer les notifications ne déforme plus le HUD entier.
+- La fiche staff et les aperçus à côté du menu suivent la position du menu (ou la position enregistrée en Gestion).
+
+---
+
+# Patch notes — Best Dev (core v1.12.14) — 20/09/2026
+
+## Nouveautés
+
+### Chat (touche T)
+- Nouveau chat, aux couleurs et au logo du serveur. `T` ouvre la saisie (touche rebindable dans Paramètres → Touches → FiveM), `Entrée` envoie, `Échap` ferme.
+- Tape `/` : les commandes s'affichent au fur et à mesure avec leurs paramètres et leur description ; `Tab` complète, le paramètre en cours est surligné avec son aide.
+- `↑ ↓` : navigation dans les suggestions, sinon historique de tes messages. Codes couleur `^1`…`^9`, `^*` gras, `^r` reset.
+- Chat fermé : les derniers messages restent quelques secondes puis s'effacent.
+- Compatible avec tous les scripts existants (`chat:addMessage`, suggestions, templates). Commandes `/say` (console) et `/clearchat`.
+
+### Documents (carte d'identité, permis, PPA, carte d'entreprise, badges, visa)
+- Nouvelle carte « physique » : relief, reflet holographique, puce, guillochis, entrée en 3D.
+- Couleur et icône par type (identité = couleur du serveur, permis = bleu, PPA = rouge, carte pro = vert + logo de l'entreprise, police / EMS, visa).
+- Photo pleine hauteur, champs rangés dans un ordre logique, catégories de permis A / B / C avec coche, signature manuscrite, bande de lecture optique, tampon **EXPIRÉ** sur un visa périmé.
+
+### Images de vêtements
+- Gestion → Images → Vêtements → **Générer les images** : Homme / Femme puis Haut, Bas, Chaussures, Masque, Accessoire, Chapeau, Lunettes ; option « seulement les vêtements sans image ».
+- Capture automatique sur fond vert, détourage, envoi sur **FiveManage** (clé `FIVEMANAGE_MEDIA_API_KEY`), images utilisées aussitôt par les boutiques et le créateur de personnage. La grille se met à jour toute seule. `Retour` interrompt le lot.
+
+### Mises à jour de la base
+- Nouvelle ressource `updater` : dans la console, `update` télécharge uniquement les fichiers qui ont changé depuis ta version. `update check` montre ce qui changerait, `update force` écrase aussi tes fichiers modifiés, `update restart` redémarre les ressources touchées, `update version` affiche les versions.
+- Tes fichiers modifiés (configs, images…) ne sont jamais écrasés : la nouvelle version est posée à côté en `.new`. Les anciens fichiers remplacés sont gardés dans `updater/backup/<version>/`. `server.cfg` et `permissions.cfg` ne sont jamais touchés.
+
+## Corrections
+- Menus : retour au menu d'origine habillé (bandeau + nom du serveur) ; plus de cartes coupées ni de barre de défilement horizontale ; les lignes « Métier / Faction » ne sont plus des sections.
+- Chat : Échap / Entrée relâchent bien le curseur, les commandes s'exécutent, la liste des commandes se recharge si le chat est redémarré après `core`.
+- Vêtements : tous les vêtements apparaissaient « sans image ».
+- Dock staff déplacé sur le bord droit (centré), alerte visuelle quand des reports attendent.
+
+## Configuration (`server.cfg`)
+```cfg
+ensure chat                              # groupe standalone, avant core
+ensure updater
+
+set update_url "https://raw.githubusercontent.com/tlzdinaz-wq/bestdev-updates/main"
+set chat_global_messages "true"          # "false" = seules les commandes passent
+
+set FIVEMANAGE_MEDIA_API_KEY "TA_CLE"    # clé Media FiveManage (mugshots, factions, vêtements)
+set core_fivemanage_outfits_path "outfits"
+```
+Redémarrage complet du serveur après ajout des deux ressources.
+
+---
+
 # Patch notes — Best Dev (core v1.12.11) — 20/09/2026
 
 ## Corrections
