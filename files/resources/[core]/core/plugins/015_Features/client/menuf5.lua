@@ -859,17 +859,23 @@ local currentHolsterStyle = GetResourceKvpString("holster_style_label") or "Par 
 -- ==========================================
 
 local function renderMainMenu()
-    local playerData = getDocumentsData()
+    -- Pas de TriggerServerCallback ici : le retour arrière part d'un keybind VUI
+    -- (autre ressource) et un yield cross-resource casse l'OnOpen.
+    local job = (VFW.PlayerData and VFW.PlayerData.job) or {
+        name = "unemployed",
+        label = "Chômeur",
+    }
+    local faction = VFW.PlayerData and VFW.PlayerData.faction or nil
+    local hasFaction = faction and faction.name and faction.name ~= "nocrew"
 
     -- ========== MES INFORMATIONS ==========
     main.Separator("Mes informations")
 
     -- Job
-    main.Title("Métier : " .. (playerData.job and playerData.job.label or "Aucun"))
+    main.Title("Métier : " .. (job.label or "Aucun"))
 
     -- Faction
-    local hasFaction = playerData.faction and playerData.faction.name ~= "nocrew"
-   main.Title("Faction : " .. (hasFaction and playerData.faction.label or "Aucune"))
+    main.Title("Faction : " .. (hasFaction and faction.label or "Aucune"))
 
     -- ========== MES DOCUMENTS & FINANCES ==========
     main.Separator("Documents & Finances")

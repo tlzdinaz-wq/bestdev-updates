@@ -15,9 +15,25 @@
 
 -- Assets du manifest panel qui n'ont pas d'équivalent direct dans BRANDING
 -- (loading screen, musique, logo de notif, fond). Injectés dans `nui:getBranding`.
+-- Pré-remplis depuis les ConVars répliquées pour que le loadscreen (avant Push)
+-- reçoive déjà l'URL vidéo via nui:getBranding.
+local function convarOrNil(name)
+    local v = GetConvar(name, "")
+    if type(v) == "string" and v ~= "" then return v end
+    return nil
+end
+
 local liveAssets = {
-    loadingScreen = nil,
-    loadingScreenMusic = nil,
+    loadingScreen = convarOrNil("core_brand_loadingscreen"),
+    loadingScreenMusic = convarOrNil("core_brand_loadingscreen_music"),
+    loadingSocialTitle = convarOrNil("core_brand_loading_social_title"),
+    loadingTicker = (function()
+        local raw = GetConvar("core_brand_loading_ticker", "")
+        if type(raw) ~= "string" or raw == "" then return nil end
+        local ok, decoded = pcall(json.decode, raw)
+        if ok and type(decoded) == "table" then return decoded end
+        return nil
+    end)(),
     notificationLogo = nil,
     background = nil,
 }
@@ -71,6 +87,8 @@ local function mergePayload(payload)
 
     liveAssets.loadingScreen = payload.loadingScreen
     liveAssets.loadingScreenMusic = payload.loadingScreenMusic
+    liveAssets.loadingSocialTitle = payload.loadingSocialTitle
+    liveAssets.loadingTicker = payload.loadingTicker
     liveAssets.background = payload.background
     if type(payload.notificationLogo) == "string" and payload.notificationLogo ~= "" then
         liveAssets.notificationLogo = payload.notificationLogo
@@ -87,6 +105,8 @@ local function buildBrandingResponse()
     end
     out.loadingScreen = liveAssets.loadingScreen
     out.loadingScreenMusic = liveAssets.loadingScreenMusic
+    out.loadingSocialTitle = liveAssets.loadingSocialTitle
+    out.loadingTicker = liveAssets.loadingTicker
     out.notificationLogo = liveAssets.notificationLogo
     out.background = liveAssets.background
     -- Bannière de marque (panel/ConVar `core_brand_vui_banner`) exposée sous la clé
@@ -143,6 +163,8 @@ RegisterNetEvent('core:branding:apply', function(payload)
             links = BRANDING.links,
             loadingScreen = liveAssets.loadingScreen,
             loadingScreenMusic = liveAssets.loadingScreenMusic,
+            loadingSocialTitle = liveAssets.loadingSocialTitle,
+            loadingTicker = liveAssets.loadingTicker,
             notificationLogo = liveAssets.notificationLogo,
             background = liveAssets.background,
             -- Locale (devise + format) résolu depuis `uiModel` : le NUI React met
@@ -159,6 +181,8 @@ RegisterNetEvent('core:branding:apply', function(payload)
         name = BRANDING.name,
         loadingScreen = liveAssets.loadingScreen,
         loadingScreenMusic = liveAssets.loadingScreenMusic,
+        loadingSocialTitle = liveAssets.loadingSocialTitle,
+        loadingTicker = liveAssets.loadingTicker,
         logo = BRANDING.logo,
         colors = BRANDING.colors,
         links = BRANDING.links,

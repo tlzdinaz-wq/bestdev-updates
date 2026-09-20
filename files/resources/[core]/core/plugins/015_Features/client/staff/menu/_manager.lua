@@ -155,6 +155,10 @@ function StaffMenu.PreparePlayerMenu(source, parent, row, isAnimatorCtx)
     if parent and StaffMenu.player then
         StaffMenu.player.parent = parent
     end
+    -- Précharge les permis pendant qu’on regarde le menu joueur → clic « Donner un permis » instantané.
+    if StaffMenu.PrefetchPlayerLicenses then
+        StaffMenu.PrefetchPlayerLicenses(source)
+    end
     return info
 end
 StaffMenu.adminChecked = false

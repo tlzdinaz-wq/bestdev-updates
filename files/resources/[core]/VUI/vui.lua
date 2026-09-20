@@ -187,12 +187,38 @@ end
 -- Centralized back handler with debounce to prevent double-fire
 -- Both the GTA keybind and the NUI callback trigger back independently
 -- when a SearchInput is present, causing double-back or unexpected menu close
+local function CloseAnyColorPickers()
+    if VUI_RoleColorPickerKeyThread or VUI_RoleColorPickerCallbacks then
+        VUI_RoleColorPickerKeyThread = false
+        SendNUIMessage({ action = "vui:menu:closeRoleColorPicker" })
+        if VUI_HubMode then
+            TriggerEvent("vui:hub:focus")
+        else
+            SetNuiFocus(false, false)
+        end
+        VUI_RoleColorPickerCallbacks = nil
+    end
+    if VUI_ColorPickerKeyThread or VUI_ColorPickerCallbacks then
+        VUI_ColorPickerKeyThread = false
+        SendNUIMessage({ action = "vui:menu:closeColorPicker" })
+        if VUI_HubMode then
+            TriggerEvent("vui:hub:focus")
+        else
+            SetNuiFocus(false, false)
+        end
+        VUI_ColorPickerCallbacks = nil
+    end
+end
+
 function VUI_HandleBack()
     if not VUI_CurrentMenu then return end
 
     local now = GetGameTimer()
     if now - VUI_LastBackTime < 200 then return end
     VUI_LastBackTime = now
+
+    -- Toujours fermer un color picker ouvert avant de remonter (sinon focus NUI / callbacks orphelins).
+    CloseAnyColorPickers()
 
     local entry = table.remove(VUI_MenuStack)
     local backTarget
@@ -1056,79 +1082,87 @@ function CreateMenu(title, banner, autoRefresh)
         end
         VUI_CurrentMenu = menu
         VUI_CurrentMenu.opened = true
+        menu._openGen = (menu._openGen or 0) + 1
+        local openGen = menu._openGen
 
-        -- Appel DIRECT : beaucoup d'OnOpen font TriggerServerCallback (Citizen.Await).
-        -- pcall interdit le yield → le menu s'envoyait au NUI encore vide (rôles, items, etc.).
-        if menu._openFn then
-            menu._openFn()
-        end
-
-        -- Types that should always be shown (non-interactive / decorative)
-        local alwaysShowTypes = {
-            separator = true,
-            textbox = true,
-            imagebox = true,
-            title = true
-        }
-
-        local _items = {}
-        menu.visibleItems = {}
-        for _, item in ipairs(menu.items) do
-            table.insert(_items, {
-                type = item.type,
-                props = item.props
-            })
-            table.insert(menu.visibleItems, item)
-        end
-
-        local indexRestored = false
-        if menu.title and VUI_LastMenuIndex[menu.title] and VUI_LastMenuIndex[menu.title] > 0 then
-            menu.index = VUI_LastMenuIndex[menu.title]
-            VUI_LastMenuIndex[menu.title] = nil
-            indexRestored = true
-        end
-
-        -- Clamp restored index to valid range
-        if menu.index > #_items then
-            menu.index = math.max(1, #_items)
-            indexRestored = false
-        end
-
-        -- Only skip separators if index was NOT restored (fresh open)
-        if not indexRestored and #_items > 1 then
-            menu.index = 1
-            for i, item in ipairs(_items) do
-                if not alwaysShowTypes[item.type] and not item.props.disabled then
-                    break
-                end
-                menu.index = menu.index + 1
+        -- OnOpen vient souvent d'une autre ressource (ex. core) et peut yield
+        -- (TriggerServerCallback). Appel direct depuis un keybind VUI →
+        -- "Execution of function reference in script host failed".
+        -- CreateThread + push NUI après le callback corrige ça.
+        CreateThread(function()
+            if menu._openFn then
+                menu._openFn()
             end
-            if menu.index > #_items then menu.index = #_items end
-        end
+            if VUI_CurrentMenu ~= menu or not menu.opened or menu._openGen ~= openGen then
+                return
+            end
 
-        -- Cacher le chat quand le menu s'ouvre
-        TriggerEvent('chat:setVisible', false)
-
-        SendNUIMessage({
-            action = "vui:menu",
-            data = {
-                title = menu.title,
-                banner = menu.banner,
-                index = menu.index - 1,
-                helpButtons = menu._helpButtons,
-                items = _items
+            local alwaysShowTypes = {
+                separator = true,
+                textbox = true,
+                imagebox = true,
+                title = true
             }
-        })
+
+            local _items = {}
+            menu.visibleItems = {}
+            for _, item in ipairs(menu.items) do
+                table.insert(_items, {
+                    type = item.type,
+                    props = item.props
+                })
+                table.insert(menu.visibleItems, item)
+            end
+
+            local indexRestored = false
+            if menu.title and VUI_LastMenuIndex[menu.title] and VUI_LastMenuIndex[menu.title] > 0 then
+                menu.index = VUI_LastMenuIndex[menu.title]
+                VUI_LastMenuIndex[menu.title] = nil
+                indexRestored = true
+            end
+
+            if menu.index > #_items then
+                menu.index = math.max(1, #_items)
+                indexRestored = false
+            end
+
+            if not indexRestored and #_items > 1 then
+                menu.index = 1
+                for i, item in ipairs(_items) do
+                    if not alwaysShowTypes[item.type] and not item.props.disabled then
+                        break
+                    end
+                    menu.index = menu.index + 1
+                end
+                if menu.index > #_items then menu.index = #_items end
+            end
+
+            TriggerEvent('chat:setVisible', false)
+
+            SendNUIMessage({
+                action = "vui:menu",
+                data = {
+                    title = menu.title,
+                    banner = menu.banner,
+                    index = menu.index - 1,
+                    helpButtons = menu._helpButtons,
+                    items = _items
+                }
+            })
+        end)
     end
 
     -- Internal close: skips NUI message (used for submenu transitions)
     menu._closeInternal = function()
         menu.opened = false
+        CloseAnyColorPickers()
         if menu._closeFn then
-            local ok, err = pcall(menu._closeFn)
-            if not ok then
-                print("^1[VUI] Error in OnClose handler: " .. tostring(err) .. "^7")
-            end
+            -- Pas de pcall : les OnClose cross-resource (core) échouent avec
+            -- "Execution of function reference in script host failed" sous pcall.
+            local closeFn = menu._closeFn
+            CreateThread(function()
+                closeFn()
+            end)
         end
         if menu.autoRefresh then
             menu.ClearItems()

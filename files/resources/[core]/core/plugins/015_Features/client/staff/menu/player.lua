@@ -616,29 +616,78 @@ local licenseTypes = {
     { type = "truck", label = "Permis Poids Lourd" },
 }
 
+local function normalizeLicenseMap(raw)
+    if type(raw) ~= "table" then return {} end
+    -- Déjà une map { car = true, ... }
+    if raw.car ~= nil or raw.motorcycle ~= nil or raw.truck ~= nil then
+        return {
+            car = raw.car == true,
+            motorcycle = raw.motorcycle == true,
+            truck = raw.truck == true,
+        }
+    end
+    -- Ancien format liste
+    local out = {}
+    for _, playerLic in ipairs(raw) do
+        if type(playerLic) == "string" then
+            out[playerLic] = true
+        elseif type(playerLic) == "table" and type(playerLic.type) == "string" then
+            out[playerLic.type] = true
+        end
+    end
+    return out
+end
+
+function StaffMenu.FetchPlayerLicenses(targetSource, force)
+    targetSource = tonumber(targetSource)
+    if not targetSource then return {} end
+
+    StaffMenu.data.licensesByPlayer = StaffMenu.data.licensesByPlayer or {}
+    if not force and type(StaffMenu.data.licensesByPlayer[targetSource]) == "table" then
+        return StaffMenu.data.licensesByPlayer[targetSource]
+    end
+
+    local ok, raw = pcall(TriggerServerCallback, "vfw:staff:getPlayerLicenses", targetSource)
+    local map = normalizeLicenseMap(ok and raw or {})
+    StaffMenu.data.licensesByPlayer[targetSource] = map
+    return map
+end
+
+function StaffMenu.PrefetchPlayerLicenses(targetSource)
+    targetSource = tonumber(targetSource)
+    if not targetSource then return end
+    CreateThread(function()
+        StaffMenu.FetchPlayerLicenses(targetSource, true)
+    end)
+end
+
 function StaffMenu.BuildPlayerLicenseMenu()
     local selectedPlayer = StaffMenu.data.selectedPlayer
     if not selectedPlayer then return end
 
-    local licenses = TriggerServerCallback("vfw:staff:getPlayerLicenses", selectedPlayer) or {}
+    StaffMenu.data.licensesByPlayer = StaffMenu.data.licensesByPlayer or {}
+    local licenses = StaffMenu.data.licensesByPlayer[selectedPlayer]
+    -- Pas de wait serveur à l’ouverture : cache ou liste vide, puis sync en fond.
+    if type(licenses) ~= "table" then
+        licenses = {}
+    end
     local hasAny = false
 
     for _, lic in ipairs(licenseTypes) do
-        local alreadyHas = false
-        for _, playerLic in ipairs(licenses) do
-            if playerLic == lic.type or (type(playerLic) == "table" and playerLic.type == lic.type) then
-                alreadyHas = true
-                break
-            end
-        end
-
+        local alreadyHas = licenses[lic.type] == true
         local label = alreadyHas and (lic.label .. " :check:") or lic.label
         StaffMenu.playerLicense.Button(label, nil, nil, "arrow", alreadyHas, function()
             if alreadyHas then return end
             TriggerServerEvent("vfw:staff:giveLicense", selectedPlayer, lic.type)
+            StaffMenu.data.licensesByPlayer = StaffMenu.data.licensesByPlayer or {}
+            local cached = StaffMenu.data.licensesByPlayer[selectedPlayer] or {}
+            cached[lic.type] = true
+            StaffMenu.data.licensesByPlayer[selectedPlayer] = cached
             VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Gestion Joueur', message = "Permis " .. lic.label .. " attribué." })
-            SetTimeout(300, function()
-                StaffMenu.playerLicense.refresh()
+            SetTimeout(200, function()
+                if StaffMenu.playerLicense and StaffMenu.playerLicense.opened then
+                    StaffMenu.playerLicense.refresh()
+                end
             end)
         end)
         if not alreadyHas then hasAny = true end
@@ -647,4 +696,20 @@ function StaffMenu.BuildPlayerLicenseMenu()
     if not hasAny then
         StaffMenu.playerLicense.Separator("Tous les permis sont attribués")
     end
+
+    CreateThread(function()
+        local fresh = StaffMenu.FetchPlayerLicenses(selectedPlayer, true)
+        if StaffMenu.data.selectedPlayer ~= selectedPlayer then return end
+        if not (StaffMenu.playerLicense and StaffMenu.playerLicense.opened) then return end
+        local changed = false
+        for _, lic in ipairs(licenseTypes) do
+            if (licenses[lic.type] == true) ~= (fresh[lic.type] == true) then
+                changed = true
+                break
+            end
+        end
+        if changed then
+            StaffMenu.playerLicense.refresh()
+        end
+    end)
 end

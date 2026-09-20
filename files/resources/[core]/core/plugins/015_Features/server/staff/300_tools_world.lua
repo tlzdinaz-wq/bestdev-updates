@@ -812,6 +812,43 @@ RegisterServerCallback("vfw:staff:getPlayerLicensesForRemoval", function(source,
     }
 end)
 
+-- Lecture mémoire uniquement (pas de SQL) : utilisé par le menu joueur + outils.
+RegisterServerCallback("vfw:staff:getPlayerLicenses", function(source, targetId)
+    local xPlayer = allow(source, "give_permis", "retirer_permis")
+    if not xPlayer then return {} end
+
+    local target = VFW.GetPlayerFromId(tonumber(targetId))
+    if not target then return {} end
+
+    return licenseMap(target)
+end)
+
+RegisterNetEvent("vfw:staff:giveLicense", function(targetId, licenseType)
+    local source = source
+    local xPlayer = allow(source, "give_permis")
+    if not xPlayer then return end
+
+    local target = VFW.GetPlayerFromId(tonumber(targetId))
+    if not target then
+        notify(source, "ERROR", "Permis", "Ce joueur n'est pas connecté.")
+        return
+    end
+
+    local internal = type(licenseType) == "string" and STAFF_LICENSE_TYPES[licenseType] or nil
+    if not internal then return end
+    if not Misc30 or not Misc30.GrantLicense then return end
+
+    if not Misc30.GrantLicense(target, internal) then
+        notify(source, "ERROR", "Permis", "Ce joueur a déjà ce permis (ou type invalide).")
+        return
+    end
+
+    notify(source, "SUCCESS", "Permis", ("Permis attribué à %s."):format(target.name))
+    notify(target.source, "INFO", "Permis", "Un permis vient de vous être attribué.")
+
+    logStaff(source, "give_license", { target = target.source, license = internal })
+end)
+
 RegisterNetEvent("vfw:staff:removeLicense", function(targetId, licenseType)
     local source = source
     local xPlayer = allow(source, "retirer_permis")

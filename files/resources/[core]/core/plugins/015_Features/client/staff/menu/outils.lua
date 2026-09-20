@@ -577,6 +577,9 @@ function StaffMenu.BuildOutilsMenu()
                 return
             end
             StaffMenu.data.licenseTargetId = idplayer
+            if StaffMenu.PrefetchPlayerLicenses then
+                StaffMenu.PrefetchPlayerLicenses(idplayer)
+            end
         end, StaffMenu.giveLicense)
     end
 
@@ -1165,13 +1168,16 @@ end)
 
 --- .BuildGiveLicenseMenu
 function StaffMenu.BuildGiveLicenseMenu()
-    local targetSource = StaffMenu.data.licenseTargetId
+    local targetSource = tonumber(StaffMenu.data.licenseTargetId)
     if not targetSource then
         return
     end
 
-    -- Récupérer les permis existants du joueur
-    local existingLicenses = TriggerServerCallback("vfw:staff:getPlayerLicenses", tonumber(targetSource)) or {}
+    StaffMenu.data.licensesByPlayer = StaffMenu.data.licensesByPlayer or {}
+    local existingLicenses = StaffMenu.data.licensesByPlayer[targetSource]
+    if type(existingLicenses) ~= "table" then
+        existingLicenses = {}
+    end
 
     local licenseTypes = {
         { type = "car", label = "Permis Voiture" },
@@ -1183,22 +1189,45 @@ function StaffMenu.BuildGiveLicenseMenu()
         local alreadyHas = existingLicenses[license.type] == true
         if alreadyHas then
             StaffMenu.giveLicense.Button(":check: " .. "Retirer " .. license.label, nil, nil, "trash", false, function()
-                TriggerServerEvent("vfw:staff:removeLicense", tonumber(targetSource), license.type)
-                SetTimeout(300, function()
+                TriggerServerEvent("vfw:staff:removeLicense", targetSource, license.type)
+                if StaffMenu.data.licensesByPlayer and StaffMenu.data.licensesByPlayer[targetSource] then
+                    StaffMenu.data.licensesByPlayer[targetSource][license.type] = false
+                end
+                SetTimeout(200, function()
                     StaffMenu.giveLicense.ClearItems()
                     StaffMenu.giveLicense.refresh()
                 end)
             end)
         else
             StaffMenu.giveLicense.Button("Donner " .. license.label, nil, nil, "arrow", false, function()
-                TriggerServerEvent("vfw:staff:giveLicense", tonumber(targetSource), license.type)
-                SetTimeout(300, function()
+                TriggerServerEvent("vfw:staff:giveLicense", targetSource, license.type)
+                StaffMenu.data.licensesByPlayer = StaffMenu.data.licensesByPlayer or {}
+                StaffMenu.data.licensesByPlayer[targetSource] = StaffMenu.data.licensesByPlayer[targetSource] or {}
+                StaffMenu.data.licensesByPlayer[targetSource][license.type] = true
+                SetTimeout(200, function()
                     StaffMenu.giveLicense.ClearItems()
                     StaffMenu.giveLicense.refresh()
                 end)
             end)
         end
     end
+
+    CreateThread(function()
+        if not StaffMenu.FetchPlayerLicenses then return end
+        local fresh = StaffMenu.FetchPlayerLicenses(targetSource, true)
+        if tonumber(StaffMenu.data.licenseTargetId) ~= targetSource then return end
+        if not (StaffMenu.giveLicense and StaffMenu.giveLicense.opened) then return end
+        local changed = false
+        for _, license in ipairs(licenseTypes) do
+            if (existingLicenses[license.type] == true) ~= (fresh[license.type] == true) then
+                changed = true
+                break
+            end
+        end
+        if changed then
+            StaffMenu.giveLicense.refresh()
+        end
+    end)
 end
 
 -- Variable pour la recherche de joueurs

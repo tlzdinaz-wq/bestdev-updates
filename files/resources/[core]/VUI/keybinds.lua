@@ -90,6 +90,17 @@ end)
 
 -- Retour arrière → remonte d'un niveau dans la navigation (via VUI_HandleBack)
 Keybind("back", "menu_back", "Retour", function()
+    -- Modale screenshot (NUI core) ouverte : Escape ferme la capture, pas le menu staff.
+    if LocalPlayer.state.staffScreenshotOpen then
+        TriggerEvent("vfw:staff:closeScreenshot")
+        return
+    end
     if not VUI_CurrentMenu or VUI_HubMode then return end
     VUI_HandleBack()
+end)
+
+-- Remet le curseur VUI après fermeture d'une UI core (screenshot, etc.)
+AddEventHandler("vui:restoreFocus", function()
+    if VUI_HubMode or not VUI_CurrentMenu or not VUI_CurrentMenu.opened then return end
+    SetNuiFocus(true, true)
 end)

@@ -192,9 +192,9 @@ RegisterNetEvent("vfw:staff:takeScreenshot", function(targetId, playerInfo)
         return
     end
 
-    if not VFW.CDN.IsConfigured() then
+    if not (VFW.FiveManage and VFW.FiveManage.ApiKey and VFW.FiveManage.ApiKey()) then
         notifyStaffScreenshot(source, "ERROR",
-            "Le stockage d'images n'est pas configuré. Renseignez les convars core_cdn_api_url et core_cdn_token.")
+            "FiveManage n'est pas configuré. Renseigne FIVEMANAGE_MEDIA_API_KEY dans server.cfg.")
         return
     end
 
@@ -215,6 +215,18 @@ RegisterNetEvent("vfw:staff:takeScreenshot", function(targetId, playerInfo)
         fail("La capture n'a pas abouti dans le délai imparti.")
     end)
 
+    local function screenshotsFolder()
+        local folder = GetConvar("core_fivemanage_screenshots_path", "")
+        if type(folder) == "string" and folder ~= "" then
+            return folder:gsub("^/+", ""):gsub("/+$", "")
+        end
+        local root = GetConvar("core_fivemanage_path", "")
+        if type(root) == "string" and root ~= "" then
+            return (root:gsub("^/+", ""):gsub("/+$", "")) .. "/screenshots"
+        end
+        return "staff/screenshots"
+    end
+
     exports["screenshot-basic"]:requestClientScreenshot(targetId, { encoding = "jpg", quality = 0.7 },
         function(err, data)
             if answered then return end
@@ -224,14 +236,19 @@ RegisterNetEvent("vfw:staff:takeScreenshot", function(targetId, playerInfo)
                 return
             end
 
-            local base64 = data:match("^data:[^;]+;base64,(.+)$") or data
-            local path = ("staff/screenshots/%s_%s.jpg"):format(targetId, os.time())
-
-            VFW.CDN.Upload(path, { base64 = base64, contentType = "image/jpeg" }, function(ok, url)
+            CreateThread(function()
                 if answered then return end
 
-                if not ok or type(url) ~= "string" then
-                    fail("L'envoi de l'image a échoué.")
+                local dataUrl = data
+                if not dataUrl:match("^data:") then
+                    dataUrl = "data:image/jpeg;base64," .. data
+                end
+                local filename = ("%s_%s.jpg"):format(targetId, os.time())
+                local url = VFW.FiveManage.UploadBase64(dataUrl, filename, screenshotsFolder())
+
+                if answered then return end
+                if type(url) ~= "string" or url == "" then
+                    fail("L'envoi FiveManage a échoué (voir la console serveur).")
                     return
                 end
 

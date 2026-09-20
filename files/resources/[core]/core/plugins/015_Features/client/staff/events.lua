@@ -325,7 +325,33 @@ end)
 -- Recevoir le screenshot et l'afficher au staff
 ---@param imgUrl string URL de l'image
 ---@param playerInfo table Infos du joueur (name, visaId)
+local screenshotOpen = false
+
+local function closeStaffScreenshot()
+    if not screenshotOpen then return end
+    screenshotOpen = false
+    LocalPlayer.state:set("staffScreenshotOpen", false, false)
+    SendNUIMessage({ action = "staff:screenshot:forceClose" })
+    VFW.Nui.Focus(false, false)
+    if VFW.DisableEscapeMenu then
+        VFW.DisableEscapeMenu(false)
+    end
+    -- Rendre le focus au menu staff VUI s'il est encore ouvert
+    CreateThread(function()
+        Wait(0)
+        pcall(function()
+            if exports["VUI"] and exports["VUI"].IsHubMode and exports["VUI"]:IsHubMode() then
+                return
+            end
+            -- VUI écoute cet event pour reprendre curseur + clavier
+            TriggerEvent("vui:restoreFocus")
+        end)
+    end)
+end
+
 RegisterNetEvent("vfw:staff:receiveScreen", function(imgUrl, playerInfo)
+    screenshotOpen = true
+    LocalPlayer.state:set("staffScreenshotOpen", true, false)
     SendNUIMessage({
         action = "staff:screenshot:open",
         data = {
@@ -334,14 +360,38 @@ RegisterNetEvent("vfw:staff:receiveScreen", function(imgUrl, playerInfo)
             visaId = playerInfo and playerInfo.visaId or 0
         }
     })
+    if VFW.DisableEscapeMenu then
+        VFW.DisableEscapeMenu(true)
+    end
     VFW.Nui.Focus(true, false)
 end)
 
--- Callback pour fermer la modale du screenshot
-RegisterNUICallback("staff:screenshot:close", function(data, cb)
-    VFW.Nui.Focus(false, false)
-    cb('ok')
+-- Callback pour fermer la modale du screenshot (clic X / overlay / ESC côté NUI)
+RegisterNUICallback("staff:screenshot:close", function(_, cb)
+    closeStaffScreenshot()
+    cb("ok")
 end)
+
+-- ESC jeu : même si le keybind VUI « back » mange la touche, on ferme la modale.
+CreateThread(function()
+    while true do
+        if screenshotOpen then
+            DisableControlAction(0, 200, true)
+            DisableControlAction(0, 199, true)
+            DisableControlAction(0, 322, true)
+            if IsDisabledControlJustPressed(0, 200)
+                or IsDisabledControlJustPressed(0, 199)
+                or IsDisabledControlJustPressed(0, 322) then
+                closeStaffScreenshot()
+            end
+            Wait(0)
+        else
+            Wait(250)
+        end
+    end
+end)
+
+AddEventHandler("vfw:staff:closeScreenshot", closeStaffScreenshot)
 
 VFW.ListTpIpl = {}
 local blipsEnter = {}

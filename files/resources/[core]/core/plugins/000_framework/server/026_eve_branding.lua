@@ -25,6 +25,8 @@ local CFG_NAME = GetConvar("core_brand_name", (BRANDING and BRANDING.name) or "E
 local CFG_WEBSITE = GetConvar("core_brand_website", (BRANDING and BRANDING.website) or "")
 local CFG_DISCORD = GetConvar("core_discord_invite", (BRANDING and BRANDING.discord) or "")
 local CFG_PRIMARY = GetConvar("core_brand_color_primary", "#7263EE")
+local CFG_LOADING = GetConvar("core_brand_loadingscreen", "")
+local CFG_LOADING_MUSIC = GetConvar("core_brand_loadingscreen_music", "")
 
 local function str(value, fallback)
     if type(value) == "string" and value ~= "" then return value end
@@ -108,6 +110,37 @@ local function readColors(raw)
     return derived
 end
 
+local DEFAULT_LOADING_SOCIAL_TITLE = "Rejoignez-nous"
+local DEFAULT_LOADING_TICKER = {
+    "BON JEU SUR NOTRE SERVEUR 🌹",
+    "N'HÉSITEZ PAS À FAIRE UN TOUR SUR NOTRE BOUTIQUE ( F1 )",
+    "LISEZ LE RÈGLEMENT POUR NE PAS PRENDRE DE SANCTION",
+    "MERCI DE NOUS SOUTENIR CHAQUE JOUR ❤️",
+}
+
+local function normalizeTickerList(raw)
+    local out = {}
+    if type(raw) == "string" then
+        for line in (raw .. "\n"):gmatch("(.-)\n") do
+            local t = line:gsub("^%s+", ""):gsub("%s+$", "")
+            if t ~= "" then
+                out[#out + 1] = t:sub(1, 160)
+            end
+        end
+    elseif type(raw) == "table" then
+        for i = 1, math.min(#raw, 12) do
+            local t = raw[i]
+            if type(t) == "string" then
+                t = t:gsub("^%s+", ""):gsub("%s+$", "")
+                if t ~= "" then
+                    out[#out + 1] = t:sub(1, 160)
+                end
+            end
+        end
+    end
+    return out
+end
+
 local function snapshotOverrides(current)
     local colors = nil
     if type(current.colors) == "table" and type(current.colors.primary) == "string" then
@@ -127,6 +160,10 @@ local function snapshotOverrides(current)
         discord = current.discord or "",
         tiktok = current.tiktok or "",
         shop = current.shop or "",
+        loadingScreen = current.loadingScreen or "",
+        loadingScreenMusic = current.loadingScreenMusic or "",
+        loadingSocialTitle = current.loadingSocialTitle or "",
+        loadingTicker = normalizeTickerList(current.loadingTicker),
         colors = colors,
     }
 end
@@ -135,6 +172,7 @@ local function encodeOverridesJson(data)
     local function field(key, value, last)
         return string.format('  %s: %s%s', json.encode(key), json.encode(value or ""), last and "" or ",")
     end
+    local tickerJson = json.encode(normalizeTickerList(data.loadingTicker))
     local lines = {
         "{",
         field("displayName", data.displayName),
@@ -144,6 +182,10 @@ local function encodeOverridesJson(data)
         field("shop", data.shop),
         field("logo", data.logo),
         field("banner", data.banner),
+        field("loadingScreen", data.loadingScreen),
+        field("loadingScreenMusic", data.loadingScreenMusic),
+        field("loadingSocialTitle", data.loadingSocialTitle),
+        string.format('  "loadingTicker": %s,', tickerJson),
     }
     if type(data.colors) == "table" and data.colors.primary then
         table.insert(lines, '  "colors": {')
@@ -216,6 +258,10 @@ function VFW.Branding.GetOverrides()
         discord = type(raw.discord) == "string" and raw.discord or "",
         tiktok = type(raw.tiktok) == "string" and raw.tiktok or "",
         shop = type(raw.shop) == "string" and raw.shop or "",
+        loadingScreen = type(raw.loadingScreen) == "string" and raw.loadingScreen or "",
+        loadingScreenMusic = type(raw.loadingScreenMusic) == "string" and raw.loadingScreenMusic or "",
+        loadingSocialTitle = type(raw.loadingSocialTitle) == "string" and raw.loadingSocialTitle or "",
+        loadingTicker = normalizeTickerList(raw.loadingTicker),
         colors = readColors(raw.colors),
     }
 end
@@ -281,6 +327,48 @@ function VFW.Branding.SetConfig(patch)
     return true
 end
 
+local function cleanMediaUrl(value, maxLen)
+    if type(value) ~= "string" then return "" end
+    local out = value:gsub("^%s+", ""):gsub("%s+$", ""):gsub("^['\"]+", ""):gsub("['\"]+$", "")
+    return out:sub(1, maxLen or 1024)
+end
+
+--- Fond vidéo/image + musique + textes/liens du loading screen (persisté dans branding_overrides.json).
+function VFW.Branding.SetLoadingScreen(patch)
+    if type(patch) ~= "table" then return false, "Données invalides." end
+    local current = VFW.Branding.GetOverrides()
+    if patch.reset == true then
+        current.loadingScreen = ""
+        current.loadingScreenMusic = ""
+        current.loadingSocialTitle = ""
+        current.loadingTicker = {}
+    else
+        if patch.loadingScreen ~= nil then
+            current.loadingScreen = cleanMediaUrl(patch.loadingScreen, 1024)
+        end
+        if patch.loadingScreenMusic ~= nil then
+            current.loadingScreenMusic = cleanMediaUrl(patch.loadingScreenMusic, 1024)
+        end
+        if patch.loadingSocialTitle ~= nil then
+            local title = type(patch.loadingSocialTitle) == "string" and patch.loadingSocialTitle or ""
+            current.loadingSocialTitle = title:gsub("^%s+", ""):gsub("%s+$", ""):sub(1, 48)
+        end
+        if patch.loadingTicker ~= nil then
+            current.loadingTicker = normalizeTickerList(patch.loadingTicker)
+        end
+        for _, key in ipairs({ "website", "discord", "tiktok", "shop" }) do
+            if patch[key] ~= nil then
+                current[key] = cleanMediaUrl(patch[key], 256)
+            end
+        end
+    end
+    if not persistOverrides(current) then
+        return false, "Impossible d'écrire config/branding_overrides.json."
+    end
+    VFW.Branding.Push(-1)
+    return true
+end
+
 function VFW.Branding.Defaults()
     return {
         displayName = CFG_NAME,
@@ -335,8 +423,18 @@ function VFW.Branding.Build()
             return derived
         end)(),
         uiModel = str(manifest.uiModel, MENTA_SERVER),
-        loadingScreen = manifest.loadingScreen,
-        loadingScreenMusic = manifest.loadingScreenMusic,
+        loadingScreen = firstUrl(ov.loadingScreen, manifest.loadingScreen, CFG_LOADING),
+        loadingScreenMusic = firstUrl(ov.loadingScreenMusic, manifest.loadingScreenMusic, CFG_LOADING_MUSIC),
+        loadingSocialTitle = (function()
+            local t = type(ov.loadingSocialTitle) == "string" and ov.loadingSocialTitle:gsub("^%s+", ""):gsub("%s+$", "") or ""
+            if t ~= "" then return t end
+            return DEFAULT_LOADING_SOCIAL_TITLE
+        end)(),
+        loadingTicker = (function()
+            local list = normalizeTickerList(ov.loadingTicker)
+            if #list > 0 then return list end
+            return DEFAULT_LOADING_TICKER
+        end)(),
         notificationLogo = notifLogo,
         background = manifest.background,
         discord = buildDiscord(),
@@ -401,6 +499,18 @@ local function applyLocally(payload)
     pcall(SetConvarReplicated, "core_brand_logo", BRANDING.logo or DEFAULT_LOGO)
     pcall(SetConvarReplicated, "core_brand_notification_logo", payload.notificationLogo or BRANDING.logo or DEFAULT_NOTIF)
     pcall(SetConvarReplicated, "core_brand_vui_banner", BRANDING.vuiBanner or DEFAULT_BANNER)
+    if type(payload.loadingScreen) == "string" then
+        pcall(SetConvarReplicated, "core_brand_loadingscreen", payload.loadingScreen)
+    end
+    if type(payload.loadingScreenMusic) == "string" then
+        pcall(SetConvarReplicated, "core_brand_loadingscreen_music", payload.loadingScreenMusic)
+    end
+    if type(payload.loadingSocialTitle) == "string" then
+        pcall(SetConvarReplicated, "core_brand_loading_social_title", payload.loadingSocialTitle)
+    end
+    if type(payload.loadingTicker) == "table" then
+        pcall(SetConvarReplicated, "core_brand_loading_ticker", json.encode(payload.loadingTicker))
+    end
 end
 
 function VFW.Branding.Push(target)
