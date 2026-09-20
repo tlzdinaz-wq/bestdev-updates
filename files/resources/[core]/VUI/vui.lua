@@ -1208,18 +1208,79 @@ function CreateMenu(title, banner, autoRefresh)
         end)
     end
 
-    --- Rebuild le menu : sauvegarde l'index, ferme (flash NUI), puis rouvre.
-    --- ⚠️ Cause un flash visuel. Toujours précéder d'un `if menu.opened then`.
+    --- Rebuild le menu ouvert sans close/open (pas de flash, pas de course hub/OnClose).
+    --- Toujours précéder d'un `if menu.opened then` côté appelant.
     menu.refresh = function(resetIndex)
+        if not menu.opened or VUI_CurrentMenu ~= menu then
+            return
+        end
         if not resetIndex then
             VUI_LastMenuIndex[menu.title] = menu.index
         end
-        local stack = VUI_MenuStack
-        VUI_Switching = true
-        menu.close()
-        VUI_Switching = false
-        VUI_MenuStack = stack
-        menu.open()
+
+        menu.ClearItems()
+        menu._openGen = (menu._openGen or 0) + 1
+        local openGen = menu._openGen
+
+        CreateThread(function()
+            if menu._openFn then
+                menu._openFn()
+            end
+            if VUI_CurrentMenu ~= menu or not menu.opened or menu._openGen ~= openGen then
+                return
+            end
+
+            local alwaysShowTypes = {
+                separator = true,
+                textbox = true,
+                imagebox = true,
+                title = true
+            }
+
+            local _items = {}
+            menu.visibleItems = {}
+            for _, item in ipairs(menu.items) do
+                table.insert(_items, {
+                    type = item.type,
+                    props = item.props
+                })
+                table.insert(menu.visibleItems, item)
+            end
+
+            local indexRestored = false
+            if menu.title and VUI_LastMenuIndex[menu.title] and VUI_LastMenuIndex[menu.title] > 0 then
+                menu.index = VUI_LastMenuIndex[menu.title]
+                VUI_LastMenuIndex[menu.title] = nil
+                indexRestored = true
+            end
+
+            if menu.index > #_items then
+                menu.index = math.max(1, #_items)
+                indexRestored = false
+            end
+
+            if not indexRestored and #_items > 1 then
+                menu.index = 1
+                for i, item in ipairs(_items) do
+                    if not alwaysShowTypes[item.type] and not item.props.disabled then
+                        break
+                    end
+                    menu.index = menu.index + 1
+                end
+                if menu.index > #_items then menu.index = #_items end
+            end
+
+            SendNUIMessage({
+                action = "vui:menu",
+                data = {
+                    title = menu.title,
+                    banner = menu.banner,
+                    index = menu.index - 1,
+                    helpButtons = menu._helpButtons,
+                    items = _items
+                }
+            })
+        end)
     end
 
     menu.toggle = function()

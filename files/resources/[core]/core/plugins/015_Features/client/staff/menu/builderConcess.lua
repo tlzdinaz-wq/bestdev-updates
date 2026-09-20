@@ -1,6 +1,5 @@
 -- Builder Concessionnaire
 local VUI <const> = exports["VUI"]
-local bIsOpen = false
 
 local adminBanner <const> = GetVUIBanner("admin")
 
@@ -45,9 +44,9 @@ local tNewVehicle = {
 }
 
 local function fcRefresh(Menu)
-    bIsOpen = true
-    Menu.refresh()
-    bIsOpen = false
+    if Menu and Menu.opened then
+        Menu.refresh()
+    end
 end
 
 local function fcGetIcon(condition)
@@ -104,19 +103,18 @@ ConcessCreate.OnOpen(function()
 
     ConcessCreate.List(":car: TYPE VÉHICULES", nil, false, concessTypes, tNewConcess.concessType, function(index)
         tNewConcess.concessType = index
-        fcRefresh(ConcessCreate)
     end)
 
     ConcessCreate.Checkbox(":robot: MODE AUTO PERMANENT", "PED toujours présent (pas besoin d'employés)", false, tNewConcess.automatic, function(checked)
-        tNewConcess.automatic = checked
-        if checked then
-            tNewConcess.job = "" -- Reset job si mode auto
+        tNewConcess.automatic = checked == true
+        if tNewConcess.automatic then
+            tNewConcess.job = ""
         end
-        fcRefresh(ConcessCreate)
+        -- Pas de fcRefresh : le rebuild close/open annulait la coche dans le hub.
     end)
 
-    -- Job seulement si mode non-auto (besoin d'employés pour gérer)
-    if not tNewConcess.automatic then
+    -- Job toujours listé (ignoré à la création si mode auto) — évite un refresh à chaque coche
+    do
         local societies = TriggerServerCallback("core:get:societies") or {}
         local jobNames = {}
         local jobIndex = 1
@@ -130,9 +128,10 @@ ConcessCreate.OnOpen(function()
         end
 
         if #jobNames > 0 then
-            ConcessCreate.List(":briefcase: JOB ACCÈS", "Employés qui gèrent le concessionnaire", false, jobNames, jobIndex, function(index)
-                tNewConcess.job = jobNames[index]
-                fcRefresh(ConcessCreate)
+            ConcessCreate.List(":briefcase: JOB ACCÈS", "Ignoré si mode auto activé", false, jobNames, jobIndex, function(index)
+                if not tNewConcess.automatic then
+                    tNewConcess.job = jobNames[index]
+                end
             end)
         else
             ConcessCreate.Button(":briefcase: JOB ACCÈS", "Aucun job disponible", nil, "lock", true, function() end)
@@ -246,8 +245,9 @@ ConcessCreate.OnOpen(function()
 end)
 
 ConcessCreate.OnClose(function()
-    if bIsOpen then return end
-    fcResetNewConcess()
+    -- Ne pas reset ici : Menu.refresh() ferme/rouvre en CreateThread et
+    -- OnClose tournait APRÈS la saisie → name / type / points effacés.
+    -- Reset uniquement à l'ouverture « CRÉER » et après création réussie.
 end)
 
 -- ==================== GESTION CONCESSIONNAIRES ====================
@@ -283,19 +283,17 @@ ConcessEdit.OnOpen(function()
 
     ConcessEdit.List(":car: TYPE VÉHICULES", nil, false, concessTypes, tSelectedConcess.concessType or 1, function(index)
         tSelectedConcess.concessType = index
-        fcRefresh(ConcessEdit)
     end)
 
     ConcessEdit.Checkbox(":robot: MODE AUTO PERMANENT", "PED toujours présent (pas besoin d'employés)", false, tSelectedConcess.automatic or false, function(checked)
-        tSelectedConcess.automatic = checked
-        if checked then
-            tSelectedConcess.job = "" -- Reset job si mode auto
+        tSelectedConcess.automatic = checked == true
+        if tSelectedConcess.automatic then
+            tSelectedConcess.job = ""
         end
-        fcRefresh(ConcessEdit)
+        -- Pas de fcRefresh : le rebuild close/open annulait la coche dans le hub.
     end)
 
-    -- Job seulement si mode non-auto (besoin d'employés pour gérer)
-    if not tSelectedConcess.automatic then
+    do
         local societies = TriggerServerCallback("core:get:societies") or {}
         local jobNames = {}
         local jobIndex = 1
@@ -309,9 +307,10 @@ ConcessEdit.OnOpen(function()
         end
 
         if #jobNames > 0 then
-            ConcessEdit.List(":briefcase: JOB ACCÈS", "Employés qui gèrent le concessionnaire", false, jobNames, jobIndex, function(index)
-                tSelectedConcess.job = jobNames[index]
-                fcRefresh(ConcessEdit)
+            ConcessEdit.List(":briefcase: JOB ACCÈS", "Ignoré si mode auto activé", false, jobNames, jobIndex, function(index)
+                if not tSelectedConcess.automatic then
+                    tSelectedConcess.job = jobNames[index]
+                end
             end)
         end
     end
@@ -590,7 +589,6 @@ ConcessVehicleEditor.OnOpen(function()
 
     ConcessVehicleEditor.List(":folder: CATÉGORIE", nil, false, tCategories, iCatIndex, function(index)
         tSelectedVehicle.category = tCategories[index]
-        fcRefresh(ConcessVehicleEditor)
     end)
 
     ConcessVehicleEditor.Separator(":wrench: ACTIONS")
@@ -626,7 +624,6 @@ ConcessVehicleAdd.OnOpen(function()
 
     ConcessVehicleAdd.List(":folder: CATÉGORIE", nil, false, tCategories, iCatIndex, function(index)
         tNewVehicle.sCategory = tCategories[index]
-        fcRefresh(ConcessVehicleAdd)
     end)
 
     ConcessVehicleAdd.Button(":edit: MODEL", tNewVehicle.sModel ~= "" and tNewVehicle.sModel or "Non défini", nil, fcGetIcon(tNewVehicle.sModel ~= ""), false, function()

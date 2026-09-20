@@ -1,4 +1,4 @@
-#version	1.12.37	2026-09-20T14:48:52.773Z
+#version	1.12.38	2026-09-20T15:09:42.365Z
 #protected	resources/[core]/core/config/**
 #protected	resources/[core]/core/plugins/015_Features/config/**
 #protected	resources/[core]/eve_bridge/config.lua
@@ -1192,7 +1192,7 @@ b56f6cdda2974e3e174df49e0421813944c334312b834473ecb6b0a06f7d50f0	3663	resources/
 9bf71e2625845a383abb01511f1d60ee4a855a3ec1a8c3c25cdc30cf2f481322	152587	resources/[core]/core/interface/documents/assets/index.js
 b266837cc2f80e16a1f5c808fe3d6d168fb32b81a66fb5b23633e4baa4c4eb57	8145	resources/[core]/core/interface/documents/assets/style.css
 cdbbc5610960ad2f9af1e2dae306f7cf932461738157dbfb02063060215efc17	669	resources/[core]/core/interface/documents/index.html
-3f23913ead5d27596482844d8d725fc6deb65602e44dc17c35f3e1f6621e5e4d	777036	resources/[core]/core/interface/gestion/assets/index.js
+135a50844611d687e1a6308cc32bc118c6d6d183e7040c16e4908a9b9d6e085d	777141	resources/[core]/core/interface/gestion/assets/index.js
 6e39751e013b207c4072c1353561762e9f8041118b4993d84c1f2d95f86eafb2	48382	resources/[core]/core/interface/gestion/assets/style.css
 911561e2d876caac8552cb69b66386cecc54adca2fc116da2d01557e1b8c4f5a	1626	resources/[core]/core/interface/gestion/assets/uilayout.css
 4402b24128cb85057cad8a48945ca9ddd81c7883f728c8d6149a8a5302f4e966	3378	resources/[core]/core/interface/gestion/assets/uilayout.js
@@ -1211,7 +1211,7 @@ bec7d28e57fd2414bada2e67a167a4695ccf167e9a380bc88d23411ca408d33c	14778	resources
 e3f9d9c4624d978f8825ea06b4b2b377dacb3f16e03bc902c38727fbe2d1d010	557	resources/[core]/core/jobs/ambulance/server/321_ambulance.lua
 7d9db9ad6823d29ac79c3e50cff1f1abdb7af0de6ee170f79dbf7569b1fcaed1	36383	resources/[core]/core/jobs/concess/client/concess.lua
 64b0fbb3e930de58fe26ed129dbbc95a80a0b61003b1a09bb55be16eba1b7a66	15686	resources/[core]/core/jobs/concess/client/menu.lua
-15e7be0a27f82754c600f1ecb9600ba6bba1b08ce2f367da09a8970193618f10	17410	resources/[core]/core/jobs/concess/server/320_concess_store.lua
+d93e3dd0939fc71d9b63c864ab71a04fc97b4665aab60b1a6ae8f3c2be8351b3	22287	resources/[core]/core/jobs/concess/server/320_concess_store.lua
 60d572db159e8505fda827a6a474941cded4ecfec76a941fedf80b163a80491a	5586	resources/[core]/core/jobs/concess/server/321_concess_callbacks.lua
 e6e57a4606f6d27d408d2666e4947412698f4f6c812dc0a767ae12a4629e3340	26973	resources/[core]/core/jobs/concess/server/322_concess_events.lua
 25f72cf5b612baa5f5f4e29ed2c054d5d8522faeaf1ff558964300058e7c196e	254	resources/[core]/core/jobs/dynasty/client/dynasty.lua
@@ -1677,7 +1677,7 @@ a6fb87298aa4a8dff612df4d68a364a7d786214d3224667b87f4acce12c868df	12247	resources
 51afd92058522f75d00112388071acd8bfd80e05522641a251759ccb1a49b8db	53753	resources/[core]/core/plugins/015_Features/client/inventory/callback.lua
 c02ea63e749d16bee627d5ad6702758490d06c8ab380cd1b8e46673f9bbcd413	30530	resources/[core]/core/plugins/015_Features/client/inventory/clothes.lua
 2bb4cd7b1232b16d195265e962c0998a29004ca34b950032249b8cb728222408	62062	resources/[core]/core/plugins/015_Features/client/inventory/main.lua
-ce0f41bb7241b592776947c8877b0cde5625fe1f8a11fa072fcd6513c76d373c	12031	resources/[core]/core/plugins/015_Features/client/inventory/ped_display.lua
+5b5b8e399fa03373a7592081354d3567df66f57a25c16b1939597551ee7ae829	11671	resources/[core]/core/plugins/015_Features/client/inventory/ped_display.lua
 d917b3cbfbe5712050816775ca32c403e2451b2f157c5314c7ff6311c22a736b	3887	resources/[core]/core/plugins/015_Features/client/inventory/pickup.lua
 77b13960fa6bf4202cea681ce18a272d871be26d9a2f2271eef96cba78a4c9c4	1632	resources/[core]/core/plugins/015_Features/client/inventory/utils/raycast.lua
 f0ed646f9fb19af9a603106027c139efac57eaf766e4b6fd9755f35bd50911b4	16741	resources/[core]/core/plugins/015_Features/client/inventory/weapon_back.lua
@@ -1896,7 +1896,7 @@ ed637e92179609a30599eb0d9b26444571d09f249263d3455f665804321fb338	32489	resources
 80b8370d583429e9a115a34a3b658b948f53797c9bb35645993616a2c055daea	31600	resources/[core]/core/plugins/015_Features/client/staff/menu/builderBurgerShotDelivery.lua
 fc9a917faf8f888ff1128f00640a288eb1da1cf2a60aaefe1d73ef61b9281046	30728	resources/[core]/core/plugins/015_Features/client/staff/menu/builderChairs.lua
 d5828c4bc21c8839970f0a1b0085c559c8e6d301811026de4524c4929479d331	12274	resources/[core]/core/plugins/015_Features/client/staff/menu/builderClothesBlacklist.lua
-9f18cda00834a49f6cbeb2d43403eb9194a88ea760741a30fba7dd09efcffe14	30961	resources/[core]/core/plugins/015_Features/client/staff/menu/builderConcess.lua
+ff2d3083d612e55b8989c4523e11bb6a8b09444f4a1479ea74b1b65d2841a16e	31020	resources/[core]/core/plugins/015_Features/client/staff/menu/builderConcess.lua
 e81127cb0966fdc528c9e4c28f6f35e582f6fe60d288332189168f39fdf3f305	18734	resources/[core]/core/plugins/015_Features/client/staff/menu/builderCustomPrices.lua
 6cebeb1c0db00b0a2785e1446b57cca95418797c2caffd59070aa16bd0623df8	4766	resources/[core]/core/plugins/015_Features/client/staff/menu/builderDeletedProperties.lua
 04f2f475f922396a22bbf9837586e8c9b1b70ab1df6b6bfc1e2e328eccfdc576	7959	resources/[core]/core/plugins/015_Features/client/staff/menu/builderDriveby.lua
@@ -2475,7 +2475,7 @@ ee5e978b9693a71ae3fd5d423d75d2c14db4f747ec134045f59220b53713ca24	1359949	resourc
 8963a6a70a2bd96ac262c2e5f447e544d0a694e5adc986b41868e1b57d378da9	9027	resources/[core]/VUI/callbacks.lua
 1c57b978a84ff2a03f32a7c36d3f3baa2cd5cc205e5deba73fe6129189387a27	998	resources/[core]/VUI/fxmanifest.lua
 6cbf920a3f512d2f81b3290ea0b32fa034756a71a0d94bf54525b0c9f6d54e65	3970	resources/[core]/VUI/keybinds.lua
-de952ff00ebd8348a55886d412e90e471d30441d83c43062a4d843ac89fd82c0	56795	resources/[core]/VUI/vui.lua
+bfb2e822b139b46cb0331d98a208e0bb828a71c4836c505800f0a74da7866fc5	58811	resources/[core]/VUI/vui.lua
 828617e7659a588a5c68502ae7663833a24f49c08c0d8afa8cbefc92a48dc3fb	178421	resources/[core]/VUI/web/app/assets/index.js
 f61a55a2b25ebcd8e79ec299f73fd972c44801a93ba213e0de0608a807605e51	16485	resources/[core]/VUI/web/app/assets/style.css
 a0dc4330381aa698689aaaff5b13b47d7e8a15d141293fa7812fe7fed497be38	618	resources/[core]/VUI/web/app/index.html

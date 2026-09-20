@@ -1,12 +1,16 @@
 {
- "version": "1.12.37",
- "date": "2026-09-20T14:48:52.773Z",
- "notes": "**Correction hub gestion** — depuis le hub, on ne pouvait plus remplir les champs clavier (noms du concessionnaire, modèles, etc.) : le clavier s’ouvrait derrière l’interface. Corrigé : le hub se masque le temps de la saisie, puis réapparaît.\n\nPour appliquer : `update.bat` / `./update.sh`, ou dézippe l’archive ci-jointe à la racine du serveur, puis redémarre.",
+ "version": "1.12.38",
+ "date": "2026-09-20T15:09:42.365Z",
+ "notes": "**Correction builder concessionnaire (hub)** — case MODE AUTO, listes (voiture/bateau/avion, job), saisie du nom, et surtout **ajout des points** (catalogue / preview / spawn / showcase) qui restaient à 0 : le refresh menu fermait/rouvrait et annulait l’affichage. Rebuild sans fermer. Points aussi miroirés dans `config/concess_points.json`.\n\nPour appliquer : `update.bat` / `./update.sh`, ou l’archive ci-jointe.",
  "added": [],
  "changed": [
-  "resources/[core]/core/plugins/000_framework/client/010_nui.lua"
+  "resources/[core]/core/interface/gestion/assets/index.js",
+  "resources/[core]/core/jobs/concess/server/320_concess_store.lua",
+  "resources/[core]/core/plugins/015_Features/client/inventory/ped_display.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderConcess.lua",
+  "resources/[core]/VUI/vui.lua"
  ],
  "removed": [],
- "total": 289336039,
+ "total": 289342736,
  "fileCount": 3313
 }

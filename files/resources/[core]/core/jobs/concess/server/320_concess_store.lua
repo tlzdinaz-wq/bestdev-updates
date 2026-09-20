@@ -8,6 +8,9 @@ local concessList = {}
 local categoryList = {}
 local vehicleList = {}
 
+-- Miroir fichier des points (survit aux reboot même si la table SQL est vide / reset).
+local POINTS_FILE <const> = "config/concess_points.json"
+
 Concess.DefaultPed = "a_m_y_business_01"
 Concess.TestDuration = 300000
 Concess.StockRefundRatio = 0.75
@@ -87,6 +90,90 @@ end
 
 Concess.Normalize = normalize
 
+local function serializeEntry(entry)
+    return {
+        id = entry.id,
+        name = entry.name,
+        job = entry.job,
+        concessType = entry.concessType,
+        automatic = entry.automatic == true,
+        pedModel = entry.pedModel,
+        catalog = entry.catalog or {},
+        preview = entry.preview or {},
+        spawn = entry.spawn or {},
+        showcase = entry.showcase or {},
+    }
+end
+
+function Concess.SavePointsFile()
+    local list = {}
+    for _, entry in pairs(concessList) do
+        if entry and entry.id then
+            list[#list + 1] = serializeEntry(entry)
+        end
+    end
+    table.sort(list, function(a, b) return (a.id or 0) < (b.id or 0) end)
+    local body = json.encode({ version = 1, updatedAt = os.date("!%Y-%m-%dT%H:%M:%SZ"), entries = list })
+    local ok = SaveResourceFile(GetCurrentResourceName(), POINTS_FILE, body, -1)
+    if not ok then
+        print("^1[concess]^7 impossible d'écrire " .. POINTS_FILE)
+    end
+    return ok == true
+end
+
+local function loadPointsFile()
+    local raw = LoadResourceFile(GetCurrentResourceName(), POINTS_FILE)
+    if type(raw) ~= "string" or raw == "" then return nil end
+    local ok, decoded = pcall(json.decode, raw)
+    if not ok or type(decoded) ~= "table" then return nil end
+    local entries = decoded.entries or decoded
+    if type(entries) ~= "table" then return nil end
+    local out = {}
+    for i = 1, #entries do
+        local row = entries[i]
+        if type(row) == "table" then
+            local entry = normalize({
+                id = row.id,
+                name = row.name,
+                job = row.job,
+                concess_type = row.concessType or row.concess_type,
+                automatic = row.automatic and 1 or 0,
+                ped_model = row.pedModel or row.ped_model,
+                catalog = row.catalog,
+                preview = row.preview,
+                spawn = row.spawn,
+                showcase = row.showcase,
+            })
+            if entry.id then out[entry.id] = entry end
+        end
+    end
+    return out
+end
+
+local function restoreEntryToDb(entry)
+    if not entry or not entry.id then return end
+    local exists = JC.Scalar("SELECT id FROM concess WHERE id = ?", { entry.id }, nil)
+    if exists then
+        Concess.Persist(entry)
+        return
+    end
+    JC.Insert([[
+        INSERT INTO concess (id, name, job, concess_type, automatic, ped_model, catalog, preview, spawn, showcase)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ]], {
+        entry.id,
+        entry.name,
+        entry.job or "",
+        entry.concessType or 1,
+        entry.automatic and 1 or 0,
+        entry.pedModel or Concess.DefaultPed,
+        JC.Encode(entry.catalog) or "[]",
+        JC.Encode(entry.preview) or "[]",
+        JC.Encode(entry.spawn) or "[]",
+        JC.Encode(entry.showcase) or "[]",
+    })
+end
+
 function Concess.Load()
     local rows = JC.Query("SELECT * FROM concess ORDER BY id ASC")
     local out = {}
@@ -94,7 +181,44 @@ function Concess.Load()
         local entry = normalize(rows[i])
         if entry.id then out[entry.id] = entry end
     end
+
+    -- Fichier JSON : complète / restaure les points manquants après reboot
+    local fromFile = loadPointsFile()
+    if fromFile then
+        local dbCount = 0
+        for _ in pairs(out) do dbCount = dbCount + 1 end
+        if dbCount == 0 then
+            for id, entry in pairs(fromFile) do
+                out[id] = entry
+                restoreEntryToDb(entry)
+            end
+            if next(fromFile) then
+                print("^2[concess]^7 points restaurés depuis " .. POINTS_FILE)
+            end
+        else
+            -- DB présente : le fichier prime sur les coords (catalog/preview/spawn/showcase)
+            for id, fileEntry in pairs(fromFile) do
+                local dbEntry = out[id]
+                if dbEntry then
+                    dbEntry.catalog = fileEntry.catalog
+                    dbEntry.preview = fileEntry.preview
+                    dbEntry.spawn = fileEntry.spawn
+                    dbEntry.showcase = fileEntry.showcase
+                    if fileEntry.name and fileEntry.name ~= "" then dbEntry.name = fileEntry.name end
+                    if fileEntry.job ~= nil then dbEntry.job = fileEntry.job end
+                    if fileEntry.concessType then dbEntry.concessType = fileEntry.concessType end
+                    if fileEntry.automatic ~= nil then dbEntry.automatic = fileEntry.automatic end
+                    if fileEntry.pedModel then dbEntry.pedModel = fileEntry.pedModel end
+                else
+                    out[id] = fileEntry
+                    restoreEntryToDb(fileEntry)
+                end
+            end
+        end
+    end
+
     concessList = out
+    Concess.SavePointsFile()
     return concessList
 end
 
@@ -410,6 +534,9 @@ function Concess.Persist(entry)
         JC.Encode(entry.showcase),
         entry.id,
     })
+    -- garder le miroir mémoire + fichier à jour
+    concessList[entry.id] = entry
+    Concess.SavePointsFile()
 end
 
 function Concess.Broadcast(entry)
