@@ -153,18 +153,25 @@ local function writeFile(path, data)
     local dir = path:match("^(.*)/[^/]+$")
     if dir then mkdirp(dir) end
     local resName, inner = splitResource(path)
+    local apiTried = false
     if resName and inner and knownResource(resName) then
+        apiTried = true
         if SaveResourceFile(resName, inner, data, -1) then return true end
     end
     local tmp = path .. ".updtmp"
     local f, openErr = io.open(tmp, "wb")
-    if not f then return false, "écriture refusée (" .. tostring(openErr) .. ")" end
+    if not f then
+        return false, "écriture refusée (" .. tostring(openErr) .. (apiTried and " ; SaveResourceFile refusé aussi" or "") .. ") — le serveur n'a pas le droit d'écrire ici : droits/propriétaire des fichiers à corriger sur l'hébergement"
+    end
     local ok = f:write(data)
     f:close()
     if not ok then os.remove(tmp) return false, "écriture impossible" end
     os.remove(path)
     local moved, mvErr = os.rename(tmp, path)
-    if not moved then os.remove(tmp) return false, tostring(mvErr) end
+    if not moved then
+        os.remove(tmp)
+        return false, tostring(mvErr) .. (tostring(mvErr):find("ermission") and " — le fichier n'appartient pas à l'utilisateur du serveur (chown -R)" or "")
+    end
     if resName and not knownResource(resName) and not refreshedFor[resName] and path:match("/fxmanifest%.lua$") then
         refreshedFor[resName] = true
         ExecuteCommand("refresh")
@@ -512,10 +519,32 @@ local function command(args)
             return
         end
 
+        -- test d'écriture (droits) avant de tout télécharger
+        do
+            local probeRes = nil
+            for _, d in ipairs(p.download) do probeRes = splitResource(root .. "/" .. d.rel) if probeRes and knownResource(probeRes) then break end probeRes = nil end
+            if probeRes then
+                local okProbe = SaveResourceFile(probeRes, ".updater_write_test", "ok", -1)
+                if okProbe then
+                    pcall(os.remove, GetResourcePath(probeRes):gsub("\\", "/"):gsub("/+", "/"):gsub("/+$", "") .. "/.updater_write_test")
+                else
+                    err("le serveur ne peut pas écrire dans resources/" .. probeRes .. " : droits insuffisants. Sur un hébergement Linux, corrige le propriétaire des fichiers (chown -R <utilisateur> resources) et les droits (chmod -R u+rwX resources), puis relance `update`.")
+                    return
+                end
+            end
+        end
+
         local res = apply(manifest, p, state, base, root)
         if #res.errors > 0 then
-            for _, e2 in ipairs(res.errors) do err("échec : " .. tostring(e2.item.rel or "?") .. " — " .. tostring(e2.error)) end
+            local perms = 0
+            for _, e2 in ipairs(res.errors) do
+                err("échec : " .. tostring(e2.item.rel or "?") .. " — " .. tostring(e2.error))
+                if tostring(e2.error):find("ermission") or tostring(e2.error):find("refusée") then perms = perms + 1 end
+            end
             err(#res.errors .. " erreur(s). Relance `update` pour réessayer.")
+            if perms > 0 then
+                err("droits insuffisants sur " .. perms .. " fichier(s) : le serveur n'a pas le droit d'écrire dans resources/. Sur Linux : `chown -R <utilisateur-du-serveur> resources` puis `chmod -R u+rwX resources`.")
+            end
         else
             log("mise à jour " .. tostring(manifest.version) .. " appliquée. Sauvegarde des anciens fichiers : " .. res.backupRoot:gsub("^" .. root:gsub("%p", "%%%0") .. "/", ""))
         end
@@ -526,8 +555,8 @@ local function command(args)
         for _, d in ipairs(p.download) do
             if d.rel:sub(1, #("resources/[standalone]/updater/")) == "resources/[standalone]/updater/" then selfUpdated = true end
         end
-        if selfUpdated then
-            log("updater mis à jour : redémarrage automatique dans 2 s…")
+        if selfUpdated and #res.errors == 0 then
+            log("updater mis à jour : redémarrage automatique dans 2 s… (si « Access denied for command restart » : ajoute `add_ace resource.updater command.restart allow` dans server.cfg)")
             SetTimeout(2000, function() ExecuteCommand("restart " .. RES) end)
         end
         if #res.touched > 0 then

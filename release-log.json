@@ -1,13 +1,13 @@
 {
- "version": "1.12.32",
- "date": "2026-09-20T13:32:37.271Z",
- "notes": "**Correctif — création de personnage au lieu de la sélection**\n• Certains joueurs, à la reconnexion, tombaient sur la création de personnage alors qu'ils en avaient un, puis restaient sans interface. Le serveur ne confond plus une erreur de base de données passagère avec « aucun personnage » (nouvelle tentative, sinon message clair), et un créateur ouvert sur un personnage existant enregistre l'apparence et charge le personnage au lieu de bloquer.\n• Reconnexion rapide : l'ancienne session ne peut plus écraser les données de la nouvelle.\n\n`update` puis `restart core` (ou `update restart`).",
+ "version": "1.12.33",
+ "date": "2026-09-20T13:40:26.195Z",
+ "notes": "**Connexion & updater**\n• Connexion : un joueur ne peut plus rester bloqué sur « chargement de votre compte… » — si la base de données ne répond pas en 20 s, il reçoit un message et peut réessayer.\n• Updater : test d'écriture avant téléchargement avec un message clair quand l'hébergement n'autorise pas l'écriture (droits/propriétaire des fichiers, fréquent sur Linux : `chown -R <utilisateur> resources`), et aide en cas de « Access denied for command restart ».\n\n**`server.cfg` — lignes à ajouter (redémarrage automatique des ressources par l'updater)**\n```\nadd_ace resource.updater command.restart allow\nadd_ace resource.updater command.refresh allow\n```",
  "added": [],
  "changed": [
   "resources/[core]/core/plugins/000_framework/server/000_connection.lua",
-  "resources/[core]/core/plugins/015_Features/server/multicharacter.lua"
+  "resources/[standalone]/updater/server.lua"
  ],
  "removed": [],
- "total": 289317214,
+ "total": 289320063,
  "fileCount": 3309
 }

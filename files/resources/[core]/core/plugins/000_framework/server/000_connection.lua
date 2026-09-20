@@ -32,7 +32,25 @@ AddEventHandler("playerConnecting", function(name, setKickReason, deferrals)
         end
     end
 
-    local ok, account = pcall(VFW.DB.LoadAccount, identifier)
+    -- Chargement du compte avec délai maximum : si la base de données ne répond pas,
+    -- le joueur ne doit pas rester bloqué sur « chargement de votre compte… ».
+    local result = nil
+    CreateThread(function()
+        local ok, account = pcall(VFW.DB.LoadAccount, identifier)
+        result = { ok = ok, account = account }
+    end)
+    local waitedDb = 0
+    while not result do
+        Wait(100)
+        waitedDb = waitedDb + 100
+        if waitedDb == 5000 then deferrals.update(("Bienvenue sur %s, la base de données met un peu de temps à répondre..."):format(VFW.BrandName())) end
+        if waitedDb > 20000 then
+            console.error(("[connexion] chargement du compte %s : pas de réponse de la base de données après 20 s"):format(identifier))
+            deferrals.done("Le serveur n'a pas pu charger votre compte à temps (base de données). Réessayez dans quelques secondes.")
+            return
+        end
+    end
+    local ok, account = result.ok, result.account
     if not ok or not account then
         console.error(("[connexion] échec du chargement du compte %s : %s"):format(identifier, tostring(account)))
         deferrals.done("Erreur lors du chargement de votre compte. Contactez le staff.")
