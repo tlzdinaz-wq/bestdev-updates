@@ -1,16 +1,15 @@
 {
- "version": "1.12.26",
- "date": "2026-09-20T03:14:46.468Z",
- "notes": "**Best Dev — mise à jour 1.12.26**\n\n### Correction inventaire\n- **TAB n’ouvrait plus l’inventaire** après une capture d’écran staff (focus NUI resté coincé).\n- Fermeture du menu VUI / du screenshot : le clavier est bien rendu au jeu.\n\n### Technique\n- `screenshot-basic` : plus d’avertissement Node `Buffer()` déprécié dans la console serveur.\n\nConsole serveur : `update` puis `ensure VUI` et `ensure core` (ou restart).",
+ "version": "1.12.27",
+ "date": "2026-09-20T03:21:58.671Z",
+ "notes": "**Best Dev — mise à jour 1.12.27**\n\n### Inventaire\n- **Corrigé** : avec le HUD staff affiché, l’inventaire s’ouvrait *derrière* le dock et restait invisible.\n- TAB plus fiable ; secours : tape `/inv` dans le chat.\n\nConsole serveur : `update` puis `ensure core` (ou restart).",
  "added": [],
  "changed": [
-  "resources/[core]/core/plugins/015_Features/client/inventory/main.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/events.lua",
-  "resources/[core]/VUI/keybinds.lua",
-  "resources/[core]/VUI/vui.lua",
-  "resources/[standalone]/screenshot-basic/dist/server.js"
+  "resources/[core]/core/interface/build/assets/index-yMOrF4qJ.css",
+  "resources/[core]/core/interface/build/index.html",
+  "resources/[core]/core/plugins/015_Features/client/inventory/callback.lua",
+  "resources/[core]/core/plugins/015_Features/client/inventory/main.lua"
  ],
  "removed": [],
- "total": 289308460,
+ "total": 289309667,
  "fileCount": 3309
 }

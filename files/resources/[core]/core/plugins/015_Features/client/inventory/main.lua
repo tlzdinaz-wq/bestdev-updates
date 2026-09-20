@@ -202,6 +202,7 @@ RegisterNetEvent("vfw:inventoryGive", function(target)
 end)
 
 local open = false
+VFW._inventoryIgnoreNuiCloseUntil = 0
 
 function VFW.IsInventoryOpen()
     return open
@@ -209,6 +210,9 @@ end
 
 function VFW.OpenInventory(target)
     if not VFW.Items then
+        if VFW.ShowNotification then
+            VFW.ShowNotification({ type = "ROUGE", content = "Inventaire indisponible (items non chargés)" })
+        end
         return
     end
 
@@ -222,6 +226,7 @@ function VFW.OpenInventory(target)
     open = not open
 
     if not open then
+        VFW._inventoryIgnoreNuiCloseUntil = 0
         --Close the inventory and delete the cloned ped
         VFW.SetInventoryPedState(false)
 
@@ -280,6 +285,8 @@ function VFW.OpenInventory(target)
 
     VFW.Nui.HudVisible(false, true)
     VFW.DisableEscapeMenu(true)
+    -- Ignore le Tab/Escape NUI de la même frappe qui vient d'ouvrir l'inventaire
+    VFW._inventoryIgnoreNuiCloseUntil = GetGameTimer() + 400
     TriggerEvent("core:inventory:opened")
 
     -- Open effects
@@ -412,6 +419,15 @@ RegisterCommand('+inventory', function()
         return
     end
 
+    -- Focus NUI orphelin (screenshot / VUI) : TAB n'atteint sinon jamais la commande
+    if not VFW.StateInventory() and IsNuiFocused and IsNuiFocused() then
+        SetNuiFocus(false, false)
+        if VFW.Nui then
+            VFW.Nui._hasFocus = false
+        end
+        SetNuiFocusKeepInput(false)
+    end
+
     if IsPlayerInTIG() then
         VFW.ShowNotification({
             type = 'ROUGE',
@@ -429,7 +445,7 @@ RegisterCommand('+inventory', function()
         return
     end
 
-    if Death.isDead or VFW.PlayerData.dead then
+    if (Death and Death.isDead) or (VFW.PlayerData and VFW.PlayerData.dead) then
         return
     end
 
@@ -456,6 +472,14 @@ RegisterCommand('+inventory', function()
     end
     VFW.OpenInventory()
 end)
+
+RegisterCommand('inv', function()
+    if VFW.StateInventory() then
+        VFW.CloseInventory()
+    else
+        VFW.OpenInventory()
+    end
+end, false)
 
 local function haveItem(itemCompare)
     for i = 1, #VFW.PlayerData.inventory do

@@ -564,6 +564,9 @@ end)
 
 RegisterNUICallback("nui:inventory:close", function(_, cb)
     cb("ok")
+    if GetGameTimer() < (VFW._inventoryIgnoreNuiCloseUntil or 0) then
+        return
+    end
     VFW.CloseInventory()
 end)
 

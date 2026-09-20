@@ -10,6 +10,8 @@
     <style>
       html, body, #root { background: transparent !important; }
       .container-weather-manager { z-index: 10050 !important; pointer-events: auto !important; }
+      /* Inventaire au-dessus du dock staff (iframe hud z-index:10000) */
+      #root [class*="_inventory_"] { position: relative !important; z-index: 10050 !important; }
       #nui-host, #t3d-host { display: contents; }
     </style>
     <script>
