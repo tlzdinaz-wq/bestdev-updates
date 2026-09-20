@@ -52,7 +52,7 @@
     <link rel="stylesheet" href="./skin/boss-panel.css?v=1">
     <link rel="stylesheet" href="./skin/notifications.css?v=7">
     <link rel="stylesheet" href="./skin/status-hud.css?v=5">
-    <link rel="stylesheet" href="./skin/nui-fallbacks.css?v=21">
+    <link rel="stylesheet" href="./skin/nui-fallbacks.css?v=22">
   </head>
   <body style="background: transparent !important;">
     <div id="root" style="background: transparent !important;"></div>
@@ -208,15 +208,14 @@
           var editingNow = editor.classList.contains('is-on');
           tag.textContent =
             '.Speedometer-container{' +
-              'position:relative!important;' +
+              'position:fixed!important;' +
               'left:' + Number(box.x) + '%!important;' +
-              'top:0!important;' +
+              'top:' + Number(box.y) + '%!important;' +
               'right:auto!important;' +
               'bottom:auto!important;' +
               'transform:none!important;' +
               '-webkit-transform:none!important;' +
               'margin:0!important;' +
-              'margin-top:' + Number(box.y) + 'vh!important;' +
               'width:' + Number(box.w || 20) + 'vw!important;' +
               'height:' + Number(box.h || 12) + 'vh!important;' +
             '}' +

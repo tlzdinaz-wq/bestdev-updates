@@ -1,13 +1,14 @@
 {
- "version": "1.12.22",
- "date": "2026-09-20T02:02:36.221Z",
- "notes": "**Updater** : chemin de ressource avec double slash (Windows) géré.",
+ "version": "1.12.23",
+ "date": "2026-09-20T02:14:16.403Z",
+ "notes": "**Updater** : vérification sans à-coup serveur (pause tous les 150 fichiers).",
  "added": [],
  "changed": [
   "resources/[core]/core/interface/build/index.html",
+  "resources/[core]/core/interface/build/skin/nui-fallbacks.css",
   "resources/[standalone]/updater/server.lua"
  ],
  "removed": [],
- "total": 289299706,
+ "total": 289299991,
  "fileCount": 3307
 }

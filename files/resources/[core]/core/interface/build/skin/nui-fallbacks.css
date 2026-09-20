@@ -105,16 +105,18 @@ html.hud-layout-on .hud {
   width: 100% !important;
 }
 
+/* Compteur : positionné par rapport à l'écran (comme les autres éléments), pas par rapport
+   à sa place dans le flux de .hud — sinon il ne suit pas le cadre et ne peut pas monter. */
 html.hud-layout-on .Speedometer-container,
 html.hud-layout-on .hud .Speedometer-container {
-  position: relative !important;
+  position: fixed !important;
   left: var(--hud-speedo-left) !important;
-  top: 0 !important;
+  top: var(--hud-speedo-top) !important;
   right: auto !important;
   bottom: auto !important;
   transform: none !important;
   -webkit-transform: none !important;
-  margin-top: var(--hud-speedo-shift, 86vh) !important;
+  margin: 0 !important;
   width: var(--hud-speedo-width, 20vw) !important;
   height: var(--hud-speedo-height, 12vh) !important;
   z-index: 30 !important;
