@@ -1,15 +1,15 @@
 {
- "version": "1.12.27",
- "date": "2026-09-20T03:21:58.671Z",
- "notes": "**Best Dev — mise à jour 1.12.27**\n\n### Inventaire\n- **Corrigé** : avec le HUD staff affiché, l’inventaire s’ouvrait *derrière* le dock et restait invisible.\n- TAB plus fiable ; secours : tape `/inv` dans le chat.\n\nConsole serveur : `update` puis `ensure core` (ou restart).",
+ "version": "1.12.28",
+ "date": "2026-09-20T03:29:39.506Z",
+ "notes": "**Best Dev — mise à jour 1.12.28 (URGENT)**\n\n### Crash total corrigé\nErreur de syntaxe `end)` dans :\n- `VUI/vui.lua` → menus / F5 / staff cassés\n- `staff/events.lua` → events staff cassés\n\n**À faire maintenant :**\n1. Console serveur : `update`\n2. `ensure VUI` puis `ensure core` (ou **restart** du serveur)\n3. Reconnecte-toi",
  "added": [],
  "changed": [
-  "resources/[core]/core/interface/build/assets/index-yMOrF4qJ.css",
-  "resources/[core]/core/interface/build/index.html",
-  "resources/[core]/core/plugins/015_Features/client/inventory/callback.lua",
-  "resources/[core]/core/plugins/015_Features/client/inventory/main.lua"
+  "resources/[core]/core/plugins/015_Features/client/inventory/main.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/events.lua",
+  "resources/[core]/VUI/keybinds.lua",
+  "resources/[core]/VUI/vui.lua"
  ],
  "removed": [],
- "total": 289309667,
+ "total": 289307386,
  "fileCount": 3309
 }

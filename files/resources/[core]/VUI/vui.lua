@@ -1198,11 +1198,6 @@ function CreateMenu(title, banner, autoRefresh)
             VUI_HubMode = false
             VUI_HubReturnProxy = nil
             TriggerEvent("vui:hub:ended")
-            -- hub:ended restaure le focus Gestion — ne pas le retirer
-        elseif not VUI_Switching then
-            -- Libérer tout focus NUI orphelin (screenshot, color picker, etc.)
-            -- sinon TAB / inventaire restent bloqués.
-            SetNuiFocus(false, false)
         end
 
         -- Après un court délai, vérifier si un menu est ouvert. Si non, montrer le chat.
@@ -1211,7 +1206,7 @@ function CreateMenu(title, banner, autoRefresh)
                 TriggerEvent('chat:setVisible', true)
             end
         end)
-    end)
+    end
 
     --- Rebuild le menu : sauvegarde l'index, ferme (flash NUI), puis rouvre.
     --- ⚠️ Cause un flash visuel. Toujours précéder d'un `if menu.opened then`.

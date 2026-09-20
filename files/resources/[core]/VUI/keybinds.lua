@@ -99,10 +99,9 @@ Keybind("back", "menu_back", "Retour", function()
     VUI_HandleBack()
 end)
 
--- Après fermeture d'une UI core (screenshot, etc.) : NE PAS rappeler
--- SetNuiFocus(true, true). Les menus VUI naviguent via les contrôles jeu
--- (RegisterKeyMapping) sans curseur NUI. Reprendre le focus clavier ici
--- bloquait TAB (inventaire) et restait coincé, car menu.close() ne le
--- relâchait pas. SearchInput / color pickers gèrent déjà leur propre focus.
+-- Remet le curseur NUI seulement si un SearchInput VUI était actif (focusState).
+-- Ne force PAS SetNuiFocus(true,true) pour un menu RageUI classique.
 AddEventHandler("vui:restoreFocus", function()
+    if VUI_HubMode or not VUI_CurrentMenu or not VUI_CurrentMenu.opened then return end
+    -- Les menus VUI standards n'utilisent pas le focus NUI ; ne rien faire.
 end)

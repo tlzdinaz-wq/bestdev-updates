@@ -419,15 +419,6 @@ RegisterCommand('+inventory', function()
         return
     end
 
-    -- Focus NUI orphelin (screenshot / VUI) : TAB n'atteint sinon jamais la commande
-    if not VFW.StateInventory() and IsNuiFocused and IsNuiFocused() then
-        SetNuiFocus(false, false)
-        if VFW.Nui then
-            VFW.Nui._hasFocus = false
-        end
-        SetNuiFocusKeepInput(false)
-    end
-
     if IsPlayerInTIG() then
         VFW.ShowNotification({
             type = 'ROUGE',

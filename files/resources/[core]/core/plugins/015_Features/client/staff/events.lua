@@ -336,9 +336,12 @@ local function closeStaffScreenshot()
     if VFW.DisableEscapeMenu then
         VFW.DisableEscapeMenu(false)
     end
-    -- Ne pas rappeler SetNuiFocus via vui:restoreFocus : les menus VUI
-    -- n'ont pas besoin du curseur NUI, et le focus restait coincé → inventaire (TAB) mort.
-end)
+    -- Si un SearchInput VUI avait le focus, le restaurer uniquement dans ce cas.
+    CreateThread(function()
+        Wait(0)
+        TriggerEvent("vui:restoreFocus")
+    end)
+end
 
 RegisterNetEvent("vfw:staff:receiveScreen", function(imgUrl, playerInfo)
     screenshotOpen = true
