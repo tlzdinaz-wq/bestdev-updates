@@ -257,9 +257,11 @@ local function plan(manifest, state, force, root)
     for rel in pairs(files) do rels[#rels + 1] = rel end
     table.sort(rels)
 
+    if not state then log("première vérification : calcul de l'empreinte de chaque fichier (" .. #rels .. "), cela peut prendre une à deux minutes…") end
     for idx, rel in ipairs(rels) do
         -- 3 300 fichiers à vérifier : on rend la main au serveur régulièrement (pas de hitch)
         if Wait and idx % 150 == 0 then Wait(0) end
+        if not state and idx % 500 == 0 then log(("vérification %d / %d…"):format(idx, #rels)) end
         local safe = safeRel(rel)
         local base = safe and safe:match("([^/]+)$")
         if safe and not NEVER[base] then

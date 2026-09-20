@@ -1,15 +1,12 @@
 {
- "version": "1.12.29",
- "date": "2026-09-20T03:56:52.444Z",
- "notes": "**Best Dev — mise à jour 1.12.29**\n\n### Inventaire (TAB) de nouveau visible\nLe ped clone s'affichait mais l'UI web restait invisible.\n\n**Causes :**\n- iframe boutique en `display:block` permanent au-dessus de React\n- `position:fixed` sur `#root` incompatible avec le rendu FiveM (`x-cfx-game-view`)\n\n**Corrigé :** panneau inventaire fixé seul, boutique masquée à l'ouverture, Escape pour fermer (plus Tab côté NUI).\n\n### À faire\n1. Console serveur : `update`\n2. `ensure core` (ou restart)\n3. Reconnecte-toi",
+ "version": "1.12.30",
+ "date": "2026-09-20T12:44:20.176Z",
+ "notes": "**Updater** : progression affichée lors de la première vérification complète.",
  "added": [],
  "changed": [
-  "resources/[core]/core/interface/build/assets/index-CgLoM61l.js",
-  "resources/[core]/core/interface/build/index.html",
-  "resources/[core]/core/plugins/015_Features/client/inventory/main.lua",
-  "resources/[core]/core/plugins/015_Features/client/inventory/ped_display.lua"
+  "resources/[standalone]/updater/server.lua"
  ],
  "removed": [],
- "total": 289310325,
+ "total": 289310586,
  "fileCount": 3309
 }
