@@ -524,11 +524,18 @@ local function command(args)
             local probeRes = nil
             for _, d in ipairs(p.download) do probeRes = splitResource(root .. "/" .. d.rel) if probeRes and knownResource(probeRes) then break end probeRes = nil end
             if probeRes then
-                local okProbe = SaveResourceFile(probeRes, ".updater_write_test", "ok", -1)
-                if okProbe then
-                    pcall(os.remove, GetResourcePath(probeRes):gsub("\\", "/"):gsub("/+", "/"):gsub("/+$", "") .. "/.updater_write_test")
-                else
-                    err("le serveur ne peut pas écrire dans resources/" .. probeRes .. " : droits insuffisants. Sur un hébergement Linux, corrige le propriétaire des fichiers (chown -R <utilisateur> resources) et les droits (chmod -R u+rwX resources), puis relance `update`.")
+                local resDir = GetResourcePath(probeRes):gsub("\\", "/"):gsub("/+", "/"):gsub("/+$", "")
+                local probePath = resDir .. "/updater_write_test.tmp"
+                local okProbe = SaveResourceFile(probeRes, "updater_write_test.tmp", "ok", -1)
+                local ioErr = nil
+                if not okProbe then
+                    local f
+                    f, ioErr = io.open(probePath, "wb")
+                    if f then f:write("ok") f:close() okProbe = true end
+                end
+                pcall(os.remove, probePath)
+                if not okProbe then
+                    err(("le serveur ne peut pas écrire dans %s (%s). Droits insuffisants pour le processus du serveur : sur Windows, donne le contrôle total du dossier resources à l'utilisateur qui lance FXServer (Propriétés → Sécurité) et retire l'attribut « lecture seule » ; sur Linux : chown -R <utilisateur> resources && chmod -R u+rwX resources. Puis relance `update`."):format(resDir, tostring(ioErr or "SaveResourceFile refusé")))
                     return
                 end
             end

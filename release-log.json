@@ -1,13 +1,12 @@
 {
- "version": "1.12.34",
- "date": "2026-09-20T13:49:50.161Z",
- "notes": "**Correctif — « Entrer en jeu » qui renvoie à la sélection**\n• Sur la sélection de personnage, cliquer « Entrer en jeu » ramenait à la sélection au lieu de faire apparaître le joueur (sauf sur un serveur tout neuf). L'interface envoyait la position dans la liste au lieu de l'identifiant du personnage. Corrigé, avec un message clair si un personnage est vraiment introuvable.\n\n`update` puis `restart core` (ou `update restart`).",
+ "version": "1.12.35",
+ "date": "2026-09-20T13:50:56.095Z",
+ "notes": "**Updater** : le test d'écriture affiche le chemin et la raison exacte du refus (Windows / Linux).",
  "added": [],
  "changed": [
-  "resources/[core]/core/plugins/015_Features/client/multicharacter/modules/multicharacter.lua",
-  "resources/[core]/core/plugins/015_Features/server/multicharacter.lua"
+  "resources/[standalone]/updater/server.lua"
  ],
  "removed": [],
- "total": 289321013,
+ "total": 289321499,
  "fileCount": 3309
 }
