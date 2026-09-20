@@ -1,14 +1,18 @@
 {
- "version": "1.12.17",
- "date": "2026-09-20T01:50:27.442Z",
- "notes": "**Corrections**\n• 🚗 Le compteur suit enfin le cadre (F5 / Gestion). Il restait coincé en bas à droite à cause d’un ancien décalage CSS.\n\n**À faire en jeu**\nRelance `core` ou `/uireload`. Aucune ligne `server.cfg` à ajouter.",
+ "version": "1.12.18",
+ "date": "2026-09-20T01:52:52.378Z",
+ "notes": "**Correctif updater**\n• `update` plantait avec « Access to this API has been restricted » : le serveur n'autorise l'accès disque qu'à l'intérieur de `resources/`. Les fichiers à la racine (README, SQL, patch notes) ne sont plus inclus dans les mises à jour, et un fichier inaccessible est ignoré et signalé au lieu de tout arrêter.\n\nCe correctif touche l'updater lui-même : après `update`, fais `restart updater` (ou `update restart`) une fois.",
  "added": [],
  "changed": [
-  "PATCHNOTES.md",
-  "resources/[core]/core/interface/build/index.html",
-  "resources/[core]/core/interface/build/skin/nui-fallbacks.css"
+  "resources/[standalone]/updater/server.js"
  ],
- "removed": [],
- "total": 289553683,
- "fileCount": 3312
+ "removed": [
+  "avrex.sql",
+  "install.sql",
+  "PATCHNOTES.md",
+  "README.md",
+  "sql/items-seed.sql"
+ ],
+ "total": 289288901,
+ "fileCount": 3307
 }

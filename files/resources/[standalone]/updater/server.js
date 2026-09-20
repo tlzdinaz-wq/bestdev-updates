@@ -117,20 +117,34 @@ function resourceOf(rel) {
     return m ? m[1] : null;
 }
 
+// Le runtime Node de FXServer n'autorise l'accès disque qu'à l'intérieur des dossiers de
+// ressources : tout chemin hors `resources/` est refusé (ERR_ACCESS_DENIED). Ces fichiers
+// sont ignorés et signalés, sans faire échouer la mise à jour.
+function exists(abs) {
+    try { return fs.existsSync(abs); } catch (_) { return false; }
+}
+function isDenied(e) {
+    return e && (e.code === 'ERR_ACCESS_DENIED' || /restricted|permission/i.test(String(e.message)));
+}
+
 async function plan(manifest, state, force) {
     const root = serverRoot();
-    const out = { download: [], skipped: [], deleted: [], keep: [], same: [], pendingNew: [], unchanged: 0 };
+    const out = { download: [], skipped: [], deleted: [], keep: [], same: [], pendingNew: [], denied: [], unchanged: 0 };
     const files = manifest.files || {};
     const known = state && state.files ? state.files : {};
 
     for (const rel of Object.keys(files)) {
         const safe = safeRel(rel);
         if (!safe || NEVER.has(path.basename(safe))) continue;
+        if (!safe.startsWith('resources/')) { out.denied.push(safe); continue; }
         const remote = files[rel];
         const abs = path.join(root, safe);
         let localHash = null;
-        if (fs.existsSync(abs)) {
-            try { localHash = await sha256(abs); } catch (_) { localHash = null; }
+        if (exists(abs)) {
+            try { localHash = await sha256(abs); } catch (e) {
+                if (isDenied(e)) { out.denied.push(safe); continue; }
+                localHash = null;
+            }
         }
         if (localHash === remote.h) { out.unchanged++; out.same.push({ rel: safe, h: remote.h }); continue; }
         const installed = known[rel];
@@ -139,7 +153,7 @@ async function plan(manifest, state, force) {
         if (!force && (modified || unknownProtected)) {
             // nouvelle version déjà posée en .new lors d'un passage précédent → rien à refaire
             let pending = false;
-            try { pending = fs.existsSync(abs + '.new') && (await sha256(abs + '.new')) === remote.h; } catch (_) { }
+            try { pending = exists(abs + '.new') && (await sha256(abs + '.new')) === remote.h; } catch (_) { }
             if (pending) out.pendingNew.push(safe);
             else out.skipped.push({ rel: safe, remote, reason: modified ? 'modifié localement' : 'fichier protégé (état inconnu)' });
         } else {
@@ -154,10 +168,11 @@ async function plan(manifest, state, force) {
         if (!safe) continue;
         // fichiers protégés (configs, images, données écrites par le serveur) : jamais supprimés
         if (matchProtected(safe, manifest.protected)) continue;
+        if (!safe.startsWith('resources/')) continue;
         const abs = path.join(root, safe);
-        if (!fs.existsSync(abs)) continue;
+        if (!exists(abs)) continue;
         let localHash = null;
-        try { localHash = await sha256(abs); } catch (_) { }
+        try { localHash = await sha256(abs); } catch (_) { continue; }
         if (force || localHash === known[rel]) out.deleted.push(safe);
         else out.keep.push(safe);
     }
@@ -275,9 +290,20 @@ async function command(args) {
             return;
         }
 
+        // accès disque : ce runtime autorise-t-il la lecture des autres ressources ?
+        try {
+            fs.statSync(path.join(serverRoot(), 'resources'));
+        } catch (e) {
+            if (isDenied(e)) {
+                err('ce serveur interdit à la ressource updater de lire le dossier resources (permissions du runtime Node). Mise à jour impossible : signale-le à l’auteur de la base.');
+                return;
+            }
+        }
+
         const force = mode === 'force';
         const doRestart = mode === 'restart';
         const p = await plan(manifest, state, force);
+        if (p.denied.length) warn(p.denied.length + ' fichier(s) hors de resources/ ignoré(s) (accès disque refusé par le serveur) : ' + p.denied.slice(0, 5).join(', ') + (p.denied.length > 5 ? '…' : ''));
         const total = p.download.reduce((n, d) => n + (d.remote.s || 0), 0);
 
         log('version ' + ((state && state.version) || '?') + ' → ' + manifest.version + ' : ' + p.download.length + ' fichier(s) à télécharger (' + fmtSize(total) + '), ' + p.skipped.length + ' modifié(s) localement, ' + p.deleted.length + ' à supprimer, ' + p.unchanged + ' à jour.');
