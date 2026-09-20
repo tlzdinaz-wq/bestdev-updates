@@ -655,8 +655,19 @@ function VFW.Nui.KeyboardInputVisible(visible)
         action = "nui:keyboardinput:visible",
         data = visible,
     })
-    if (not visible) and StaffMenu and StaffMenu.IsGestionHubOpen and StaffMenu.IsGestionHubOpen() then
-        StaffMenu.RestoreGestionHubFocus()
+    -- Hub gestion = iframe z-index 9999 : sans le couvrir, le clavier NUI (dans #root)
+    -- s'ouvre derrière et on ne peut rien saisir (noms concess, etc.).
+    if StaffMenu and StaffMenu.IsGestionHubOpen and StaffMenu.IsGestionHubOpen() then
+        if visible then
+            if StaffMenu.CoverGestionHub then StaffMenu.CoverGestionHub() end
+            VFW.Nui.Focus(true)
+        else
+            if StaffMenu.UncoverGestionHub then
+                StaffMenu.UncoverGestionHub()
+            else
+                StaffMenu.RestoreGestionHubFocus()
+            end
+        end
         return
     end
     VFW.Nui.Focus(visible)
@@ -730,6 +741,9 @@ function VFW.Nui.ChoiceInput(title, subtitle, options)
         }
     })
 
+    if StaffMenu and StaffMenu.IsGestionHubOpen and StaffMenu.IsGestionHubOpen() and StaffMenu.CoverGestionHub then
+        StaffMenu.CoverGestionHub()
+    end
     VFW.Nui.Focus(true)
 
     while choice_input == nil do
@@ -756,7 +770,11 @@ RegisterNUICallback('nui:choiceinput:response', function(data, cb)
     })
 
     if StaffMenu and StaffMenu.IsGestionHubOpen and StaffMenu.IsGestionHubOpen() then
-        StaffMenu.RestoreGestionHubFocus()
+        if StaffMenu.UncoverGestionHub then
+            StaffMenu.UncoverGestionHub()
+        else
+            StaffMenu.RestoreGestionHubFocus()
+        end
     else
         VFW.Nui.Focus(false)
     end
@@ -775,6 +793,19 @@ function VFW.Nui.ColorPickerVisible(visible)
         action = "nui:colorpicker:visible",
         data = visible,
     })
+    if StaffMenu and StaffMenu.IsGestionHubOpen and StaffMenu.IsGestionHubOpen() then
+        if visible then
+            if StaffMenu.CoverGestionHub then StaffMenu.CoverGestionHub() end
+            VFW.Nui.Focus(true)
+        else
+            if StaffMenu.UncoverGestionHub then
+                StaffMenu.UncoverGestionHub()
+            else
+                StaffMenu.RestoreGestionHubFocus()
+            end
+        end
+        return
+    end
     VFW.Nui.Focus(visible)
 end
 

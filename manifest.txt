@@ -1,4 +1,4 @@
-#version	1.12.36	2026-09-20T14:27:55.023Z
+#version	1.12.37	2026-09-20T14:48:52.773Z
 #protected	resources/[core]/core/config/**
 #protected	resources/[core]/core/plugins/015_Features/config/**
 #protected	resources/[core]/eve_bridge/config.lua
@@ -1395,7 +1395,7 @@ c452e575cb533bac386068ac6965dc6277943528a415822024085208e2367971	5261	resources/
 8833c224f8f9fe4954d870c2a6fd64729be2e73af3efd155405088c0b69d5682	737	resources/[core]/core/plugins/000_framework/client/007_paycheck.lua
 d79889f8e9be39e6f6b90d580af6a6f76141543ef81d989294e2fe5f1541e86f	3758	resources/[core]/core/plugins/000_framework/client/008_interact.lua
 160abfedc984fe883d47e92383a1eb819d30eb0971f1461fa81f611c084e6907	3570	resources/[core]/core/plugins/000_framework/client/009_select.lua
-ddf71985f6e7a940421b13b803780c69a15dc2ed25a0a0ada891e075bb2c2e58	37171	resources/[core]/core/plugins/000_framework/client/010_nui.lua
+9aa9e4369c8ff32c80fffc2a7411f423af0e610f4fb7114a106e13592ef5a658	38329	resources/[core]/core/plugins/000_framework/client/010_nui.lua
 3df1d21a98fddc0628a8d03319427925a30677598d304975fde818e1989951d2	3617	resources/[core]/core/plugins/000_framework/client/011_scaleform.lua
 1e8ac71776b7870f30a3f100a9f946c60f46a314579e6d13427b595f5f769901	10043	resources/[core]/core/plugins/000_framework/client/012_floatingUI.lua
 b245c8b8f7a56a0d91d4f2cb0fd36e2218b17c69309ef6b27c21b110f67b3de4	2243	resources/[core]/core/plugins/000_framework/client/012_streaming.lua
