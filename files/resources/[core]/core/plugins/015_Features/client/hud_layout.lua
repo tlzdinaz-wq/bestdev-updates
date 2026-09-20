@@ -17,6 +17,9 @@ local DEFAULTS = {
     notif   = { x = 1.2,  y = 28.0, w = 22.0, h = 28.0 },
 }
 
+-- Fiche joueur staff : positionnée seulement dans Gestion, jamais dans le F5.
+local SERVER_ONLY = { preview = true }
+
 local layout = nil
 local editing = false
 local editingServer = false
@@ -62,6 +65,17 @@ local function defaultMinimapBox()
     }
 end
 
+local function defaultPreviewBox(vui)
+    vui = type(vui) == "table" and vui or DEFAULTS.vui
+    local w, h = 22.0, 70.0
+    local x = (tonumber(vui.x) or 2.0) + (tonumber(vui.w) or 26.0) + 1.5
+    local y = tonumber(vui.y) or 2.2
+    if x + w > 98.0 then
+        x = math.max(0.5, (tonumber(vui.x) or 2.0) - w - 1.5)
+    end
+    return { x = x, y = y, w = w, h = h }
+end
+
 local function mergeDefaults(data)
     local out = copy(DEFAULTS)
     out.minimap = defaultMinimapBox()
@@ -78,10 +92,36 @@ local function mergeDefaults(data)
             }
         end
     end
+    local preview = data.preview
+    if type(preview) == "table" and tonumber(preview.x) and tonumber(preview.y) then
+        local fallback = defaultPreviewBox(out.vui)
+        out.preview = {
+            x = tonumber(preview.x) or fallback.x,
+            y = tonumber(preview.y) or fallback.y,
+            w = tonumber(preview.w) or fallback.w,
+            h = tonumber(preview.h) or fallback.h,
+        }
+    end
     if data.custom == true then
         out.custom = true
     end
     return out
+end
+
+local function stripServerOnly(data)
+    if type(data) ~= "table" then return data end
+    for id in pairs(SERVER_ONLY) do
+        data[id] = nil
+    end
+    return data
+end
+
+local function ensureServerPreview(data)
+    if type(data) ~= "table" then return data end
+    if type(data.preview) ~= "table" or not tonumber(data.preview.x) then
+        data.preview = defaultPreviewBox(data.vui)
+    end
+    return data
 end
 
 local function hasBoxes(data)
@@ -114,7 +154,7 @@ end
 
 local function rememberPersonal(data)
     if not hasBoxes(data) then return nil end
-    personalLayout = mergeDefaults(data)
+    personalLayout = stripServerOnly(mergeDefaults(data))
     personalLayout.custom = true
     writeKvp(personalLayout)
     return personalLayout

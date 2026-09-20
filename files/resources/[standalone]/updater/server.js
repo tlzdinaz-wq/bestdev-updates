@@ -152,6 +152,8 @@ async function plan(manifest, state, force) {
         if (files[rel]) continue;
         const safe = safeRel(rel);
         if (!safe) continue;
+        // fichiers protégés (configs, images, données écrites par le serveur) : jamais supprimés
+        if (matchProtected(safe, manifest.protected)) continue;
         const abs = path.join(root, safe);
         if (!fs.existsSync(abs)) continue;
         let localHash = null;
