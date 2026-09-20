@@ -52,7 +52,7 @@
     <link rel="stylesheet" href="./skin/boss-panel.css?v=1">
     <link rel="stylesheet" href="./skin/notifications.css?v=7">
     <link rel="stylesheet" href="./skin/status-hud.css?v=5">
-    <link rel="stylesheet" href="./skin/nui-fallbacks.css?v=15">
+    <link rel="stylesheet" href="./skin/nui-fallbacks.css?v=16">
   </head>
   <body style="background: transparent !important;">
     <div id="root" style="background: transparent !important;"></div>
@@ -195,15 +195,32 @@
             preview.style.display = hasReal ? 'none' : '';
           }
         }
+        function pinSpeedo(box) {
+          if (!box) return;
+          var tag = document.getElementById('hud-speedo-place');
+          if (!tag) {
+            tag = document.createElement('style');
+            tag.id = 'hud-speedo-place';
+            document.head.appendChild(tag);
+          }
+          tag.textContent =
+            '.Speedometer-container{' +
+              'position:fixed!important;' +
+              'left:' + Number(box.x) + '%!important;' +
+              'top:' + Number(box.y) + '%!important;' +
+              'right:auto!important;' +
+              'bottom:auto!important;' +
+              'transform:none!important;' +
+              'width:' + Number(box.w || 20) + '%!important;' +
+              'height:' + Number(box.h || 12) + '%!important;' +
+              'margin:0!important;' +
+              'z-index:20!important;' +
+            '}';
+        }
         function applyVars(data) {
           var next = unwrap(data);
           if (!next) return;
           layout = next;
-          if (data && data.custom === false && !editor.classList.contains('is-on')) {
-            root.classList.remove('hud-layout-on');
-            pinNotifs(next.notif);
-            return;
-          }
           ['status', 'health', 'speedo', 'logo', 'notif'].forEach(function (key) {
             var box = next[key];
             if (!box) return;
@@ -214,6 +231,7 @@
           });
           root.classList.add('hud-layout-on');
           pinNotifs(next.notif);
+          pinSpeedo(next.speedo);
           pinFiche(next.preview);
         }
         function previewSoon() {
@@ -258,7 +276,7 @@
             el.innerHTML = '<b>' + labels[key] + '</b>';
             bindDrag(el, key);
             editor.appendChild(el);
-            if (key !== 'notif' && key !== 'preview') fitBoxToTarget(el, key);
+            if (key !== 'notif' && key !== 'preview' && key !== 'speedo') fitBoxToTarget(el, key);
           });
         }
         function bindDrag(el, key) {
@@ -300,10 +318,10 @@
           });
         }
         function openEditor(data) {
-          applyVars(data);
           editor.classList.add('is-on');
           root.classList.add('hud-layout-edit');
           editor.setAttribute('aria-hidden', 'false');
+          applyVars(data);
           var preview = document.getElementById('hud-layout-notif-preview');
           if (preview) preview.setAttribute('aria-hidden', 'false');
           pinFiche(layout.preview);

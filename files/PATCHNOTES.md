@@ -1,3 +1,19 @@
+# Patch notes — Best Dev (core v1.12.17) — 20/09/2026
+
+## Corrections
+- **Compteur** : il suivait encore le coin bas-droit (ancien `transform`). Il se place maintenant dans le cadre, comme le reste du HUD.
+
+---
+
+# Patch notes — Best Dev (core v1.12.16) — 20/09/2026
+
+## HUD statut
+- Vie / armure : barres fines, pastille ronde (cœur / bouclier) cerclée de la couleur.
+- Faim / soif / oxygène : anneaux plus épais, icône au centre, plus de pourcentage affiché.
+- Thèmes Néon / Cercles / Minimal, couleurs F5 et éditeur de positions conservés.
+
+---
+
 # Patch notes — Best Dev (core v1.12.15) — 20/09/2026
 
 ## Interfaces

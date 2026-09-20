@@ -1,15 +1,14 @@
 {
- "version": "1.12.16",
- "date": "2026-09-20T01:49:02.573Z",
- "notes": "**HUD statut**\n• ❤️ Vie / armure : barres fines sans cadre, pastille ronde avec icône (cœur / bouclier) cerclée de la couleur, remplissage lumineux avec halo.\n• 🍴💧 Faim / soif / oxygène : anneaux plus épais à bouts arrondis avec halo, disque sombre, icône dans une pastille centrale — le pourcentage n'est plus affiché.\n• Thèmes Néon / Cercles / Minimal, couleurs du F5 et éditeur de positions conservés.\n\nRedémarrage de `core` après la mise à jour (`update restart` le fait).",
- "added": [
-  "resources/[core]/core/interface/build/skin/status-hud.css"
- ],
+ "version": "1.12.17",
+ "date": "2026-09-20T01:50:27.442Z",
+ "notes": "**Corrections**\n• 🚗 Le compteur suit enfin le cadre (F5 / Gestion). Il restait coincé en bas à droite à cause d’un ancien décalage CSS.\n\n**À faire en jeu**\nRelance `core` ou `/uireload`. Aucune ligne `server.cfg` à ajouter.",
+ "added": [],
  "changed": [
+  "PATCHNOTES.md",
   "resources/[core]/core/interface/build/index.html",
-  "resources/[core]/core/interface/build/skin/README.md"
+  "resources/[core]/core/interface/build/skin/nui-fallbacks.css"
  ],
  "removed": [],
- "total": 289552190,
+ "total": 289553683,
  "fileCount": 3312
 }
