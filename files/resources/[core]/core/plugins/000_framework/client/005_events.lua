@@ -272,6 +272,44 @@ AddEventHandler("entityCreated", function(entity)
     if state and state.OwnedVehicle then
         pinOwnedVehicle(entity)
     end
+    if state and state.doorsLocked ~= nil then
+        applyDoorLock(entity, state.doorsLocked == true)
+    end
+end)
+
+-- Verrouillage : l'état de référence est le state bag `doorsLocked` (posé par le serveur,
+-- plugins/015_Features/server/vehicle_lock.lua). Chaque client l'applique localement, ce qui
+-- reste cohérent quel que soit le propriétaire réseau du véhicule.
+local function applyDoorLock(vehicle, locked)
+    if not vehicle or vehicle == 0 or not DoesEntityExist(vehicle) then return end
+    if GetEntityType(vehicle) ~= 2 then return end
+    local status = GetVehicleDoorLockStatus(vehicle)
+    if locked then
+        if status ~= 2 then SetVehicleDoorsLocked(vehicle, 2) end
+        SetVehicleDoorsLockedForAllPlayers(vehicle, true)
+    else
+        if status ~= 1 then SetVehicleDoorsLocked(vehicle, 1) end
+        SetVehicleDoorsLockedForAllPlayers(vehicle, false)
+    end
+end
+
+---@diagnostic disable-next-line: param-type-mismatch
+AddStateBagChangeHandler("doorsLocked", nil, function(bagName, _, value)
+    if value == nil then return end
+    local netId = tonumber(bagName:match("entity:(%d+)"))
+    if not netId then return end
+
+    CreateThread(function()
+        local tries = 0
+        while tries < 30 do
+            if NetworkDoesEntityExistWithNetworkId(netId) then
+                applyDoorLock(NetworkGetEntityFromNetworkId(netId), value == true)
+                return
+            end
+            Wait(100)
+            tries = tries + 1
+        end
+    end)
 end)
 
 -- Periodic sweep : safety net in case entityCreated misses an entity.
@@ -285,6 +323,9 @@ CreateThread(function()
                 local state = Entity(veh).state
                 if state and state.OwnedVehicle then
                     pinOwnedVehicle(veh)
+                end
+                if state and state.doorsLocked ~= nil then
+                    applyDoorLock(veh, state.doorsLocked == true)
                 end
             end
         end

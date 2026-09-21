@@ -399,10 +399,15 @@ function Adjustments:NoCarJack()
                     end
                 end
 
+                -- anti-vol des véhicules PNJ : jamais sur un véhicule géré par le serveur
+                -- (possédé, activité, spawn staff, ou dont l'état de verrouillage est connu)
+                local vehState = Entity(veh).state
                 if not excludedModels[model]
-                        and not Entity(veh).state.VehicleProperties
-                        and not Entity(veh).state.OwnedVehicle
-                        and not Entity(veh).state.activityVehicle
+                        and not vehState.VehicleProperties
+                        and not vehState.OwnedVehicle
+                        and not vehState.activityVehicle
+                        and not vehState.staffVehicle
+                        and vehState.doorsLocked == nil
                         and not hasPlayer
                         and not (VFW.PropertyGarageVehicles and VFW.PropertyGarageVehicles[veh]) then
                     if GetVehicleDoorLockStatus(veh) == 1 then

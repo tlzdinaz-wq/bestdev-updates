@@ -751,7 +751,13 @@ RegisterServerCallback("vfw:vehicle:changePlate", function(source, oldPlate, new
     return true
 end)
 
-RegisterServerCallback("vfw:context:hasVehicleKey", function(source, plate)
+--- Le joueur a-t-il les clés de ce véhicule ? (propriétaire, véhicule de son job / sa faction,
+--- objet « keys », clé temporaire job / staff, double de clé concession). Un véhicule inconnu
+--- de la base (PNJ, spawn staff) est considéré accessible à tous.
+---@param source number
+---@param plate string
+---@return boolean
+function Staff29.PlayerHasVehicleKey(source, plate)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer then return false end
 
@@ -805,6 +811,11 @@ RegisterServerCallback("vfw:context:hasVehicleKey", function(source, plate)
     end
 
     return false
+end
+VFW.PlayerHasVehicleKey = Staff29.PlayerHasVehicleKey
+
+RegisterServerCallback("vfw:context:hasVehicleKey", function(source, plate)
+    return Staff29.PlayerHasVehicleKey(source, plate)
 end)
 
 RegisterServerCallback("vfw:staff:vehBlacklist:list", function(source)
@@ -917,12 +928,13 @@ RegisterNetEvent("vfw:staff:menu:spawnVehicle", function(model)
 
     local hash = joaat(cleaned)
     local vehicleType = VFW.GetVehicleType and VFW.GetVehicleType(hash, source) or "automobile"
-    local netId = Feat27.SpawnVehicle(hash, coords, heading, vehicleType)
+    local netId, spawned = Feat27.SpawnVehicle(hash, coords, heading, vehicleType)
 
     if not netId then
         notify(source, "ERROR", "Ce véhicule n'a pas pu apparaître.")
         return
     end
+    if VFW.MarkStaffVehicle then VFW.MarkStaffVehicle(spawned or NetworkGetEntityFromNetworkId(netId)) end
 
     notify(source, "SUCCESS", "Le véhicule est apparu.")
     logStaff(source, "vehicle_spawn_menu", { model = cleaned, coords = coords })
@@ -960,6 +972,8 @@ RegisterNetEvent("vfw:staff:carlist:spawnVehicle", function(model, livery)
         notify(source, "ERROR", "Ce véhicule n'a pas pu apparaître.")
         return
     end
+
+    if VFW.MarkStaffVehicle then VFW.MarkStaffVehicle(vehicle or NetworkGetEntityFromNetworkId(netId)) end
 
     local index = tonumber(livery)
     if vehicle and DoesEntityExist(vehicle) and index and index >= 0 and index <= 64 then

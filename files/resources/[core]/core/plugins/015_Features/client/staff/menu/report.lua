@@ -72,7 +72,7 @@ function StaffMenu.BuildReportMenu()
     end
 
     StaffMenu.report.Button(":check: FERMER LE REPORT", "Marquer le report comme traité et clôturer la fiche", nil, nil, false, function()
-        TriggerServerEvent("vfw:staff:closeReport", StaffMenu.data.selectedPlayer)
+        TriggerServerEvent("vfw:staff:closeReport", StaffMenu.data.selectedPlayer, report.id)
         StaffMenu.data.reportInfo = {}
         StaffMenu.report.close()
         SetTimeout(300, function()

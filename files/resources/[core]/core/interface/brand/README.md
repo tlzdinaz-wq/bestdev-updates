@@ -23,7 +23,7 @@ Aucune modification de code n'est nécessaire.
 
 ## Ce qui est fourni
 
-Le dossier contient **96 fichiers, 868 Ko au total**. Tous les chemins d'image que
+Le dossier contient **160 fichiers, 4,1 Mo au total** (dont les 46 portraits des parents du créateur, 2,9 Mo). Tous les chemins d'image que
 l'interface réclame sont couverts : plus aucun écran n'affiche d'image manquante.
 
 **Ce sont des placeholders, pas des visuels finaux.** Ils sont dessinés dans la
@@ -58,7 +58,7 @@ symbole à 16 pétales en dégradé `#7263EE` → `#40378A`, mot EVE en blanc, b
 | `badges/` | 5 | 350x560 | planche carte plus écusson de chaque service |
 | `boombox/` | 4 | bandeau 490x120, vignettes 220x140 | en-tête et actions de l'enceinte portable |
 | `boutique/` | 3 | SVG 24x24, jeton 96x96 | flèches de navigation et jeton de monnaie |
-| `character-creator/` | 1 | 1280x720 | fond de dressing du créateur de personnage |
+| `character-creator/` | 2 + `parents/` 46 | 1280x720, 640x320, portraits 256x256 | fond de dressing, fond de l'aperçu Héritage et portraits des parents (`parents/<Prénom>.png`, sprites du créateur GTA Online, source GTA Wiki) |
 | `entreprise/` | 4 | 96 à 256 | enseignes des commerces et écusson par défaut |
 | `gestion-propriete/` | 1 | 445x140 | bandeau d'en-tête |
 | `icons/` | 5 | 40 à 128 | pictogrammes divers de l'interface |

@@ -75,6 +75,27 @@ local function sendSelection(source)
     TriggerClientEvent("vfw:multicharacter:SetupUI", source, characters, getSlots(account))
 end
 
+-- Identifiant archivé d'un personnage supprimé : « w<id>:license:<hash> » (≤ 64 caractères),
+-- unique et sans le préfixe char<slot> pour que le slot redevienne libre.
+function VFW.ArchivedCharIdentifier(charId, identifier)
+    local rest = tostring(identifier or ""):match("^char%d+:(.+)$") or tostring(identifier or "")
+    return ("w%d:%s"):format(tonumber(charId) or 0, rest):sub(1, 64)
+end
+
+-- Un personnage supprimé (wipe) qui tient encore l'identifiant du slot bloque l'INSERT
+-- (clé unique) : on archive son identifiant avant de créer le nouveau personnage.
+local function releaseDeletedIdentifier(identifier)
+    local rows = MySQL.query.await(
+        "SELECT id FROM characters WHERE identifier = ? AND deleted_at IS NOT NULL", { identifier }
+    ) or {}
+    for i = 1, #rows do
+        local archived = VFW.ArchivedCharIdentifier(rows[i].id, identifier)
+        MySQL.update.await("UPDATE characters SET identifier = ? WHERE id = ?", { archived, rows[i].id })
+        MySQL.update.await("UPDATE character_tattoos SET identifier = ? WHERE identifier = ?", { archived, identifier })
+        console.warn(("[multichar] identifiant %s libéré (personnage supprimé #%d archivé en %s)"):format(identifier, rows[i].id, archived))
+    end
+end
+
 local function firstFreeSlot(account)
     local rows = VFW.DB.LoadCharacters(account.id)
     local used = {}
@@ -218,6 +239,8 @@ RegisterNetEvent("core:server:createIdentity", function(data)
         VFW.ShowNotification(source, { type = "ROUGE", content = "Cette identité n'est pas valide." })
         return
     end
+
+    releaseDeletedIdentifier(identifier)
 
     VFW.DB.CreateCharacter(account.id, slot, identifier, {
         firstname = firstname,

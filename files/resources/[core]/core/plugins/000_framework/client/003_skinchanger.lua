@@ -58,6 +58,11 @@ end
 ---@return any
 function GetMaxVals()
     local playerPed = PlayerPedId()
+    -- comptage vanilla + DLC + packs addon (collections), comme le magasin et le créateur
+    local function nDraw(comp) return (VFW.PedDrawableCount and VFW.PedDrawableCount(playerPed, "clothing", comp)) or GetNumberOfPedDrawableVariations(playerPed, comp) end
+    local function nTex(comp, d) return (VFW.PedTextureCount and VFW.PedTextureCount(playerPed, "clothing", comp, d)) or GetNumberOfPedTextureVariations(playerPed, comp, d) end
+    local function nProp(prop) return (VFW.PedDrawableCount and VFW.PedDrawableCount(playerPed, "props", prop)) or GetNumberOfPedPropDrawableVariations(playerPed, prop) end
+    local function nPropTex(prop, d) return (VFW.PedTextureCount and VFW.PedTextureCount(playerPed, "props", prop, d)) or GetNumberOfPedPropTextureVariations(playerPed, prop, d) end
 
     local data = {
         sex = #Config.PedsCharCreator + 3,
@@ -88,8 +93,8 @@ function GetMaxVals()
         beard_2 = 10,
         beard_3 = GetNumHairColors() - 1,
         beard_4 = GetNumHairColors() - 1,
-        hair_1 = GetNumberOfPedDrawableVariations(playerPed, 2) - 1,
-        hair_2 = GetNumberOfPedTextureVariations(playerPed, 2, Character["hair_1"]) - 1,
+        hair_1 = nDraw(2) - 1,
+        hair_2 = nTex(2, Character["hair_1"]) - 1,
         hair_color_1 = GetNumHairColors() - 1,
         hair_color_2 = GetNumHairColors() - 1,
         eye_color = 31,
@@ -126,36 +131,36 @@ function GetMaxVals()
         bodyb_2 = 10,
         bodyb_3 = GetPedHeadOverlayNum(12) - 1,
         bodyb_4 = 10,
-        ears_1 = GetNumberOfPedPropDrawableVariations(playerPed, 2) - 1,
-        ears_2 = GetNumberOfPedPropTextureVariations(playerPed, 2, Character["ears_1"] - 1),
-        tshirt_1 = GetNumberOfPedDrawableVariations(playerPed, 8) - 1,
-        tshirt_2 = GetNumberOfPedTextureVariations(playerPed, 8, Character["tshirt_1"]) - 1,
-        torso_1 = GetNumberOfPedDrawableVariations(playerPed, 11) - 1,
-        torso_2 = GetNumberOfPedTextureVariations(playerPed, 11, Character["torso_1"]) - 1,
-        decals_1 = GetNumberOfPedDrawableVariations(playerPed, 10) - 1,
-        decals_2 = GetNumberOfPedTextureVariations(playerPed, 10, Character["decals_1"]) - 1,
-        arms = GetNumberOfPedDrawableVariations(playerPed, 3) - 1,
+        ears_1 = nProp(2) - 1,
+        ears_2 = nPropTex(2, Character["ears_1"] - 1),
+        tshirt_1 = nDraw(8) - 1,
+        tshirt_2 = nTex(8, Character["tshirt_1"]) - 1,
+        torso_1 = nDraw(11) - 1,
+        torso_2 = nTex(11, Character["torso_1"]) - 1,
+        decals_1 = nDraw(10) - 1,
+        decals_2 = nTex(10, Character["decals_1"]) - 1,
+        arms = nDraw(3) - 1,
         arms_2 = 10,
-        pants_1 = GetNumberOfPedDrawableVariations(playerPed, 4) - 1,
-        pants_2 = GetNumberOfPedTextureVariations(playerPed, 4, Character["pants_1"]) - 1,
-        shoes_1 = GetNumberOfPedDrawableVariations(playerPed, 6) - 1,
-        shoes_2 = GetNumberOfPedTextureVariations(playerPed, 6, Character["shoes_1"]) - 1,
-        mask_1 = GetNumberOfPedDrawableVariations(playerPed, 1) - 1,
-        mask_2 = GetNumberOfPedTextureVariations(playerPed, 1, Character["mask_1"]) - 1,
-        bproof_1 = GetNumberOfPedDrawableVariations(playerPed, 9) - 1,
-        bproof_2 = GetNumberOfPedTextureVariations(playerPed, 9, Character["bproof_1"]) - 1,
-        chain_1 = GetNumberOfPedDrawableVariations(playerPed, 7) - 1,
-        chain_2 = GetNumberOfPedTextureVariations(playerPed, 7, Character["chain_1"]) - 1,
-        bags_1 = GetNumberOfPedDrawableVariations(playerPed, 5) - 1,
-        bags_2 = GetNumberOfPedTextureVariations(playerPed, 5, Character["bags_1"]) - 1,
-        helmet_1 = GetNumberOfPedPropDrawableVariations(playerPed, 0) - 1,
-        helmet_2 = GetNumberOfPedPropTextureVariations(playerPed, 0, Character["helmet_1"]) - 1,
-        glasses_1 = GetNumberOfPedPropDrawableVariations(playerPed, 1) - 1,
-        glasses_2 = GetNumberOfPedPropTextureVariations(playerPed, 1, Character["glasses_1"] - 1),
-        watches_1 = GetNumberOfPedPropDrawableVariations(playerPed, 6) - 1,
-        watches_2 = GetNumberOfPedPropTextureVariations(playerPed, 6, Character["watches_1"]) - 1,
-        bracelets_1 = GetNumberOfPedPropDrawableVariations(playerPed, 7) - 1,
-        bracelets_2 = GetNumberOfPedPropTextureVariations(playerPed, 7, Character["bracelets_1"] - 1),
+        pants_1 = nDraw(4) - 1,
+        pants_2 = nTex(4, Character["pants_1"]) - 1,
+        shoes_1 = nDraw(6) - 1,
+        shoes_2 = nTex(6, Character["shoes_1"]) - 1,
+        mask_1 = nDraw(1) - 1,
+        mask_2 = nTex(1, Character["mask_1"]) - 1,
+        bproof_1 = nDraw(9) - 1,
+        bproof_2 = nTex(9, Character["bproof_1"]) - 1,
+        chain_1 = nDraw(7) - 1,
+        chain_2 = nTex(7, Character["chain_1"]) - 1,
+        bags_1 = nDraw(5) - 1,
+        bags_2 = nTex(5, Character["bags_1"]) - 1,
+        helmet_1 = nProp(0) - 1,
+        helmet_2 = nPropTex(0, Character["helmet_1"]) - 1,
+        glasses_1 = nProp(1) - 1,
+        glasses_2 = nPropTex(1, Character["glasses_1"] - 1),
+        watches_1 = nProp(6) - 1,
+        watches_2 = nPropTex(6, Character["watches_1"]) - 1,
+        bracelets_1 = nProp(7) - 1,
+        bracelets_2 = nPropTex(7, Character["bracelets_1"] - 1),
         degrade_collection = -1719270477,
         degrade_hashname = -1824026490,
     }
@@ -262,24 +267,26 @@ function ApplySkin(skin, clothes)
     -- Clamp drawable/textura a la range válida del modelo actual. Sin esto, valores
     -- inválidos (ej. outfit guardado en otro modelo) generan "CPedVariation invalid"
     -- en F8 y SetPedComponentVariation/SetPedPropIndex fallan silenciosamente.
+    -- Comptage vanilla + DLC + packs addon (collections) : GetNumberOfPedDrawableVariations
+    -- seul peut ignorer les slots streamés, et un vêtement addon serait alors remis à 0.
     local function clampComp(slotId, d, t)
-        local maxDraw = GetNumberOfPedDrawableVariations(playerPed, slotId) - 1
+        local maxDraw = ((VFW.PedDrawableCount and VFW.PedDrawableCount(playerPed, "clothing", slotId)) or GetNumberOfPedDrawableVariations(playerPed, slotId)) - 1
         if maxDraw >= 0 and d > maxDraw then
             return 0, 0
         end
         if t == nil or t < 0 then t = 0 end
-        local maxTex = GetNumberOfPedTextureVariations(playerPed, slotId, d) - 1
+        local maxTex = ((VFW.PedTextureCount and VFW.PedTextureCount(playerPed, "clothing", slotId, d)) or GetNumberOfPedTextureVariations(playerPed, slotId, d)) - 1
         if maxTex >= 0 and t > maxTex then t = 0 end
         return d, t
     end
 
     local function clampProp(slotId, d, t)
-        local maxDraw = GetNumberOfPedPropDrawableVariations(playerPed, slotId) - 1
+        local maxDraw = ((VFW.PedDrawableCount and VFW.PedDrawableCount(playerPed, "props", slotId)) or GetNumberOfPedPropDrawableVariations(playerPed, slotId)) - 1
         if maxDraw >= 0 and d > maxDraw then
             return 0, 0
         end
         if t == nil or t < 0 then t = 0 end
-        local maxTex = GetNumberOfPedPropTextureVariations(playerPed, slotId, d) - 1
+        local maxTex = ((VFW.PedTextureCount and VFW.PedTextureCount(playerPed, "props", slotId, d)) or GetNumberOfPedPropTextureVariations(playerPed, slotId, d)) - 1
         if maxTex >= 0 and t > maxTex then t = 0 end
         return d, t
     end

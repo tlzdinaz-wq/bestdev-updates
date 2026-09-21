@@ -272,13 +272,17 @@ function Garage:SetExitPoint(vehType)
             local playerHeading <const> = GetEntityHeading(player)
             local vehicleName <const> = vehicleByType[vehType] or vehicleByType[1]
 
-            local vehicle = VFW.Game.SpawnVehicle(vehicleName, playerCoords, playerHeading, nil, false)
-            FreezeEntityPosition(vehicle, true)
-            SetEntityCollision(vehicle, false, false)
-            SetEntityCompletelyDisableCollision(vehicle, false, false)
-            SetEntityAlpha(vehicle, 100)
+            local okSpawn, vehicle = pcall(VFW.Game.SpawnVehicle, vehicleName, playerCoords, playerHeading, nil, false)
+            if okSpawn and vehicle and vehicle ~= 0 and DoesEntityExist(vehicle) then
+                FreezeEntityPosition(vehicle, true)
+                SetEntityCollision(vehicle, false, false)
+                SetEntityCompletelyDisableCollision(vehicle, false, false)
+                SetEntityAlpha(vehicle, 100)
+                vehicleList[#vehicleList + 1] = vehicle
+            else
+                print(("[garage] aperçu du véhicule impossible (%s), position enregistrée quand même"):format(tostring(vehicle)))
+            end
 
-            vehicleList[#vehicleList + 1] = vehicle
             exit[#exit + 1] = {
                 x = playerCoords.x,
                 y = playerCoords.y,
@@ -287,10 +291,12 @@ function Garage:SetExitPoint(vehType)
             }
         end
 
-        if IsControlJustReleased(0, 194) then
+        if IsControlJustReleased(0, 194) and #exit > 0 then
             exit[#exit] = nil
-            DeleteEntity(vehicleList[#vehicleList])
-            vehicleList[#vehicleList] = nil
+            if vehicleList[#vehicleList] then
+                DeleteEntity(vehicleList[#vehicleList])
+                vehicleList[#vehicleList] = nil
+            end
         end
 
         if IsControlJustReleased(0, 251) then

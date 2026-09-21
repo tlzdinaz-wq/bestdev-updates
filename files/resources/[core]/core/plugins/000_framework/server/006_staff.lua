@@ -411,12 +411,14 @@ RegisterNetEvent("vfw:staff:spawnVehicle", function(model, posX, posY, posZ, hea
 
     local hash = joaat(model)
     local vehicleType = VFW.GetVehicleType and VFW.GetVehicleType(hash, source) or "automobile"
-    local netId = Feat27.SpawnVehicle(hash, { x = x, y = y, z = z }, tonumber(heading) or 0.0, vehicleType)
+    local netId, spawned = Feat27.SpawnVehicle(hash, { x = x, y = y, z = z }, tonumber(heading) or 0.0, vehicleType)
 
     if not netId then
         staffNotify(source, "ERROR", "Spawn véhicule", "Ce véhicule n'a pas pu apparaître.")
         return
     end
+    -- déverrouillé et exempté de l'anti-vol (voir plugins/015_Features/server/vehicle_lock.lua)
+    if VFW.MarkStaffVehicle then VFW.MarkStaffVehicle(spawned or NetworkGetEntityFromNetworkId(netId)) end
 
     staffNotify(source, "SUCCESS", "Spawn véhicule", "Le véhicule est apparu.")
     TriggerEvent("vfw:logs:staff", source, "spawn_vehicle", { model = model, coords = { x = x, y = y, z = z } })

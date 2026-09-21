@@ -2,9 +2,33 @@
 ---@diagnostic disable: duplicate-doc-field
 
 VFW.Reports = {}
+
+local function sameReportId(a, b)
+    if a == b then return true end
+    local na, nb = tonumber(a), tonumber(b)
+    return na ~= nil and nb ~= nil and na == nb
+end
+
+local function syncStaffHud()
+    if RefreshStaffHudReports then
+        RefreshStaffHudReports()
+    end
+end
+
+local function refreshReportMenus()
+    if StaffMenu and StaffMenu.reports and StaffMenu.reports.opened then
+        StaffMenu.reports.refresh()
+    end
+    if StaffMenu and StaffMenu.main and StaffMenu.main.opened then
+        StaffMenu.main.refresh()
+    end
+    syncStaffHud()
+end
+
 ---@param reports any
 RegisterNetEvent("vfw:staff:reports", function(reports)
-    VFW.Reports = reports
+    VFW.Reports = reports or {}
+    refreshReportMenus()
 end)
 
 ---@param report any
@@ -20,51 +44,37 @@ RegisterNetEvent("vfw:staff:report", function(report)
         end
     end)
 
-    -- Auto-refresh reports menu for all staff in service (only if menu is open)
-    if StaffMenu and StaffMenu.reports and StaffMenu.reports.opened then
-        StaffMenu.reports.refresh()
-    end
-    -- Refresh main menu to update report counter
-    if StaffMenu and StaffMenu.main and StaffMenu.main.opened then
-        StaffMenu.main.refresh()
-    end
+    refreshReportMenus()
 end)
 
 ---@param id any
 RegisterNetEvent("vfw:staff:deleteReport", function(id)
     for i = 1, #VFW.Reports do
-        if VFW.Reports[i].id == id then
+        if VFW.Reports[i] and sameReportId(VFW.Reports[i].id, id) then
             table.remove(VFW.Reports, i)
-            if VFW.lastReport == id then
+            if sameReportId(VFW.lastReport, id) then
                 VFW.lastReport = nil
             end
             break
         end
     end
 
-    -- Auto-refresh reports menu for all staff in service (only if menu is open)
-    if StaffMenu and StaffMenu.reports and StaffMenu.reports.opened then
-        StaffMenu.reports.refresh()
-    end
-    -- Refresh main menu to update report counter
-    if StaffMenu and StaffMenu.main and StaffMenu.main.opened then
-        StaffMenu.main.refresh()
-    end
+    refreshReportMenus()
 end)
 
 ---@param report any
 RegisterNetEvent("vfw:staff:updateReport", function(report)
     for i, r in ipairs(VFW.Reports) do
-        if r.id == report.id then
+        if sameReportId(r.id, report.id) then
             VFW.Reports[i] = report
             break
         end
     end
 
-    -- Auto-refresh reports menu for all staff in service (only if menu is open)
     if StaffMenu and StaffMenu.reports and StaffMenu.reports.opened then
         StaffMenu.reports.refresh()
     end
+    syncStaffHud()
 end)
 
 RegisterNetEvent("vfw:staff:refreshMenu", function()

@@ -565,7 +565,8 @@ function VFW.Game.SpawnVehicle(vehicleModel, coords, heading, cb, networked)
     local vector = type(coords) == "vector3" and coords or vec(coords.x, coords.y, coords.z)
     local isNetworked = networked == nil or networked
 
-    local playerCoords = GetEntityCoords(VFW.PlayerData.ped)
+    local playerPed = PlayerPedId()
+    local playerCoords = GetEntityCoords(playerPed)
     if not vector or not playerCoords then
         return
     end
@@ -596,6 +597,13 @@ function VFW.Game.SpawnVehicle(vehicleModel, coords, heading, cb, networked)
             vehicle = CreateVehicle(model, vector.x, vector.y, vector.z, heading, false, true)
         end
 
+        if not vehicle or vehicle == 0 or not DoesEntityExist(vehicle) then
+            SetModelAsNoLongerNeeded(model)
+            local msg = ("Impossible de créer le véhicule ^3%s^7 (limite d'entités ou modèle indisponible)."):format(vehicleModel)
+            if promise then return promise:reject(msg) end
+            error(msg)
+        end
+
         if isNetworked and NetworkGetEntityIsNetworked(vehicle) then
             local id = NetworkGetNetworkIdFromEntity(vehicle)
             SetNetworkIdCanMigrate(id, true)
@@ -607,8 +615,10 @@ function VFW.Game.SpawnVehicle(vehicleModel, coords, heading, cb, networked)
         SetModelAsNoLongerNeeded(model)
         SetVehRadioStation(vehicle, "OFF")
 
+        -- collisions : au plus 5 s, sinon on rend quand même le véhicule (jamais de blocage)
         RequestCollisionAtCoord(vector.x, vector.y, vector.z)
-        while not HasCollisionLoadedAroundEntity(vehicle) do
+        local collisionDeadline = GetGameTimer() + 5000
+        while not HasCollisionLoadedAroundEntity(vehicle) and GetGameTimer() < collisionDeadline do
             Wait(0)
         end
 

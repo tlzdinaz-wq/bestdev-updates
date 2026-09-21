@@ -169,6 +169,29 @@ end
 local lastTattoos = {}
 local creatorActive = false
 
+-- Catalogues (vêtements, tatouages, boutons, peds) mémorisés par sexe : leur calcul enchaîne des
+-- milliers de natives puis un envoi NUI très lourd. On ne le refait pas quand le joueur rebascule
+-- Homme / Femme ; vidé à la fermeture du créateur.
+local creatorCache = {}
+local creatorSwitching = false
+local creatorPendingChoice = nil
+local FREEMODE_MODELS = { joaat('mp_m_freemode_01'), joaat('mp_f_freemode_01') }
+
+-- Garde les deux modèles freemode en mémoire pendant la création : le passage Homme ↔ Femme
+-- n'attend plus le streaming du modèle (le skinchanger relâche le modèle qu'il applique).
+local function PreloadFreemodeModels()
+    CreateThread(function()
+        for i = 1, #FREEMODE_MODELS do RequestModel(FREEMODE_MODELS[i]) end
+    end)
+end
+
+-- Rend la main au jeu régulièrement pendant l'indexation des vêtements (pas de gel d'image).
+local creatorYieldCount = 0
+local function CreatorBreathe()
+    creatorYieldCount = creatorYieldCount + 1
+    if creatorYieldCount % 24 == 0 then Wait(0) end
+end
+
 CreateThread(function()
     while true do
         if isInMugshot then
@@ -353,7 +376,7 @@ local function LoadFaceFeatures()
     end
 
     AddDefaultToCatalogue(0, "hair")
-    for i = 1, GetNumberOfPedDrawableVariations(playerPed, 2) - 1 do
+    for i = 1, ((VFW.PedDrawableCount and VFW.PedDrawableCount(playerPed, "clothing", 2)) or GetNumberOfPedDrawableVariations(playerPed, 2)) - 1 do
         if not VFW.Table.TableContains(Config.BarberBan[playerType].CoupesBan, i) then
             AddToCatalogue(i, "Coiffure", "catalogues/barber/" .. playerType .. "/Coupes/", "hair")
         end
@@ -447,24 +470,35 @@ local function LoadPedsFeatures()
     local pedsMale = Config.PedsJustForCrea.homme
     local pedsFemale = Config.PedsJustForCrea.femme
 
+    -- id envoyé à la NUI = position du modèle dans Config.PedsCharCreator (le skinchanger
+    -- charge Config.PedsCharCreator[skin.sex - 1]) : valable même si les listes divergent
+    local function creatorIndex(model)
+        for i = 1, #Config.PedsCharCreator do
+            if Config.PedsCharCreator[i] == model then return i end
+        end
+        return nil
+    end
+
     for i = 1, #pedsMale do
         local v = pedsMale[i]
-        if IsModelInCdimage(joaat(v)) then
+        local idx = creatorIndex(v)
+        if idx and IsModelInCdimage(joaat(v)) then
             creaPersoData.peds[#creaPersoData.peds + 1] = {
                 category = 'man',
                 label = v,
-                id = i
+                id = idx
             }
         end
     end
 
     for i = 1, #pedsFemale do
         local v = pedsFemale[i]
-        if IsModelInCdimage(joaat(v)) then
+        local idx = creatorIndex(v)
+        if idx and IsModelInCdimage(joaat(v)) then
             creaPersoData.peds[#creaPersoData.peds + 1] = {
                 category = 'woman',
                 label = v,
-                id = #pedsMale + i
+                id = idx
             }
         end
     end
@@ -562,13 +596,25 @@ local function LoadClothesForCreator(baseURL)
     ---@param category any
     ---@param subCategory any
     ---@param prefix any
+    -- Comptage vanilla + DLC + packs addon (collections) : mêmes helpers que le magasin,
+    -- GetNumberOfPedDrawableVariations seul rate des slots streamés.
+    local function drawableCount(kind, index)
+        if VFW.PedDrawableCount then return VFW.PedDrawableCount(playerPed, kind, index) end
+        return (kind == "props" and GetNumberOfPedPropDrawableVariations or GetNumberOfPedDrawableVariations)(playerPed, index)
+    end
+    local function textureCount(kind, index, drawable)
+        if VFW.PedTextureCount then return VFW.PedTextureCount(playerPed, kind, index, drawable) end
+        return (kind == "props" and GetNumberOfPedPropTextureVariations or GetNumberOfPedTextureVariations)(playerPed, index, drawable)
+    end
+
     local function ProcessClothing(drawableType, banList, category, subCategory, prefix)
-        for i = 0, GetNumberOfPedDrawableVariations(playerPed, drawableType) - 1 do
+        for i = 0, drawableCount("clothing", drawableType) - 1 do
+            CreatorBreathe()
             if not VFW.Table.TableContains(banList, i) then
                 local drawableURL = VFW.OutfitImage(baseURL, "clothing", prefix, i, 0)
                 AddToCatalogue(i, string.format("%s N°%d", category, i), drawableURL, category, subCategory, i)
 
-                for z = 0, GetNumberOfPedTextureVariations(playerPed, drawableType, i) - 1 do
+                for z = 0, textureCount("clothing", drawableType, i) - 1 do
                     local imageURL = z == 0 and drawableURL or VFW.OutfitImage(baseURL, "clothing", prefix, i, z)
                     AddToCatalogue(z, string.format("Variation N°%d", z), imageURL, category, "Variations", nil, i)
                 end
@@ -582,12 +628,13 @@ local function LoadClothesForCreator(baseURL)
     ---@param category any
     ---@param prefix any
     local function ProcessProps(propType, banList, category, prefix)
-        for i = 0, GetNumberOfPedPropDrawableVariations(playerPed, propType) - 1 do
+        for i = 0, drawableCount("props", propType) - 1 do
+            CreatorBreathe()
             if not VFW.Table.TableContains(banList, i) then
                 local drawableURL = VFW.OutfitImage(baseURL, "props", prefix, i, 0)
                 AddToCatalogue(i, string.format("%s N°%d", category, i), drawableURL, category, category, i)
 
-                for z = 0, GetNumberOfPedPropTextureVariations(playerPed, propType, i) - 1 do
+                for z = 0, textureCount("props", propType, i) - 1 do
                     local imageURL = z == 0 and drawableURL or VFW.OutfitImage(baseURL, "props", prefix, i, z)
                     AddToCatalogue(z, string.format("Variation N°%d", z), imageURL, category, "Variations", nil, i)
                 end
@@ -639,9 +686,8 @@ end
 
 ---Load DataForCreator
 ---@param sex any
-local function LoadDataForCreator(sex)
-    creaPersoData.catalogue = {}
-    creaPersoData.peds = {}
+---@param switching boolean|nil true = simple changement Homme / Femme dans le créateur déjà ouvert
+local function LoadDataForCreator(sex, switching)
     creaPersoData.pedsVariantes = {} -- Clear PED variations when switching to normal character
     temporaryDatas.playerType = sex == 1 and "Femme" or "Homme"
 
@@ -652,6 +698,17 @@ local function LoadDataForCreator(sex)
     else
         temporaryDatas.playerSex = "ped"
     end
+
+    local cached = creatorCache[temporaryDatas.playerType]
+    if cached then
+        creaPersoData.catalogue = cached.catalogue
+        creaPersoData.tattoos = cached.tattoos
+        creaPersoData.buttons = cached.buttons
+        creaPersoData.peds = cached.peds
+        creaPersoData.hideItemList = cached.hideItemList
+    else
+    creaPersoData.catalogue = {}
+    creaPersoData.peds = {}
 
     local baseURL = temporaryDatas.playerSex
 
@@ -679,7 +736,16 @@ local function LoadDataForCreator(sex)
     LoadTattooCatalogue()
     LoadClothesForCreator(baseURL)
 
-    Wait(250)
+    creatorCache[temporaryDatas.playerType] = {
+        catalogue = creaPersoData.catalogue,
+        tattoos = creaPersoData.tattoos,
+        buttons = creaPersoData.buttons,
+        peds = creaPersoData.peds,
+        hideItemList = creaPersoData.hideItemList,
+    }
+    end
+
+    if not switching then Wait(250) end
     creatorActive = true
     TriggerEvent("pma-voice:toggleUi", false)
     VFW.Nui.Creator(true, creaPersoData)
@@ -693,6 +759,8 @@ local function LoadDataForCreator(sex)
     TriggerEvent("skinchanger:change", "skin_md_weight", 50)
     lastlookingValue = 0.5
     lastSkinValue = 0.5
+
+    if switching then return end
 
     -- Fade in after UI is loaded
     Wait(100)
@@ -758,6 +826,7 @@ function LoadNewCharCreator()
     SetWeatherTypeNowPersist('CLEAR')
 
     LoadDataForCreator(0)
+    PreloadFreemodeModels()
 end
 
 ---Load VariationForPed
@@ -778,7 +847,7 @@ local function LoadVariationForPed(sex)
         local component = valeur.component
         local category = valeur.category
 
-        for ii = 0, GetNumberOfPedDrawableVariations(playerPed, component) - 1 do
+        for ii = 0, ((VFW.PedDrawableCount and VFW.PedDrawableCount(playerPed, "clothing", component)) or GetNumberOfPedDrawableVariations(playerPed, component)) - 1 do
             creaPersoData.pedsVariantes[#creaPersoData.pedsVariantes + 1] = {
                 category = category,
                 subCategory = sex,
@@ -991,16 +1060,20 @@ RegisterNuiCallback("nui:char-creator:getCategorySliderInfo", function(data, cb)
 
     local isDrawable = mapping.type == "drawable"
     local compId = mapping.componentId
+    local kind = isDrawable and "clothing" or "props"
 
-    local getVariations = isDrawable and GetNumberOfPedDrawableVariations or GetNumberOfPedPropDrawableVariations
     local getCurrent = isDrawable and GetPedDrawableVariation or GetPedPropIndex
     local getCurrentTex = isDrawable and GetPedTextureVariation or GetPedPropTextureIndex
-    local getTextures = isDrawable and GetNumberOfPedTextureVariations or GetNumberOfPedPropTextureVariations
 
     local currentDrawable = getCurrent(playerPed, compId)
     local currentTexture = getCurrentTex(playerPed, compId)
-    local maxDrawable = getVariations(playerPed, compId) - 1
-    local maxTexture = getTextures(playerPed, compId, currentDrawable) - 1
+    -- comptage vanilla + DLC + packs addon (collections), comme le magasin
+    local drawableCount = (VFW.PedDrawableCount and VFW.PedDrawableCount(playerPed, kind, compId))
+        or ((isDrawable and GetNumberOfPedDrawableVariations or GetNumberOfPedPropDrawableVariations)(playerPed, compId))
+    local textureCount = (VFW.PedTextureCount and VFW.PedTextureCount(playerPed, kind, compId, currentDrawable))
+        or ((isDrawable and GetNumberOfPedTextureVariations or GetNumberOfPedPropTextureVariations)(playerPed, compId, currentDrawable))
+    local maxDrawable = (drawableCount or 0) - 1
+    local maxTexture = (textureCount or 0) - 1
 
     cb({
         maxDrawable = math.max(maxDrawable, 0),
@@ -1037,8 +1110,9 @@ RegisterNuiCallback("nui:char-creator:getTextureCount", function(data, cb)
         return
     end
 
-    local getTextures = mapping.type == "drawable" and GetNumberOfPedTextureVariations or GetNumberOfPedPropTextureVariations
-    local count = getTextures(playerPed, mapping.componentId, drawableId)
+    local kind = mapping.type == "drawable" and "clothing" or "props"
+    local count = (VFW.PedTextureCount and VFW.PedTextureCount(playerPed, kind, mapping.componentId, drawableId))
+        or ((mapping.type == "drawable" and GetNumberOfPedTextureVariations or GetNumberOfPedPropTextureVariations)(playerPed, mapping.componentId, drawableId))
 
     cb({ maxTexture = math.max(count - 1, 0) })
 end)
@@ -1195,7 +1269,7 @@ RegisterNuiCallback("CreationPersonnageMouseZoom", function(data)
 end)
 
 local lastIdentityCharacterChoice = nil
-RegisterNuiCallback("nui:char-creator:identity", function(data)
+local function OnCreatorIdentity(data)
     local dataIdentity = data.newData
 
     if dataIdentity and dataIdentity ~= nil then
@@ -1216,6 +1290,23 @@ RegisterNuiCallback("nui:char-creator:identity", function(data)
 
         -- Reset PED cache when changing character type to allow proper reloading
         lastLoadedPedId = nil
+
+        -- Un changement à la fois : si le joueur reclique pendant le chargement, on garde le dernier choix
+        if creatorSwitching then
+            creatorPendingChoice = dataIdentity.characterChoice
+            return
+        end
+        creatorSwitching = true
+        -- Le skinchanger change le modèle dans un thread : on attend qu'il soit appliqué avant
+        -- d'indexer les vêtements (sinon le catalogue est compté sur l'ancien modèle).
+        local modelReady = promise.new()
+        local modelDone = false
+        local function onModel()
+            if modelDone then return end
+            modelDone = true
+            modelReady:resolve(true)
+        end
+        SetTimeout(8000, onModel) -- garde-fou : jamais bloqué si le skinchanger ne rappelle pas
 
         if dataIdentity.characterChoice == "men" then
             TypePed = 0
@@ -1282,8 +1373,9 @@ RegisterNuiCallback("nui:char-creator:identity", function(data)
                 chest_4      = 0,
                 bodyb_1      = 0,
                 bodyb_2      = 0
-            })
-            LoadDataForCreator(0)
+            }, onModel)
+            Citizen.Await(modelReady)
+            LoadDataForCreator(0, true)
         elseif dataIdentity.characterChoice == "women" then
             TypePed = 1
             TriggerEvent('skinchanger:loadSkin', {
@@ -1349,15 +1441,27 @@ RegisterNuiCallback("nui:char-creator:identity", function(data)
                 chest_4      = 0,
                 bodyb_1      = 0,
                 bodyb_2      = 0
-            })
-            LoadDataForCreator(1)
+            }, onModel)
+            Citizen.Await(modelReady)
+            LoadDataForCreator(1, true)
         elseif dataIdentity.characterChoice == "custom" then
             TypePed = 2
-            TriggerEvent("skinchanger:loadSkin", { sex = 2 })
+            TriggerEvent("skinchanger:loadSkin", { sex = 2 }, onModel)
+            Citizen.Await(modelReady)
             LoadVariationForPed(2)
         end
+
+        creatorSwitching = false
+        PreloadFreemodeModels()
+        local pending = creatorPendingChoice
+        creatorPendingChoice = nil
+        if pending and pending ~= dataIdentity.characterChoice then
+            lastIdentityCharacterChoice = nil
+            OnCreatorIdentity({ newData = { firstName = dataIdentity.firstName, lastName = dataIdentity.lastName, birthDate = dataIdentity.birthDate, sex = dataIdentity.sex, birthPlace = dataIdentity.birthPlace, height = dataIdentity.height, characterChoice = pending } })
+        end
     end
-end)
+end
+RegisterNuiCallback("nui:char-creator:identity", OnCreatorIdentity)
 
 ---Handle SkinChange
 ---@param key any
@@ -1969,6 +2073,7 @@ local function Thread(state)
 
     if not state then
         creatorActive = false
+        creatorCache = {}
         TriggerEvent("pma-voice:toggleUi", true)
     end
 
@@ -2459,6 +2564,7 @@ RegisterNuiCallback("nui:char-creator:spawnpoint", function(data)
     if data.spawnPoint ~= nil then
         EmoteCancel()
         creatorActive = false
+        creatorCache = {}
         TriggerEvent("pma-voice:toggleUi", true)
         VFW.Nui.Creator(false)
         lastLoadedPedId = nil -- Reset du cache PED

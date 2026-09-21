@@ -1199,14 +1199,21 @@ local function wipeCharacter(staffSource, xStaff, accountId, charId)
     if not id then return false end
 
     local row = Staff29.Single([[
-        SELECT id, account_id, firstname, lastname FROM characters
+        SELECT id, account_id, identifier, firstname, lastname FROM characters
         WHERE id = ? AND account_id = ? AND deleted_at IS NULL
     ]], { id, accountId })
     if not row then return false end
 
-    if Staff29.Update("UPDATE characters SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
-        { Staff29.Now(), id }) == 0 then
+    -- Suppression douce + identifiant archivé (« w<id>:license:… ») : l'identifiant
+    -- « char<slot>:… » est unique, sans ça le joueur ne peut plus recréer un personnage
+    -- dans ce slot (Duplicate entry uk_characters_identifier). Les tatouages suivent.
+    local archived = VFW.ArchivedCharIdentifier and VFW.ArchivedCharIdentifier(id, row.identifier) or row.identifier
+    if Staff29.Update("UPDATE characters SET deleted_at = ?, identifier = ? WHERE id = ? AND deleted_at IS NULL",
+        { Staff29.Now(), archived, id }) == 0 then
         return false
+    end
+    if archived ~= row.identifier then
+        Staff29.Update("UPDATE character_tattoos SET identifier = ? WHERE identifier = ?", { archived, row.identifier })
     end
 
     local owner = VFW.GetPlayerFromCharId(id)
@@ -1527,12 +1534,30 @@ local function findReportBySession(sessionId)
     return nil
 end
 
+local function findReportById(reportId)
+    local id = Staff29.ToInt(reportId, 1, 2147483647)
+    if not id then return nil end
+    for i = 1, #reports do
+        if reports[i].id == id then return i, reports[i] end
+    end
+    return nil
+end
+
 local function removeReport(index)
     local entry = reports[index]
     if not entry then return end
     table.remove(reports, index)
     broadcastReport("vfw:staff:deleteReport", entry.id)
+    -- Toujours renvoyer la liste (y compris vide) : le HUD staff ne doit pas rester à 1.
+    pushReportList()
 end
+
+RegisterNetEvent("vfw:staff:requestReports", function()
+    local src = source
+    local xPlayer = Staff29.Require(src, "staff_menu")
+    if not xPlayer then return end
+    pushReportList(src)
+end)
 
 --- Ouvre un signalement pour un joueur (commande /report et formulaire Support du pause menu).
 --- Retourne true, ou false + message d'erreur destiné au joueur.
@@ -1650,12 +1675,15 @@ RegisterNetEvent("vfw:staff:abandonReport", function(sessionId)
     auditLog(source, "staff_report_release", { reportId = entry.id, target = entry.player.accountId })
 end)
 
-RegisterNetEvent("vfw:staff:closeReport", function(sessionId)
+RegisterNetEvent("vfw:staff:closeReport", function(sessionId, reportId)
     local source = source
     local xPlayer = Staff29.Require(source, "staff_menu")
     if not xPlayer then return end
 
     local index, entry = findReportBySession(sessionId)
+    if not index then
+        index, entry = findReportById(reportId or sessionId)
+    end
     if not index then return end
 
     auditLog(source, "staff_report_close", { reportId = entry.id, target = entry.player.accountId })

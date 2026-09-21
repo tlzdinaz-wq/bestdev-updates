@@ -410,20 +410,24 @@ end, function(veh)
     OpenVehicleMusicRadioUI(veh)
 end)
 
--- Verrouiller/Déverrouiller (avec clés)
+-- Verrouiller/Déverrouiller (avec clés) : le serveur vérifie les clés (objet, propriétaire,
+-- job / faction, clé temporaire) et pose l'état `doorsLocked`, appliqué par tous les clients.
+local function mayHaveVehicleKeys(vehicle)
+    if PlayerHasVehicleKeys(vehicle) then return true end
+    local plate = VFW.Math.Trim(GetVehicleNumberPlateText(vehicle))
+    if plate ~= "" and LocalPlayer.state["tempVehicleKey:" .. plate] ~= nil then return true end
+    local state = Entity(vehicle).state
+    -- véhicule possédé / de groupe : le serveur tranche ; véhicule non enregistré : accessible
+    return state.OwnedVehicle == true or state.staffVehicle == true or not state.VehicleProperties
+end
+
 VFW.ContextAddButton("vehicle", ":lock: Verrouiller/Déverrouiller", function(vehicle)
-    return DoesEntityExist(vehicle) and PlayerHasVehicleKeys(vehicle)
+    return DoesEntityExist(vehicle) and NetworkGetEntityIsNetworked(vehicle) and mayHaveVehicleKeys(vehicle)
 end, function(vehicle)
-    local locked = GetVehicleDoorLockStatus(vehicle) > 1
-    if locked then
-        SetVehicleDoorsLocked(vehicle, 0)
-        SetVehicleDoorsLockedForAllPlayers(vehicle, false)
-        VFW.ShowNotification({ type = 'VERT', content = "Véhicule déverrouillé." })
-    else
-        SetVehicleDoorsLocked(vehicle, 2)
-        SetVehicleDoorsLockedForAllPlayers(vehicle, true)
-        VFW.ShowNotification({ type = 'VERT', content = "Véhicule verrouillé." })
-    end
+    local state = Entity(vehicle).state
+    local locked = state.doorsLocked
+    if locked == nil then locked = GetVehicleDoorLockStatus(vehicle) > 1 end
+    TriggerServerEvent("vfw:vehicle:setLock", NetworkGetNetworkIdFromEntity(vehicle), not locked)
 end)
 
 -- Ouvrir le coffre (extérieur, près du coffre)

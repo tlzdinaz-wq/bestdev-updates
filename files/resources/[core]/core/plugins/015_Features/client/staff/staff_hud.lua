@@ -2,23 +2,42 @@
 ---@diagnostic disable: duplicate-doc-field
 
 local staffHudVisible = false
-local reports = {}
-local reportsLen = 0
 local onlineStaffs = 0
 local staffsInService = 0
 local hudInitialized = false
 
+local function reportCount()
+    if VFW and type(VFW.Reports) == "table" then
+        return #VFW.Reports
+    end
+    return 0
+end
+
 -- Update NUI with current data
 local function UpdateStaffHudNUI()
+    local n = reportCount()
     SendNUIMessage({
         action = "staffHud:update",
         data = {
             visible = staffHudVisible,
-            reports = reportsLen,
+            reports = n,
+            reportsStr = tostring(n),
+            hasReports = n > 0 and 1 or 0,
             onlineStaffs = onlineStaffs > 0 and onlineStaffs or 1,
             staffsInService = staffsInService > 0 and staffsInService or 1
         }
     })
+end
+
+-- Même source que le menu Reports (VFW.Reports), pour ne pas rester à 1 après fermeture.
+_G.RefreshStaffHudReports = function()
+    UpdateStaffHudNUI()
+end
+
+local function refreshHudSoon()
+    SetTimeout(0, function()
+        UpdateStaffHudNUI()
+    end)
 end
 
 -- Toggle HUD visibility
@@ -55,12 +74,9 @@ function StaffMenu.BuildHUDConfigMenu()
     end)
 end
 
--- Update staff data (reports, online staffs, etc.)
+-- Update staff data (online staffs, etc.)
 RegisterNetEvent('vfw:staff:sendStaffsData', function(staffData)
-    if staffData.reportsList then
-        reports = staffData.reportsList or {}
-        reportsLen = #reports
-    end
+    if not staffData then return end
 
     if staffData.onlineStaffs then
         onlineStaffs = staffData.onlineStaffs
@@ -70,46 +86,19 @@ RegisterNetEvent('vfw:staff:sendStaffsData', function(staffData)
         staffsInService = staffData.staffsInService
     end
 
-    -- Update NUI with new data
-    if staffHudVisible then
-        UpdateStaffHudNUI()
-    end
+    UpdateStaffHudNUI()
 end)
 
-RegisterNetEvent('vfw:staff:reports', function(reportsList)
-    reports = reportsList or {}
-    reportsLen = #reports
-
-    if staffHudVisible then
-        UpdateStaffHudNUI()
-    end
+RegisterNetEvent('vfw:staff:reports', function()
+    refreshHudSoon()
 end)
 
--- Cache new report (matching server event name)
-RegisterNetEvent('vfw:staff:report', function(report)
-    reportsLen = reportsLen + 1
-    reports[reportsLen] = report
-
-    -- Update NUI with new data
-    if staffHudVisible then
-        UpdateStaffHudNUI()
-    end
+RegisterNetEvent('vfw:staff:report', function()
+    refreshHudSoon()
 end)
 
--- Uncache report (matching server event name)
-RegisterNetEvent('vfw:staff:deleteReport', function(reportId)
-    for i = 1, reportsLen do
-        if reports[i] and reports[i].id == reportId then
-            table.remove(reports, i)
-            reportsLen = reportsLen - 1
-            break
-        end
-    end
-
-    -- Update NUI with new data
-    if staffHudVisible then
-        UpdateStaffHudNUI()
-    end
+RegisterNetEvent('vfw:staff:deleteReport', function()
+    refreshHudSoon()
 end)
 
 -- Auto-enable HUD when staff mode is activated
@@ -121,9 +110,6 @@ RegisterNetEvent("vfw:staff:modeChanged", function(enabled)
         TriggerServerEvent("vfw:staff:requestReports")
     else
         ToggleStaffHUD(false)
-        -- Clear reports when leaving staff mode
-        reports = {}
-        reportsLen = 0
     end
 end)
 
@@ -141,8 +127,6 @@ _G.ApplyHudOffDutyPreference = function()
     else
         TriggerServerEvent("vfw:staff:setHudOffDuty", false)
         ToggleStaffHUD(false)
-        reports = {}
-        reportsLen = 0
     end
 end
 

@@ -1882,5 +1882,26 @@ Config.PedsJustForCrea = {
         "u_f_y_beth",
         "u_f_y_lauren",
         "u_f_y_taylor",
+        -- peds addon livrés avec la base (resources/[gameplay])
+        "pmp_st_sweet",
     }
 }
+
+-- Config.PedsCharCreator est la table de référence des modèles custom : un personnage
+-- sauvegardé avec skin.sex = N utilise Config.PedsCharCreator[N - 1]. La liste ci-dessus
+-- ne bouge pas (personnages existants) ; tout modèle présent dans PedsJustForCrea (homme
+-- puis femme) mais absent ici est ajouté à la suite, dans un ordre fixe, pour qu'il ait
+-- un index valide (ex. un ped addon ajouté seulement à la liste du créateur).
+do
+    local known = {}
+    for i = 1, #Config.PedsCharCreator do known[Config.PedsCharCreator[i]] = true end
+    for _, list in ipairs({ Config.PedsJustForCrea.homme, Config.PedsJustForCrea.femme }) do
+        for i = 1, #list do
+            local model = list[i]
+            if not known[model] then
+                known[model] = true
+                Config.PedsCharCreator[#Config.PedsCharCreator + 1] = model
+            end
+        end
+    end
+end
