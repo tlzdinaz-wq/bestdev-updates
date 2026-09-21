@@ -966,7 +966,7 @@ function VFW.LoadInventories(maxSlots, infiniteItems)
                 max = VFW.PlayerData.maxWeight,
                 current = playerData.weight
             },
-            maxSlots = playerData.maxSlots or 100,
+            maxSlots = inventoryResult.maxSlots or playerData.maxSlots or 100,
             items = inventoryData,
             secondaryInventory = targetData,
             clothes = equippedClothes,
@@ -995,6 +995,20 @@ local function mapItemType(serverType)
         ["keys"] = "keys"
     }
     return typeMapping[serverType] or "items"
+end
+
+local function maxSlotFromItems(items, fallback)
+    local maxSlot = tonumber(fallback) or 100
+    if type(items) ~= "table" then return maxSlot end
+
+    for _, item in pairs(items) do
+        local slot = item and tonumber(item.slot or item.position)
+        if slot and slot > maxSlot then
+            maxSlot = slot
+        end
+    end
+
+    return maxSlot
 end
 
 function VFW.LoadInventory(targetData)
@@ -1088,7 +1102,7 @@ function VFW.LoadInventory(targetData)
             max = targetData.maxWeight or Config.MaxWeight,
             current = targetData.weight or 0
         },
-        maxSlots = targetData.maxSlots or 100,
+        maxSlots = maxSlotFromItems(inventoryData, targetData.maxSlots or 100),
         search = targetData.search,
         infiniteItems = targetData.infiniteItems or false,
         money = money,
@@ -1636,4 +1650,3 @@ end)
 function VFW.GetInfiniteItemNameFromSlot(slot)
     return infiniteItemsMap[slot]
 end
-

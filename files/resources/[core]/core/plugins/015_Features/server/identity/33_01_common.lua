@@ -5,6 +5,17 @@ local Cl = VFW.Cloths
 Cl.FreeSkin = {}
 Cl.Rate = {}
 
+local CLOTHING_ITEM_NAMES = {
+    top = true,
+    bottom = true,
+    shoe = true,
+    hat = true,
+    accessory = true,
+    outfit = true,
+    clothes_bag = true,
+    arms = true,
+}
+
 Cl.Categories = {
     { key = "top",           label = "Haut",                price = 250 },
     { key = "bottom",        label = "Pantalon",            price = 200 },
@@ -141,6 +152,21 @@ function Cl.Inv()
     return VFW.Inventory
 end
 
+function Cl.MaxSlotsForItem(name)
+    local Inv = VFW.Inventory
+    if not Inv then return nil end
+
+    local maxSlots = tonumber(Inv.PlayerMaxSlots) or 100
+    local def = Inv.Def and Inv.Def(name) or nil
+    local itemType = def and def.type or nil
+
+    if itemType == "clothes" or itemType == "outfit" or CLOTHING_ITEM_NAMES[name] then
+        return maxSlots + 400
+    end
+
+    return maxSlots
+end
+
 function Cl.GiveItem(xPlayer, name, count, meta)
     count = Cl.Int(count, 1)
     if count <= 0 then return false end
@@ -149,7 +175,7 @@ function Cl.GiveItem(xPlayer, name, count, meta)
     if Inv and Inv.PlayerList then
         if not Inv.Exists(name) then return false end
         local list = Inv.PlayerList(xPlayer)
-        local added = Inv.AddToList(list, name, count, meta, Inv.PlayerMaxSlots)
+        local added = Inv.AddToList(list, name, count, meta, Cl.MaxSlotsForItem(name))
         if added <= 0 then return false end
         Inv.PushPlayer(xPlayer)
         return true

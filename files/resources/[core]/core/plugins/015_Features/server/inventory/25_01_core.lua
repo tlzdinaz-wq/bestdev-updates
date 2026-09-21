@@ -18,6 +18,16 @@ Inv.Bags = {}
 Inv.Viewers = {}
 Inv.NearbyMap = {}
 
+local ZERO_WEIGHT_CLOTHING_ITEMS = {
+    top = true,
+    bottom = true,
+    shoe = true,
+    hat = true,
+    accessory = true,
+    outfit = true,
+    arms = true,
+}
+
 local claimedEvents = {}
 local claimedCallbacks = {}
 
@@ -52,7 +62,15 @@ end
 
 function Inv.Weight(name)
     local def = Inv.Def(name)
+    if def and (def.type == "clothes" or def.type == "outfit" or ZERO_WEIGHT_CLOTHING_ITEMS[name]) then
+        return 0
+    end
     return def and tonumber(def.weight) or 0
+end
+
+function Inv.IsClothing(name)
+    local def = Inv.Def(name)
+    return def and (def.type == "clothes" or def.type == "outfit" or ZERO_WEIGHT_CLOTHING_ITEMS[name]) or false
 end
 
 function Inv.TypeOf(name)

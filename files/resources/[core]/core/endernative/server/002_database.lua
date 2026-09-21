@@ -53,6 +53,37 @@ local function itemDataJson(name, description)
     return json.encode({ type = "objects" })
 end
 
+local CLOTHING_ITEMS = {
+    { name = "top", label = "Haut", type = "clothes", image = "items/top.webp", description = "Vetement haut equipable." },
+    { name = "bottom", label = "Pantalon", type = "clothes", image = "items/bottom.webp", description = "Pantalon equipable." },
+    { name = "shoe", label = "Chaussures", type = "clothes", image = "items/shoe.webp", description = "Chaussures equipables." },
+    { name = "hat", label = "Chapeau", type = "clothes", image = "items/hat.webp", description = "Chapeau equipable." },
+    { name = "accessory", label = "Accessoire", type = "clothes", image = "items/accessory.webp", description = "Accessoire equipable." },
+    { name = "arms", label = "Bras", type = "clothes", image = "items/arms.webp", description = "Bras de tenue equipables." },
+    { name = "outfit", label = "Tenue", type = "outfit", image = "items/outfit.webp", description = "Tenue complete equipable." },
+}
+
+function VFW.DB.EnsureClothingItems()
+    local values, params = {}, {}
+
+    for i = 1, #CLOTHING_ITEMS do
+        local item = CLOTHING_ITEMS[i]
+        values[#values + 1] = "(?, ?, ?, 0, 0, 0, ?, ?, ?)"
+        params[#params + 1] = item.name
+        params[#params + 1] = item.label
+        params[#params + 1] = item.type
+        params[#params + 1] = item.image
+        params[#params + 1] = item.description
+        params[#params + 1] = json.encode({ type = "objects" })
+    end
+
+    MySQL.insert.await(
+        "INSERT INTO items (name, label, type, weight, premium, perm, image, description, data) VALUES " .. table.concat(values, ", ") ..
+        " ON DUPLICATE KEY UPDATE type = VALUES(type), weight = 0",
+        params
+    )
+end
+
 function VFW.DB.SeedItemsIfEmpty()
     local count = tonumber(MySQL.scalar.await("SELECT COUNT(*) FROM items") or 0) or 0
     if count > 0 then return end
@@ -97,6 +128,7 @@ end
 
 function VFW.DB.LoadItems()
     VFW.DB.SeedItemsIfEmpty()
+    VFW.DB.EnsureClothingItems()
     local rows = MySQL.query.await("SELECT * FROM items") or {}
     local items = {}
     for i = 1, #rows do
