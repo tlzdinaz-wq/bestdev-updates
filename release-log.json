@@ -1,18 +1,9 @@
 {
- "version": "1.12.42",
- "date": "2026-09-21T20:56:22.224Z",
- "notes": "**Magasin de vêtements : nouveau design 3D** — rail et panneau encastrés dans une **dalle 3D** (châssis aluminium, tranche, LED, halo et ombre au sol) en perspective qui suit la souris, boutons en relief, caméra en télécommande ; barre du haut avec sélecteur Pièces uniques / Tenue complète, portefeuille et fermeture ; **rail d'icônes** (Accueil, catégories par groupe, Favoris, Mon sac) ; panneau avec accueil (tenues populaires, favoris), recherche, tri, grille de 3 cartes (prix, cœur, coche) et **fiche article** en bas (pastilles de couleurs, prix, Acheter) ; **caméra en pilule** à droite avec cadrage automatique. Panier de tenue, sac et paiement inchangés.\r\n\r\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L’archive des fichiers modifiés est jointe.",
- "added": [
-  "resources/[core]/core/interface/build/skin/clothing-shop.css"
- ],
- "changed": [
-  "resources/[core]/core/endernative/server/002_database.lua",
-  "resources/[core]/core/interface/build/assets/index-CgLoM61l.js",
-  "resources/[core]/core/interface/build/index.html",
-  "resources/[core]/core/plugins/015_Features/client/inventory/main.lua",
-  "resources/[core]/core/plugins/015_Features/server/identity/33_01_common.lua",
-  "resources/[core]/core/plugins/015_Features/server/inventory/25_01_core.lua"
- ],
+ "version": "1.12.43",
+ "date": "2026-09-21T21:07:24.073Z",
+ "notes": "**Correction inventaire vêtements** — les items vêtements (`top`, `bottom`, `shoe`, `hat`, `accessory`, `arms`, `outfit`) ont maintenant un poids effectif de `0` dans l'inventaire. Au démarrage, `core` garantit aussi leur présence en base et remet leur poids à `0` si une ancienne valeur existait. Acheter un vêtement ne doit plus bloquer à cause du poids ni afficher « Action impossible » si les items manquaient.\n\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L’archive des fichiers modifiés est jointe.",
+ "added": [],
+ "changed": [],
  "removed": [],
  "total": 292396721,
  "fileCount": 3368

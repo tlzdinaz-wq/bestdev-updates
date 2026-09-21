@@ -1,4 +1,4 @@
-#version	1.12.42	2026-09-21T20:56:22.224Z
+#version	1.12.43	2026-09-21T21:07:24.073Z
 #protected	resources/[core]/core/config/**
 #protected	resources/[core]/core/plugins/015_Features/config/**
 #protected	resources/[core]/eve_bridge/config.lua
