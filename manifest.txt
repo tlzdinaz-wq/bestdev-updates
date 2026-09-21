@@ -1,4 +1,4 @@
-#version	1.12.39	2026-09-20T16:00:11.148Z
+#version	1.12.40	2026-09-21T15:27:14.768Z
 #protected	resources/[core]/core/config/**
 #protected	resources/[core]/core/plugins/015_Features/config/**
 #protected	resources/[core]/eve_bridge/config.lua
@@ -1039,7 +1039,7 @@ bee429ddd2ad2328d99c38ffe3dcb5d7e0c4df7c776b5bece8ab86885add4253	5849	resources/
 28aff0d3ad55cb919d7983f7c26d3201e0e7c19bc39dde015a3adabb43fa849f	13298	resources/[core]/core/interface/brand/others/walkieframe.png
 f52a64312d471107c7ba2ccee3e6288ce0347b16a00a886b1bff8c6c6f3615d4	13596	resources/[core]/core/interface/brand/others/walkieframejob.png
 56a7f5c6c7a30f919c0f64e080201bcd72b1a528af01cc2f25723adebb722bad	441	resources/[core]/core/interface/brand/outfits_greenscreener/aucun.svg
-2f558b0f8947be68264b4e45932ba0653bdee1953335fc2aabcbac1ab95ba19e	739	resources/[core]/core/interface/brand/outfits_greenscreener/README.md
+4bb6bc9333564df371f40c06e5825d4fbe29931285dbad73f45c023377cfb8ee	835	resources/[core]/core/interface/brand/outfits_greenscreener/README.md
 56a7f5c6c7a30f919c0f64e080201bcd72b1a528af01cc2f25723adebb722bad	441	resources/[core]/core/interface/brand/placeholder.svg
 b4f7aa18d661c2a9f1e97c86838af346941460416d27531d6a04820121de4db7	6590	resources/[core]/core/interface/brand/placeholder.webp
 8ca24950b43ac1f7615685c83d88645030c1fc7b7e0c4742db2c1e9ed81396ec	50808	resources/[core]/core/interface/brand/PPA/background.webp
@@ -1192,8 +1192,8 @@ b56f6cdda2974e3e174df49e0421813944c334312b834473ecb6b0a06f7d50f0	3663	resources/
 9bf71e2625845a383abb01511f1d60ee4a855a3ec1a8c3c25cdc30cf2f481322	152587	resources/[core]/core/interface/documents/assets/index.js
 b266837cc2f80e16a1f5c808fe3d6d168fb32b81a66fb5b23633e4baa4c4eb57	8145	resources/[core]/core/interface/documents/assets/style.css
 cdbbc5610960ad2f9af1e2dae306f7cf932461738157dbfb02063060215efc17	669	resources/[core]/core/interface/documents/index.html
-7712f13ede58691933eae7a231c1b063c0f082d37a12f2af003a4d2e48da91e8	778283	resources/[core]/core/interface/gestion/assets/index.js
-6e39751e013b207c4072c1353561762e9f8041118b4993d84c1f2d95f86eafb2	48382	resources/[core]/core/interface/gestion/assets/style.css
+c4d8f13410afe410beecd79a52c14003c84aadb8696e0881cf23bc728a72b5b0	778511	resources/[core]/core/interface/gestion/assets/index.js
+12bfe80b878d0f24376a6839d0099a0f1d7a1389c14f027dbeb779812adbb486	48696	resources/[core]/core/interface/gestion/assets/style.css
 911561e2d876caac8552cb69b66386cecc54adca2fc116da2d01557e1b8c4f5a	1626	resources/[core]/core/interface/gestion/assets/uilayout.css
 4402b24128cb85057cad8a48945ca9ddd81c7883f728c8d6149a8a5302f4e966	3378	resources/[core]/core/interface/gestion/assets/uilayout.js
 2316d45abb0e3740f852c4fe3c3b298840ee1f7ce2c9a2343222680bd46011d1	1029026	resources/[core]/core/interface/gestion/gta-sat.jpg
@@ -1630,10 +1630,10 @@ b5bbc8e4fe88241567b7ea260357a6330f4ccf898aad68dbc3967c4098cb96ab	2276	resources/
 f98af02b709dfd4e7838b759559578144410746b35e0d8224b18f3b2af916b44	2614	resources/[core]/core/plugins/015_Features/client/chestBuilder/zone.lua
 b0f828364fce4956cca073b2f770fa83bfb3667159d8cc2b407fa396f551e5ff	1526	resources/[core]/core/plugins/015_Features/client/chestHistory/cl_chest_history.lua
 554ddb59a1806bb086177fe8728b90bf1aa178164210ecae64325c462f028261	10985	resources/[core]/core/plugins/015_Features/client/chicha.lua
-3498986606a1fb30d5b89d85998daecf5016b23dd88b01a742c14ec5860bf54d	3039	resources/[core]/core/plugins/015_Features/client/cloths/000_outfit_images.lua
+6107fbdd490dc6a1db144e8dd8b78cebf8ccb3ecce4677188a78308b40bc9fe2	7942	resources/[core]/core/plugins/015_Features/client/cloths/000_outfit_images.lua
 168dc455f778e80775ee34afacb3b8465d8a54d2ed88d3211de115ec418cbc55	24225	resources/[core]/core/plugins/015_Features/client/cloths/barber_shop.lua
 d69c5325c7dfc0ad5f244814d2f700e021667743f268c70bcba9d357f0ae8402	13514	resources/[core]/core/plugins/015_Features/client/cloths/cl_clothes_bag.lua
-b04595d4c9fdb84c877307772becf023a1da92c4cb843bbbbbf6697db164b555	74971	resources/[core]/core/plugins/015_Features/client/cloths/clothe_shop.lua
+50cd513a43085664a302425fc25b4f4be31f54368a849d6218a796b42c930ffc	74993	resources/[core]/core/plugins/015_Features/client/cloths/clothe_shop.lua
 55bb32dd746957a3e49ca0dda08028d2b071328253950589be11fc95406595a8	2377	resources/[core]/core/plugins/015_Features/client/cloths/dynamic_blacklist_loader.lua
 a4196a0e962a4ea3e4ecfff8c5b756b1db066ede473034a0ff11aa3105e6647d	20736	resources/[core]/core/plugins/015_Features/client/cloths/shenails_shop.lua
 47dff59ad5316c57138514371c15ca6f1e7111499b860a7da00fc95b939d4227	28010	resources/[core]/core/plugins/015_Features/client/cloths/tattoos_shop.lua
@@ -2050,7 +2050,7 @@ c77052bcab8a279d795625f08bca96b52af1b822d8911ec0c60547538a6577a9	8623	resources/
 5b670537c39a260c8e1b3a1922ca7a6361cff941b413e09759fc50683ab1204a	44786	resources/[core]/core/plugins/015_Features/client/staff/noclip.lua
 733bd4726f186494f9a0b82214fd4baab4195b27b08b936d3baa4a276c1ed516	1041	resources/[core]/core/plugins/015_Features/client/staff/notifications.lua
 5d65ea8265ddc8f46d9f1feada7d9029cb25d706a9dce3f53b3a6d5132f18d66	15552	resources/[core]/core/plugins/015_Features/client/staff/object_context_menu.lua
-91ddad5e1b5c92bd66c7dc616764be5ee741ec2f832faaff95ee4c58435beb08	45976	resources/[core]/core/plugins/015_Features/client/staff/outfit_screener.lua
+b671b495b5183234eba936a78e76805aeb7fa7f6981fc457326d294871889f49	49350	resources/[core]/core/plugins/015_Features/client/staff/outfit_screener.lua
 76992d6654946d7d706338e7c41948a8269d3f26a05283af5f1d7f28db0877d5	3929	resources/[core]/core/plugins/015_Features/client/staff/playerDropped.lua
 8d60cb376fcbad8bbf17b509eb725a749750167ce3333744eabc90339721df5a	43697	resources/[core]/core/plugins/015_Features/client/staff/prop_placer.lua
 5e91eb89a94f15a82858873573ec766d44a28d844319c3425a3e665dc311cf08	2210	resources/[core]/core/plugins/015_Features/client/staff/reports.lua

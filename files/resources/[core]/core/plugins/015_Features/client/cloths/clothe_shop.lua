@@ -600,9 +600,9 @@ local function LoadCategoryItems(categoryId)
         return {}
     end
 
-    local getVariations = drawableClothes[categoryId] and
-            GetNumberOfPedDrawableVariations or
-            GetNumberOfPedPropDrawableVariations
+    local kind = drawableClothes[categoryId] and "clothing" or "props"
+    local drawableCount = (VFW.PedDrawableCount and VFW.PedDrawableCount(playerPed, kind, drawableType))
+        or ((drawableClothes[categoryId] and GetNumberOfPedDrawableVariations or GetNumberOfPedPropDrawableVariations)(playerPed, drawableType))
 
     local priceName
     if categoryId == "torso2" or categoryId == "undershirt" or categoryId == "torso" then
@@ -629,7 +629,7 @@ local function LoadCategoryItems(categoryId)
         priceName = categoryId
     end
 
-    for i = 0, getVariations(playerPed, drawableType) - 1 do
+    for i = 0, (drawableCount or 0) - 1 do
         local shouldInclude = true
 
         if Config.ClothesBan and Config.ClothesBan[sex] then
@@ -670,23 +670,18 @@ local function LoadCategoryItems(categoryId)
                 imagePath = VFW.OutfitImage(sexType, "props", folderName, i, 0)
             end
 
-            local getTextureVariations = drawableClothes[categoryId] and
-                    GetNumberOfPedTextureVariations or
-                    GetNumberOfPedPropTextureVariations
-            local textureCount = getTextureVariations(playerPed, drawableType, i)
+            local textureCount = (VFW.PedTextureCount and VFW.PedTextureCount(playerPed, kind, drawableType, i)) or 1
 
-            if textureCount > 0 then
-                local categoryName = categoryLabels[categoryId] or categoryId
-                table.insert(items, {
-                    id = i,
-                    label = string.format("%s #%d", categoryName, i),
-                    price = price,
-                    image = imagePath,
-                    category = categoryId,
-                    drawableId = i,
-                    textureVariations = textureCount
-                })
-            end
+            local categoryName = categoryLabels[categoryId] or categoryId
+            table.insert(items, {
+                id = i,
+                label = string.format("%s #%d", categoryName, i),
+                price = price,
+                image = imagePath,
+                category = categoryId,
+                drawableId = i,
+                textureVariations = textureCount
+            })
         end
     end
 
@@ -716,11 +711,10 @@ local function LoadItemVariants(categoryId, itemId)
     local drawableType = drawableClothes[categoryId] or drawableProps[categoryId]
     if not drawableType then return {} end
 
-    local getVariations = drawableClothes[categoryId] and
-            GetNumberOfPedTextureVariations or
-            GetNumberOfPedPropTextureVariations
+    local kind = drawableClothes[categoryId] and "clothing" or "props"
+    local textureCount = (VFW.PedTextureCount and VFW.PedTextureCount(playerPed, kind, drawableType, itemId)) or 1
 
-    for i = 0, getVariations(playerPed, drawableType, itemId) - 1 do
+    for i = 0, textureCount - 1 do
         local variantFolder = ({ necklace = "accessory", earring = "ear", bag = "bags", kevlar = "armor", armor = "armor" })[categoryId] or categoryId
         local imagePath = VFW.OutfitImage(sexType, drawableClothes[categoryId] and "clothing" or "props", variantFolder, itemId, i)
 
@@ -874,15 +868,17 @@ RegisterNUICallback("clothingshop:getCategoryInfo", function(data, cb)
         return
     end
 
-    local getVariations = isDrawable and GetNumberOfPedDrawableVariations or GetNumberOfPedPropDrawableVariations
-    local getTextures = isDrawable and GetNumberOfPedTextureVariations or GetNumberOfPedPropTextureVariations
+    local kind = isDrawable and "clothing" or "props"
     local getCurrent = isDrawable and GetPedDrawableVariation or GetPedPropIndex
     local getCurrentTexture = isDrawable and GetPedTextureVariation or GetPedPropTextureIndex
 
-    local maxDrawable = getVariations(playerPed, componentId) - 1
+    local drawableCount = (VFW.PedDrawableCount and VFW.PedDrawableCount(playerPed, kind, componentId))
+        or ((isDrawable and GetNumberOfPedDrawableVariations or GetNumberOfPedPropDrawableVariations)(playerPed, componentId))
+    local maxDrawable = (drawableCount or 1) - 1
     local currentDrawable = getCurrent(playerPed, componentId)
     local currentTexture = getCurrentTexture(playerPed, componentId)
-    local maxTexture = getTextures(playerPed, componentId, currentDrawable) - 1
+    local textureCount = (VFW.PedTextureCount and VFW.PedTextureCount(playerPed, kind, componentId, currentDrawable)) or 1
+    local maxTexture = textureCount - 1
 
     -- Construire la liste des drawables bannis
     local bannedDrawables = {}
@@ -969,8 +965,8 @@ RegisterNUICallback("clothingshop:getTextureCount", function(data, cb)
         return
     end
 
-    local getTextures = isDrawable and GetNumberOfPedTextureVariations or GetNumberOfPedPropTextureVariations
-    local count = getTextures(playerPed, componentId, drawableId)
+    local kind = isDrawable and "clothing" or "props"
+    local count = (VFW.PedTextureCount and VFW.PedTextureCount(playerPed, kind, componentId, drawableId)) or 1
 
     -- Poids du sac si catégorie bag
     local bagWeight = nil

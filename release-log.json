@@ -1,17 +1,17 @@
 {
- "version": "1.12.39",
- "date": "2026-09-20T16:00:11.148Z",
- "notes": "**Builder concessionnaire (hub)** — nom, jobs et points se mettent enfin à jour à l’écran (plus de « Non défini » / « Chargement… » / 0 point alors que la notif était bonne).\n\nSaisie avec **l’ancien clavier NUI** : le hub se masque le temps d’écrire, puis revient.\n\nPour appliquer : `update.bat` / `./update.sh`, puis `ensure VUI` et `ensure core` (ou restart). L’archive des fichiers modifiés est jointe.",
+ "version": "1.12.40",
+ "date": "2026-09-21T15:27:14.768Z",
+ "notes": "**Images vêtements** — après l’ajout d’un pack addon, les slots (vêtements moddés) s’affichent enfin dans Gestion → Images → Vêtements.\n\nMagasin : un vêtement addon n’était plus listé si le jeu renvoyait 0 textures.\n\nPour appliquer : `update.bat` / `./update.sh`, puis `ensure core` (ou restart). L’archive des fichiers modifiés est jointe.",
  "added": [],
  "changed": [
-  "resources/[core]/core/interface/build/index.html",
+  "resources/[core]/core/interface/brand/outfits_greenscreener/README.md",
   "resources/[core]/core/interface/gestion/assets/index.js",
-  "resources/[core]/core/plugins/000_framework/client/010_nui.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderConcess.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_hub.lua",
-  "resources/[core]/VUI/vui.lua"
+  "resources/[core]/core/interface/gestion/assets/style.css",
+  "resources/[core]/core/plugins/015_Features/client/cloths/000_outfit_images.lua",
+  "resources/[core]/core/plugins/015_Features/client/cloths/clothe_shop.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/outfit_screener.lua"
  ],
  "removed": [],
- "total": 289347186,
+ "total": 289356123,
  "fileCount": 3313
 }

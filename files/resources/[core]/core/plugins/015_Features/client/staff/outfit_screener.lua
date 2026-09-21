@@ -55,6 +55,14 @@ local CATEGORIES = {
         label = "Haut", component = 11,
         zOffset = 0.20, distance = 0.95, pitch = 5.0,
     },
+    undershirt = {
+        label = "T-shirt", component = 8,
+        zOffset = 0.18, distance = 0.90, pitch = 4.0,
+    },
+    torso = {
+        label = "Bras", component = 3,
+        zOffset = 0.10, distance = 1.10, pitch = 0.0,
+    },
     pants = {
         label = "Pantalon", component = 4,
         zOffset = -0.40, distance = 1.05, pitch = -10.0,
@@ -62,6 +70,18 @@ local CATEGORIES = {
     shoes = {
         label = "Chaussures", component = 6,
         zOffset = -0.85, distance = 0.55, pitch = -30.0,
+    },
+    bag = {
+        label = "Sac", component = 5,
+        zOffset = 0.12, distance = 1.20, pitch = 0.0,
+    },
+    armor = {
+        label = "Gilet", component = 9,
+        zOffset = 0.18, distance = 0.95, pitch = 3.0,
+    },
+    decals = {
+        label = "Plaque", component = 10,
+        zOffset = 0.22, distance = 0.80, pitch = 5.0,
     },
     mask = {
         label = "Masque", component = 1,
@@ -78,6 +98,18 @@ local CATEGORIES = {
     hat = {
         label = "Chapeau", prop = 0,
         zOffset = 0.70, distance = 0.55, pitch = 5.0,
+    },
+    watch = {
+        label = "Montre", prop = 6,
+        zOffset = -0.12, distance = 0.48, pitch = -8.0,
+    },
+    ear = {
+        label = "Oreilles", prop = 2,
+        zOffset = 0.62, distance = 0.42, pitch = 0.0,
+    },
+    bracelet = {
+        label = "Bracelet", prop = 7,
+        zOffset = -0.14, distance = 0.48, pitch = -8.0,
     },
     outfit = {
         label = "Tenue", component = -1,
@@ -647,13 +679,21 @@ end)
 
 -- ClothingCategory (NUI) -> { kind = "clothing"|"props", folder, comp_or_prop, label }
 local OUTFIT_UI_CATEGORIES = {
-    top       = { kind = "clothing", folder = "torso2",    component = 11, label = "Hauts" },
-    pants     = { kind = "clothing", folder = "leg",       component = 4,  label = "Pantalons" },
-    shoes     = { kind = "clothing", folder = "shoes",     component = 6,  label = "Chaussures" },
-    mask      = { kind = "clothing", folder = "mask",      component = 1,  label = "Masques" },
-    accessory = { kind = "clothing", folder = "accessory", component = 7,  label = "Accessoires" },
-    hat       = { kind = "props",    folder = "hat",       prop      = 0,  label = "Chapeaux" },
-    glasses   = { kind = "props",    folder = "glasses",   prop      = 1,  label = "Lunettes" },
+    top        = { kind = "clothing", folder = "torso2",    component = 11, label = "Hauts" },
+    undershirt = { kind = "clothing", folder = "undershirt", component = 8,  label = "T-shirts" },
+    torso      = { kind = "clothing", folder = "torso",     component = 3,  label = "Bras" },
+    pants      = { kind = "clothing", folder = "leg",       component = 4,  label = "Pantalons" },
+    shoes      = { kind = "clothing", folder = "shoes",     component = 6,  label = "Chaussures" },
+    bag        = { kind = "clothing", folder = "bags",      component = 5,  label = "Sacs" },
+    armor      = { kind = "clothing", folder = "armor",     component = 9,  label = "Gilets" },
+    decals     = { kind = "clothing", folder = "decals",    component = 10, label = "Plaques" },
+    mask       = { kind = "clothing", folder = "mask",      component = 1,  label = "Masques" },
+    accessory  = { kind = "clothing", folder = "accessory", component = 7,  label = "Accessoires" },
+    hat        = { kind = "props",    folder = "hat",       prop      = 0,  label = "Chapeaux" },
+    glasses    = { kind = "props",    folder = "glasses",   prop      = 1,  label = "Lunettes" },
+    watch      = { kind = "props",    folder = "watch",     prop      = 6,  label = "Montres" },
+    ear        = { kind = "props",    folder = "ear",       prop      = 2,  label = "Oreilles" },
+    bracelet   = { kind = "props",    folder = "bracelet",  prop      = 7,  label = "Bracelets" },
 }
 
 local OUTFIT_SEX_TO_MODEL = {
@@ -706,10 +746,69 @@ local function indexFilesByDrawableTexture(files, folderUrl)
 end
 
 -- Spawn a hidden ped of the given sex, run the enumerator, then delete.
+-- Les packs addon (collections) ne s'attachent PAS à un ped créé à 7000 / -250 :
+-- on réutilise le ped joueur s'il a le bon modèle, sinon on spawn à côté.
+local function collectionCount(ped)
+    if not ped or not DoesEntityExist(ped) or not GetPedCollectionsCount then return 0 end
+    local ok, n = pcall(GetPedCollectionsCount, ped)
+    if ok and type(n) == "number" and n > 0 then return n end
+    return 0
+end
+
+local function waitPedCollections(ped, timeoutMs)
+    local deadline = GetGameTimer() + (timeoutMs or 2500)
+    local last = collectionCount(ped)
+    while GetGameTimer() < deadline do
+        last = collectionCount(ped)
+        -- Un freemode avec DLC vanilla a déjà plusieurs collections.
+        -- Les packs addon s'ajoutent ensuite : on attend qu'au moins les DLC soient là.
+        if last >= 8 then return last end
+        Wait(50)
+    end
+    return last
+end
+
+--- Nombre global de drawables (vanilla + DLC + packs addon).
+local function getGlobalDrawableCount(ped, conf)
+    local kind = conf.kind == "props" and "props" or "clothing"
+    local index = kind == "props" and conf.prop or conf.component
+    if VFW.PedDrawableCount then
+        return VFW.PedDrawableCount(ped, kind, index)
+    end
+    if kind == "clothing" then
+        return GetNumberOfPedDrawableVariations(ped, index) or 0
+    end
+    return GetNumberOfPedPropDrawableVariations(ped, index) or 0
+end
+
+local function getTextureCount(ped, conf, drawable)
+    local kind = conf.kind == "props" and "props" or "clothing"
+    local index = kind == "props" and conf.prop or conf.component
+    if VFW.PedTextureCount then
+        return VFW.PedTextureCount(ped, kind, index, drawable)
+    end
+    local numTex
+    if kind == "clothing" then
+        numTex = GetNumberOfPedTextureVariations(ped, index, drawable)
+    else
+        numTex = GetNumberOfPedPropTextureVariations(ped, index, drawable)
+    end
+    return (numTex and numTex > 0) and numTex or 1
+end
+
 local function withHiddenFreemodePed(sex, fn)
     local model = OUTFIT_SEX_TO_MODEL[sex]
     if not model then return end
     local hash = joaat(model)
+    local playerPed = PlayerPedId()
+
+    -- Même modèle que le joueur : collections addon déjà streamées.
+    if DoesEntityExist(playerPed) and GetEntityModel(playerPed) == hash then
+        local ok, err = pcall(fn, playerPed)
+        if not ok then console.error("[OutfitManifest] enumerator error: " .. tostring(err)) end
+        return
+    end
+
     RequestModel(hash)
     local timeout = GetGameTimer() + 5000
     while not HasModelLoaded(hash) and GetGameTimer() < timeout do Wait(0) end
@@ -718,15 +817,23 @@ local function withHiddenFreemodePed(sex, fn)
         return
     end
 
-    local hiddenPos = vector3(7000.0, 7000.0, -250.0)
-    local ped = CreatePed(4, hash, hiddenPos.x, hiddenPos.y, hiddenPos.z, 0.0, false, false)
+    local spawnPos
+    if DoesEntityExist(playerPed) then
+        local c = GetEntityCoords(playerPed)
+        spawnPos = vector3(c.x, c.y, c.z + 1.0)
+    else
+        spawnPos = vector3(0.0, 0.0, 80.0)
+    end
+    RequestCollisionAtCoord(spawnPos.x, spawnPos.y, spawnPos.z)
+
+    local ped = CreatePed(4, hash, spawnPos.x, spawnPos.y, spawnPos.z, 0.0, false, false)
     SetEntityVisible(ped, false, false)
     SetEntityInvincible(ped, true)
     SetEntityCollision(ped, false, false)
     FreezeEntityPosition(ped, true)
     SetBlockingOfNonTemporaryEvents(ped, true)
     SetPedDefaultComponentVariation(ped)
-    Wait(50) -- let the ped fully load default variations
+    waitPedCollections(ped, 2500)
 
     local ok, err = pcall(fn, ped)
     if not ok then console.error("[OutfitManifest] enumerator error: " .. tostring(err)) end
@@ -742,22 +849,11 @@ local function enumerateForSex(sex, manifest, out)
             local files = (manifest and manifest[sex] and manifest[sex][conf.kind] and manifest[sex][conf.kind][conf.folder]) or {}
             local idx = indexFilesByDrawableTexture(files, folderUrl)
 
-            local drawableCount
-            if conf.kind == "clothing" then
-                drawableCount = GetNumberOfPedDrawableVariations(ped, conf.component)
-            else
-                drawableCount = GetNumberOfPedPropDrawableVariations(ped, conf.prop)
-            end
+            local drawableCount = getGlobalDrawableCount(ped, conf)
 
             if drawableCount and drawableCount > 0 then
                 for d = 0, drawableCount - 1 do
-                    local numTex
-                    if conf.kind == "clothing" then
-                        numTex = GetNumberOfPedTextureVariations(ped, conf.component, d)
-                    else
-                        numTex = GetNumberOfPedPropTextureVariations(ped, conf.prop, d)
-                    end
-                    numTex = (numTex and numTex > 0) and numTex or 1
+                    local numTex = getTextureCount(ped, conf, d)
 
                     local missing = {}
                     local previewUrl = nil
@@ -780,6 +876,7 @@ local function enumerateForSex(sex, manifest, out)
                     out[#out + 1] = {
                         id              = sex .. "_" .. catId .. "_" .. d,
                         category        = catId,
+                        label           = string.format("%s #%d", conf.label or catId, d),
                         sex             = sex,
                         drawable        = d,
                         totalTextures   = numTex,
@@ -1106,20 +1203,9 @@ RegisterNUICallback("gestion:images:generateOutfits", function(data, cb)
         end
         local items = {}
         withHiddenFreemodePed(sex, function(ped)
-            local count
-            if conf.kind == "clothing" then
-                count = GetNumberOfPedDrawableVariations(ped, conf.component)
-            else
-                count = GetNumberOfPedPropDrawableVariations(ped, conf.prop)
-            end
+            local count = getGlobalDrawableCount(ped, conf)
             for d = 0, (count or 0) - 1 do
-                local numTex
-                if conf.kind == "clothing" then
-                    numTex = GetNumberOfPedTextureVariations(ped, conf.component, d)
-                else
-                    numTex = GetNumberOfPedPropTextureVariations(ped, conf.prop, d)
-                end
-                numTex = (numTex and numTex > 0) and numTex or 1
+                local numTex = getTextureCount(ped, conf, d)
                 for t = 0, numTex - 1 do
                     if not (idx[d] and idx[d][t]) then
                         items[#items + 1] = { d = d, t = t }
