@@ -70,6 +70,18 @@ local function ShowHelp(text)
     VFW.ShowHelpNotification(text)
 end
 
+local function ResolveGroundZ(x, y, z)
+    local baseZ = tonumber(z) or 0.0
+    RequestCollisionAtCoord(x + 0.0, y + 0.0, baseZ + 0.0)
+
+    local found, groundZ = GetGroundZFor_3dCoord(x + 0.0, y + 0.0, baseZ + 2.0, false)
+    if not found then
+        found, groundZ = GetGroundZFor_3dCoord(x + 0.0, y + 0.0, baseZ + 50.0, false)
+    end
+
+    return found and (groundZ + 0.03) or baseZ
+end
+
 CreateThread(function()
     Wait(2000)
     local npcs = TriggerServerCallback("core:gofast:getNPCs") or {}
@@ -90,15 +102,14 @@ local function SpawnNPC(position, model)
 
     if not HasModelLoaded(hash) then return nil end
 
-    -- Créer le PED au sol
-    local ped = CreatePed(4, hash, position.x, position.y, position.z - 1.0, position.heading or 0.0, false, true)
+    local spawnZ = ResolveGroundZ(position.x, position.y, position.z)
+    local ped = CreatePed(4, hash, position.x, position.y, spawnZ, position.heading or 0.0, false, true)
 
     -- Attendre que le PED soit créé
     Wait(100)
 
-    -- Placer le PED au sol
     PlaceObjectOnGroundProperly(ped)
-    SetEntityCoordsNoOffset(ped, position.x, position.y, position.z, false, false, false)
+    SetEntityCoordsNoOffset(ped, position.x, position.y, spawnZ, false, false, false)
 
     SetEntityAsMissionEntity(ped, true, true)
     SetPedCanRagdoll(ped, false)
@@ -540,7 +551,8 @@ AddEventHandler("core:gofast:missionStarted", function(data)
 
             -- Recongeler le NPC et le retéléporter immédiatement à sa position
             ClearPedTasks(startNPC)
-            SetEntityCoordsNoOffset(startNPC, startNPCPos.x, startNPCPos.y, startNPCPos.z, false, false, false)
+            local returnZ = ResolveGroundZ(startNPCPos.x, startNPCPos.y, startNPCPos.z)
+            SetEntityCoordsNoOffset(startNPC, startNPCPos.x, startNPCPos.y, returnZ, false, false, false)
             SetEntityHeading(startNPC, startNPCPos.heading or 0.0)
             FreezeEntityPosition(startNPC, true)
             SetBlockingOfNonTemporaryEvents(startNPC, true)

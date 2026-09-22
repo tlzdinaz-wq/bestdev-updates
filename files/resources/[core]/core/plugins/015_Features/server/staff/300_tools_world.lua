@@ -47,6 +47,12 @@ local function allow(source, ...)
     return nil
 end
 
+local function allowEvent(source, ...)
+    local xPlayer = allow(source, ...)
+    if xPlayer then return xPlayer end
+    return allow(source, "events", "menu_event", "menu_anim")
+end
+
 local function consumeEntityBudget(source, amount)
     local now = GetGameTimer()
     local budget = entityBudget[source]
@@ -505,7 +511,7 @@ end)
 
 RegisterNetEvent("vfw:staff:setBlackout", function(state)
     local source = source
-    local xPlayer = allow(source, "events")
+    local xPlayer = allowEvent(source)
     if not xPlayer then return end
 
     local enabled = state and true or false
@@ -517,7 +523,7 @@ end)
 
 RegisterNetEvent("vfw:staff:startFire", function(data)
     local source = source
-    local xPlayer = allow(source, "events")
+    local xPlayer = allowEvent(source)
     if not xPlayer then return end
     if type(data) ~= "table" then return end
     if not VFW.Fire or not VFW.Fire.Start then return end
@@ -575,7 +581,7 @@ end)
 
 RegisterNetEvent("vfw:staff:fireAlarm", function(data)
     local source = source
-    local xPlayer = allow(source, "events")
+    local xPlayer = allowEvent(source)
     if not xPlayer then return end
     if type(data) ~= "table" then return end
 
@@ -596,7 +602,7 @@ end)
 
 RegisterNetEvent("vfw:staff:stopAllFires", function()
     local source = source
-    local xPlayer = allow(source, "events")
+    local xPlayer = allowEvent(source)
     if not xPlayer then return end
     if not VFW.Fire or not VFW.Fire.StopAll then return end
 
@@ -609,7 +615,7 @@ end)
 
 RegisterNetEvent("vfw:staff:triggerEarthquake", function(durationMs)
     local source = source
-    local xPlayer = allow(source, "events")
+    local xPlayer = allowEvent(source)
     if not xPlayer then return end
     if not VFW.Earthquake or not VFW.Earthquake.Start then return end
 
@@ -627,7 +633,7 @@ end)
 
 RegisterNetEvent("vfw:staff:stopEarthquakeManual", function()
     local source = source
-    local xPlayer = allow(source, "events")
+    local xPlayer = allowEvent(source)
     if not xPlayer then return end
     if not VFW.Earthquake or not VFW.Earthquake.Stop then return end
 
@@ -639,7 +645,7 @@ end)
 
 RegisterNetEvent("vfw:staff:triggerFirework", function(durationMs, musicUrl, volume)
     local source = source
-    local xPlayer = allow(source, "events", "builder_firework")
+    local xPlayer = allowEvent(source, "builder_firework")
     if not xPlayer then return end
 
     if fireworkRunning then
@@ -679,7 +685,7 @@ end)
 
 RegisterNetEvent("vfw:staff:stopFirework", function()
     local source = source
-    local xPlayer = allow(source, "events", "builder_firework")
+    local xPlayer = allowEvent(source, "builder_firework")
     if not xPlayer then return end
 
     fireworkRunning = false
@@ -691,9 +697,8 @@ RegisterNetEvent("vfw:staff:stopFirework", function()
     logStaff(source, "firework_stop", {})
 end)
 
-RegisterNetEvent("vfw:staff:giveItemTemp", function(targetId, itemName, count, duration, radius)
-    local source = source
-    local xPlayer = allow(source, "give_item")
+local function giveItemTemp(source, targetId, itemName, count, duration, radius)
+    local xPlayer = allow(source, "give_item", "menu_event", "menu_anim")
     if not xPlayer then return end
 
     if type(itemName) ~= "string" or itemName == "" or #itemName > 64 then return end
@@ -708,11 +713,12 @@ RegisterNetEvent("vfw:staff:giveItemTemp", function(targetId, itemName, count, d
         return
     end
 
-    local minutes = readInteger(duration, 1, 60)
+    local minutes = readInteger(duration, -1, 60)
     if not minutes then
         notify(source, "ERROR", "Item temporaire", "Cette durée n'est pas valide.")
         return
     end
+    local untilReboot = minutes == -1
 
     if not Feat27 or not Feat27.Inv or not Feat27.Inv.Give then return end
 
@@ -749,13 +755,15 @@ RegisterNetEvent("vfw:staff:giveItemTemp", function(targetId, itemName, count, d
         if Feat27.Inv.Give(receiver, itemName, amount, nil, true) then
             given = given + 1
 
-            local receiverId = receiver.source
-            SetTimeout(minutes * 60000, function()
-                local still = VFW.GetPlayerFromId(receiverId)
-                if not still then return end
-                if not Feat27 or not Feat27.Inv or not Feat27.Inv.Take then return end
-                Feat27.Inv.Take(still, itemName, amount, false)
-            end)
+            if not untilReboot then
+                local receiverId = receiver.source
+                SetTimeout(minutes * 60000, function()
+                    local still = VFW.GetPlayerFromId(receiverId)
+                    if not still then return end
+                    if not Feat27 or not Feat27.Inv or not Feat27.Inv.Take then return end
+                    Feat27.Inv.Take(still, itemName, amount, false)
+                end)
+            end
         end
     end
 
@@ -766,10 +774,10 @@ RegisterNetEvent("vfw:staff:giveItemTemp", function(targetId, itemName, count, d
 
     if given == 1 then
         notify(source, "SUCCESS", "Item temporaire",
-            ("Item remis pour %d minutes."):format(minutes))
+            untilReboot and "Item remis jusqu'au reboot." or ("Item remis pour %d minutes."):format(minutes))
     else
         notify(source, "SUCCESS", "Item temporaire",
-            ("Item remis à %d joueurs pour %d minutes."):format(given, minutes))
+            untilReboot and ("Item remis à %d joueurs jusqu'au reboot."):format(given) or ("Item remis à %d joueurs pour %d minutes."):format(given, minutes))
     end
 
     logStaff(source, "give_item_temp", {
@@ -778,6 +786,14 @@ RegisterNetEvent("vfw:staff:giveItemTemp", function(targetId, itemName, count, d
         minutes = minutes,
         receivers = given,
     })
+end
+
+RegisterNetEvent("vfw:staff:giveItemTemp", function(targetId, itemName, count, duration, radius)
+    giveItemTemp(source, targetId, itemName, count, duration, radius)
+end)
+
+RegisterNetEvent("vfw:animator:giveItemTemp", function(targetId, itemName, count, duration, radius)
+    giveItemTemp(source, targetId, itemName, count, duration, radius)
 end)
 
 local function licenseMap(target)

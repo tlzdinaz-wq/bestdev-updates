@@ -215,10 +215,30 @@ end
 
 local function resolveWeaponItem(model)
     if type(model) ~= "string" or model == "" or #model > ITEM_NAME_MAX then return nil end
-    local lower = model:lower()
-    if not Inv.Exists(lower) then return nil end
-    if not Inv.IsWeapon(lower) then return nil end
-    return lower:upper()
+    local clean = model:gsub("%s+", "")
+    if clean == "" or #clean > ITEM_NAME_MAX then return nil end
+
+    local lower = clean:lower()
+    local upper = clean:upper()
+    local candidates = { lower, upper }
+
+    if lower:sub(1, 7) ~= "weapon_" then
+        candidates[#candidates + 1] = "weapon_" .. lower
+        candidates[#candidates + 1] = "WEAPON_" .. upper
+    end
+
+    local seen = {}
+    for i = 1, #candidates do
+        local candidate = candidates[i]
+        if not seen[candidate] then
+            seen[candidate] = true
+            if Inv.Exists(candidate) and Inv.IsWeapon(candidate) then
+                return candidate:upper()
+            end
+        end
+    end
+
+    return nil
 end
 
 local function weaponBurstOk(source)

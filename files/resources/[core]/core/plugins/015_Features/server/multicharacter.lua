@@ -368,6 +368,21 @@ RegisterServerCallback("vfw:server:getSkinByCharId", function(source, charId)
     return VFW.DB.Decode(row.skin, {}), mapped
 end)
 
+RegisterServerCallback("vfw:server:getActiveCharIdForMugshot", function(source, targetId)
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not canManageMugshots(xPlayer) then return nil end
+
+    local target = VFW.GetPlayerFromId(tonumber(targetId))
+    if not target then return nil end
+
+    local charId = tonumber(target.charId or target.char_id or target.characterId)
+    if charId then return charId end
+
+    if type(target.identifier) ~= "string" or target.identifier == "" then return nil end
+    local row = MySQL.single.await("SELECT id FROM characters WHERE identifier = ? AND deleted_at IS NULL", { target.identifier })
+    return row and tonumber(row.id) or nil
+end)
+
 RegisterServerCallback("vfw:skin:getPlayerSkin", function(source)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer then return nil end

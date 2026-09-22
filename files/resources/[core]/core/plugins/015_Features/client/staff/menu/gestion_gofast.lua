@@ -22,6 +22,15 @@ local function Fail(cb, result, fallback)
     })
 end
 
+local function GroundZ(x, y, z)
+    local baseZ = tonumber(z) or 0.0
+    local found, groundZ = GetGroundZFor_3dCoord(x + 0.0, y + 0.0, baseZ + 2.0, false)
+    if not found then
+        found, groundZ = GetGroundZFor_3dCoord(x + 0.0, y + 0.0, baseZ + 50.0, false)
+    end
+    return found and (groundZ + 0.03) or baseZ
+end
+
 local function Here()
     local ped = PlayerPedId()
     local pos = GetEntityCoords(ped)
@@ -29,7 +38,7 @@ local function Here()
     return {
         x = pos.x + 0.0,
         y = pos.y + 0.0,
-        z = (pos.z - 0.99) + 0.0,
+        z = GroundZ(pos.x, pos.y, pos.z),
         h = heading,
         heading = heading,
         w = heading,

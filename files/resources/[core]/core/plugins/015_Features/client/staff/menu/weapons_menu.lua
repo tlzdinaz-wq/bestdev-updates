@@ -87,18 +87,51 @@ local function GetWeaponTarget()
         return GetPlayerServerId(PlayerId()), true
     end
 
-    return tonumber(weaponData.targetPlayer), false
+    local target = tonumber(weaponData.targetPlayer)
+    if not target or target <= 0 then
+        VFW.ShowNotification({
+            type = 'STAFF', variant = 'ERROR', subtitle = 'Gestion Armes',
+            message = "Aucun joueur cible valide."
+        })
+        return nil, false
+    end
+
+    return target, false
+end
+
+function StaffMenu.OpenWeaponsForTarget(targetId)
+    local target = tonumber(targetId)
+    if not target or target <= 0 then
+        VFW.ShowNotification({
+            type = 'STAFF', variant = 'ERROR', subtitle = 'Gestion Armes',
+            message = "Cet identifiant joueur n'est pas valide."
+        })
+        return false
+    end
+
+    weaponData.giveToSelf = false
+    weaponData.targetPlayer = target
+    weaponData.selectedCategory = nil
+
+    if StaffMenu.weapons and StaffMenu.weapons.open then
+        StaffMenu.weapons.open()
+    end
+
+    return true
 end
 
 function StaffMenu.BuildWeaponsMenu()
     local categories = BuildWeaponCategories()
+    local targetLabel = weaponData.giveToSelf and ("vous (" .. GetPlayerServerId(PlayerId()) .. ")") or ("ID " .. tostring(weaponData.targetPlayer or "?"))
 
-    StaffMenu.weapons.Separator("DONNER DES ARMES")
+    StaffMenu.weapons.Separator("DONNER DES ARMES - CIBLE : " .. targetLabel)
 
     StaffMenu.weapons.Checkbox("SE DONNER A SOI-MEME", "Donner l'arme a vous-meme (desactiver pour viser un autre joueur par ID)", false, weaponData.giveToSelf, function(_checked)
         weaponData.giveToSelf = _checked
 
-        if not _checked then
+        if _checked then
+            weaponData.targetPlayer = nil
+        else
             local playerId = VFW.Nui.KeyboardInput(true, "ID du joueur cible", "")
             weaponData.targetPlayer = tonumber(playerId)
 

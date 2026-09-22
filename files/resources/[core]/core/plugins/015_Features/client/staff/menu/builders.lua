@@ -7369,6 +7369,13 @@ function StaffMenu.BuildGoFastEditNPCMenu()
     StaffMenu.GoFastEditNPC.Button(":wrench: MODIFIER POSITION NPC", "Ma position actuelle", nil, "arrow", false, function()
         local pos = GetEntityCoords(PlayerPedId())
         local heading = GetEntityHeading(PlayerPedId())
+        local found, groundZ = GetGroundZFor_3dCoord(pos.x, pos.y, pos.z + 2.0, false)
+        if not found then
+            found, groundZ = GetGroundZFor_3dCoord(pos.x, pos.y, pos.z + 50.0, false)
+        end
+        if found then
+            pos = vector3(pos.x, pos.y, groundZ + 0.03)
+        end
         TriggerServerEvent('core:gofast:updateNPC', npc.region, "position", {
             x = math.floor(pos.x * 100) / 100, y = math.floor(pos.y * 100) / 100,
             z = math.floor(pos.z * 100) / 100, heading = math.floor(heading * 100) / 100

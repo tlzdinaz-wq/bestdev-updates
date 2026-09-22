@@ -928,6 +928,53 @@ function StaffMenu.BuildAnimatorGiveItemDurationMenu(isStandalone)
 end
 
 -- Build vehicles menu
+RegisterNetEvent("vfw:animator:spawnVehicle:result", function(success, netId, model, errorMessage)
+    if not success then
+        VFW.ShowNotification({
+            type = 'STAFF',
+            variant = 'ERROR',
+            title = 'EVE Animateur', subtitle = 'Mode Animateur',
+            message = errorMessage or "Le véhicule n'a pas pu apparaître."
+        })
+        return
+    end
+
+    CreateThread(function()
+        local vehicle = 0
+        local startedAt = GetGameTimer()
+
+        while GetGameTimer() - startedAt < 5000 do
+            if netId and NetworkDoesNetworkIdExist(netId) then
+                vehicle = NetworkGetEntityFromNetworkId(netId)
+                if vehicle ~= 0 and DoesEntityExist(vehicle) then
+                    break
+                end
+            end
+            Wait(100)
+        end
+
+        if vehicle == 0 or not DoesEntityExist(vehicle) then
+            VFW.ShowNotification({
+                type = 'STAFF',
+                variant = 'ERROR',
+                title = 'EVE Animateur', subtitle = 'Mode Animateur',
+                message = ("Le véhicule %s a été créé côté serveur mais n'est pas encore visible ici."):format(tostring(model or ""))
+            })
+            return
+        end
+
+        SetVehicleOnGroundProperly(vehicle)
+        SetEntityAsMissionEntity(vehicle, true, true)
+
+        VFW.ShowNotification({
+            type = 'STAFF',
+            variant = 'SUCCESS',
+            title = 'EVE Animateur', subtitle = 'Mode Animateur',
+            message = ("Véhicule %s apparu."):format(tostring(model or ""))
+        })
+    end)
+end)
+
 function StaffMenu.BuildAnimatorVehiclesMenu(isStandalone)
     -- Select correct menus based on mode
     local vehiclesMenu = isStandalone and StaffMenu.animatorStandaloneVehicles or StaffMenu.animatorVehicles

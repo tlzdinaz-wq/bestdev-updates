@@ -73,10 +73,10 @@ local function displayName(xPlayer)
 end
 
 local function accountRowById(accountId)
-    if type(accountId) ~= "string" or accountId == "" then return nil end
+    if accountId == nil or tostring(accountId) == "" then return nil end
     return Staff29.Single(
         "SELECT id, identifier, name, role, playtime, banned, last_seen FROM users WHERE id = ?",
-        { accountId })
+        { tostring(accountId) })
 end
 
 local function accountRowByIdentifier(identifier)
@@ -87,7 +87,7 @@ local function accountRowByIdentifier(identifier)
     if row then return row end
 
     local accountId = Staff29.Scalar("SELECT account_id FROM characters WHERE identifier = ? LIMIT 1", { identifier })
-    if type(accountId) ~= "string" then return nil end
+    if accountId == nil or tostring(accountId) == "" then return nil end
     return accountRowById(accountId)
 end
 
@@ -116,9 +116,10 @@ local function targetFromRow(row)
 end
 
 local function onlineByAccount(accountId)
-    if type(accountId) ~= "string" or accountId == "" then return nil end
+    if accountId == nil or tostring(accountId) == "" then return nil end
+    local wanted = tostring(accountId)
     for _, other in pairs(VFW.Players) do
-        if other.accountId == accountId then return other end
+        if tostring(other.accountId) == wanted then return other end
     end
     return nil
 end
@@ -149,6 +150,11 @@ end
 
 local function ledgerFilter(accountId)
     return ("%%\"accountId\":\"%s\"%%"):format(likeEscape(accountId))
+end
+
+local function payloadMatchesAccount(payload, accountId)
+    if type(payload) ~= "table" or accountId == nil or tostring(accountId) == "" then return false end
+    return tostring(payload.accountId or "") == tostring(accountId)
 end
 
 local function ledgerInsert(staffSource, target, payload)
@@ -250,15 +256,14 @@ local function toSanction(id, payload)
 end
 
 local function ledgerHistory(accountId)
-    if type(accountId) ~= "string" or accountId == "" then return {} end
+    if accountId == nil or tostring(accountId) == "" then return {} end
 
-    local rows = Staff29.Query(([[
+    local rows = Staff29.Query(([[ 
         SELECT id, action, payload FROM logs_staff
-        WHERE action IN (?, ?, ?, ?, ?) AND payload LIKE ?
+        WHERE action IN (?, ?, ?, ?, ?)
         ORDER BY id DESC LIMIT %d
-    ]]):format(HISTORY_LIMIT), {
+    ]]):format(SCAN_LIMIT), {
         LEDGER.warn, LEDGER.kick, LEDGER.ban, LEDGER.tig, LEDGER.tigweapon,
-        ledgerFilter(accountId),
     })
 
     local out, n = {}, 0
@@ -266,7 +271,7 @@ local function ledgerHistory(accountId)
         local row = rows[i]
         local kind = TYPE_OF_ACTION[row.action]
         local payload = Staff29.Decode(row.payload, nil)
-        if kind and type(payload) == "table" then
+        if kind and payloadMatchesAccount(payload, accountId) then
             payload.type = kind
             if payload.active and isExpired(payload) then
                 payload.active = false
@@ -276,6 +281,7 @@ local function ledgerHistory(accountId)
             if entry then
                 n = n + 1
                 out[n] = entry
+                if n >= HISTORY_LIMIT then break end
             end
         end
     end
@@ -284,17 +290,17 @@ local function ledgerHistory(accountId)
 end
 
 local function activeSanctionOf(accountId, kind)
-    if type(accountId) ~= "string" or accountId == "" then return nil end
+    if accountId == nil or tostring(accountId) == "" then return nil end
 
-    local rows = Staff29.Query(([[
+    local rows = Staff29.Query(([[ 
         SELECT id, payload FROM logs_staff
-        WHERE action = ? AND payload LIKE ? AND payload LIKE '%%"active":true%%'
+        WHERE action = ? AND payload LIKE '%%"active":true%%'
         ORDER BY id DESC LIMIT %d
-    ]]):format(SCAN_LIMIT), { LEDGER[kind], ledgerFilter(accountId) })
+    ]]):format(SCAN_LIMIT), { LEDGER[kind] })
 
     for i = 1, #rows do
         local payload = Staff29.Decode(rows[i].payload, nil)
-        if type(payload) == "table" and payload.active then
+        if payloadMatchesAccount(payload, accountId) and payload.active then
             payload.type = kind
             if not isExpired(payload) then
                 return rows[i].id, payload
@@ -306,7 +312,8 @@ local function activeSanctionOf(accountId, kind)
 end
 
 local function hasAnticheatBan(accountId)
-    local identifier = Staff29.Scalar("SELECT identifier FROM users WHERE id = ?", { accountId })
+    if accountId == nil or tostring(accountId) == "" then return false end
+    local identifier = Staff29.Scalar("SELECT identifier FROM users WHERE id = ?", { tostring(accountId) })
     if type(identifier) ~= "string" or identifier == "" then return false end
 
     local count = Staff29.Scalar("SELECT COUNT(*) FROM anticheat_bans WHERE license = ?", { identifier }, 0)
@@ -314,7 +321,8 @@ local function hasAnticheatBan(accountId)
 end
 
 local function refreshBanFlag(accountId)
-    if type(accountId) ~= "string" or accountId == "" then return nil end
+    if accountId == nil or tostring(accountId) == "" then return nil end
+    accountId = tostring(accountId)
 
     local activeId = activeSanctionOf(accountId, "ban")
     if activeId then
@@ -946,6 +954,38 @@ RegisterNetEvent("vfw:admin:giveTIGOffline", function(accountId, amount, reason)
     end
 end)
 
+RegisterNetEvent("vfw:admin:giveTIG", function(targetId, amount, reason)
+    local source = source
+    local xPlayer = Staff29.Require(source, "give_tig")
+    if not xPlayer then return end
+    if not Staff29.RateLimit(source, "giveTig", 1000) then return end
+
+    local targetSource = Staff29.ToInt(targetId, 1, 65535)
+    local tasks = Staff29.ToInt(amount, 1, TIG_MAX_TASKS)
+    if not targetSource or not tasks then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Utilisation : ID joueur et nombre de tâches valides requis.")
+        return
+    end
+
+    local target = resolveBySession(targetSource)
+    if not target then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Ce joueur n'est pas connecté.")
+        return
+    end
+
+    local cleaned = cleanReason(reason) or "Aucun motif"
+    if commitSanction(source, xPlayer, target, {
+        type = "tig",
+        reason = cleaned,
+        active = true,
+        tasks = tasks,
+        tasksCompleted = 0,
+    }) then
+        Staff29.Notify(source, "SUCCESS", "Sanctions",
+            ("%s a reçu %s."):format(target.name, plural(tasks, "tâche", "tâches")))
+    end
+end)
+
 RegisterNetEvent("vfw:admin:removeTIGOffline", function(accountId)
     local source = source
     local xPlayer = Staff29.Require(source, "remove_tig")
@@ -955,6 +995,35 @@ RegisterNetEvent("vfw:admin:removeTIGOffline", function(accountId)
 
     local target = resolveByAccount(accountId)
     if not target then return end
+
+    local sanctionId = activeSanctionOf(target.accountId, "tig")
+    if not sanctionId then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Ce joueur n'a aucune tâche en cours.")
+        return
+    end
+
+    if revokeSanction(source, xPlayer, sanctionId, { tig = true }, nil) then
+        Staff29.Notify(source, "SUCCESS", "Sanctions", ("Les tâches de %s ont été levées."):format(target.name))
+    end
+end)
+
+RegisterNetEvent("vfw:admin:removeTIG", function(targetId)
+    local source = source
+    local xPlayer = Staff29.Require(source, "remove_tig")
+    if not xPlayer then return end
+    if not Staff29.RateLimit(source, "removeTig", 1000) then return end
+
+    local targetSource = Staff29.ToInt(targetId, 1, 65535)
+    if not targetSource then
+        Staff29.Notify(source, "ERROR", "Sanctions", "ID joueur invalide.")
+        return
+    end
+
+    local target = resolveBySession(targetSource)
+    if not target then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Ce joueur n'est pas connecté.")
+        return
+    end
 
     local sanctionId = activeSanctionOf(target.accountId, "tig")
     if not sanctionId then

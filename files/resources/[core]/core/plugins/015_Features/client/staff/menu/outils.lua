@@ -529,7 +529,20 @@ function StaffMenu.BuildOutilsMenu()
     end
 
     if perms["give_weapon"] then
-        StaffMenu.outils.Button(":gun: DONNER DES ARMES", "Donner une ou plusieurs armes à un joueur connecté", nil, "chevron", false, function() end, StaffMenu.weapons)
+        StaffMenu.outils.Button(":gun: DONNER DES ARMES", "Donner une ou plusieurs armes à un joueur connecté par ID", nil, "chevron", false, function()
+            local playerId = VFW.Nui.KeyboardInput(true, "ID du joueur")
+            if not playerId or playerId == "" then return end
+
+            local targetId = tonumber(playerId)
+            if not targetId or targetId <= 0 then
+                VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Gestion Armes', message = "Cet identifiant joueur n'est pas valide." })
+                return
+            end
+
+            if StaffMenu.OpenWeaponsForTarget then
+                StaffMenu.OpenWeaponsForTarget(targetId)
+            end
+        end)
     end
 
     if perms["zone_actions"] then
@@ -606,7 +619,24 @@ function StaffMenu.BuildOutilsMenu()
                 VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Outils Staff', message = "Cet identifiant n'est pas valide." })
                 return
             end
-            ExecuteCommand("mugshot " .. idplayer)
+
+            local targetId = tonumber(idplayer)
+            if not targetId or targetId <= 0 then
+                VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Outils Staff', message = "Cet identifiant n'est pas valide." })
+                return
+            end
+
+            local charId = TriggerServerCallback("vfw:server:getActiveCharIdForMugshot", targetId)
+            if not charId then
+                VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Mugshot', message = "Joueur introuvable ou personnage non chargé." })
+                return
+            end
+
+            if StaffMenu.RedoMugshotsForChars and StaffMenu.RedoMugshotsForChars(charId) then
+                VFW.ShowNotification({ type = 'STAFF', variant = 'INFO', subtitle = 'Mugshot', message = "Recapture mugshot lancée." })
+            else
+                VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Mugshot', message = "Une recapture est déjà en cours ou le module est indisponible." })
+            end
         end)
     end
 
