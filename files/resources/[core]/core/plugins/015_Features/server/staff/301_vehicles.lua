@@ -940,6 +940,49 @@ RegisterNetEvent("vfw:staff:menu:spawnVehicle", function(model)
     logStaff(source, "vehicle_spawn_menu", { model = cleaned, coords = coords })
 end)
 
+RegisterNetEvent("vfw:animator:spawnVehicle", function(model)
+    local source = source
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not xPlayer or not (xPlayer.hasPermission("menu_anim") or xPlayer.hasPermission("menu_event")) then return end
+    if not rateOk(source, "animator:spawnVehicle", 1000) then return end
+
+    local cleaned = cleanModel(model)
+    if not cleaned then
+        notify(source, "ERROR", "Ce modèle n'est pas valide.")
+        return
+    end
+
+    if VFW.Vehicles.IsModelBlacklisted(cleaned) then
+        notify(source, "ERROR", "Ce modèle est bloqué.")
+        return
+    end
+
+    if not Feat27 or type(Feat27.SpawnVehicle) ~= "function" then
+        notify(source, "ERROR", "Le système de spawn véhicule est indisponible.")
+        return
+    end
+
+    local coords, heading = spawnAheadOf(source, 4.0)
+    if not coords then
+        notify(source, "ERROR", "Impossible de trouver votre position.")
+        return
+    end
+
+    local hash = joaat(cleaned)
+    local vehicleType = VFW.GetVehicleType and VFW.GetVehicleType(hash, source) or "automobile"
+    local netId, spawned = Feat27.SpawnVehicle(hash, coords, heading, vehicleType)
+
+    if not netId then
+        notify(source, "ERROR", "Ce véhicule n'a pas pu apparaître.")
+        return
+    end
+
+    if VFW.MarkStaffVehicle then VFW.MarkStaffVehicle(spawned or NetworkGetEntityFromNetworkId(netId)) end
+
+    notify(source, "SUCCESS", ("Le véhicule %s est apparu."):format(cleaned))
+    logStaff(source, "animator_vehicle_spawn", { model = cleaned, coords = coords })
+end)
+
 RegisterNetEvent("vfw:staff:carlist:spawnVehicle", function(model, livery)
     local source = source
     local xPlayer = staffPlayer(source, "dev_tools")

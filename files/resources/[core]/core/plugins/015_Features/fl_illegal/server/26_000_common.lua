@@ -286,7 +286,8 @@ end
 function IL.GiveMoney(xPlayer, account, amount, reason)
     if not xPlayer or not amount or amount <= 0 then return false end
     xPlayer.addAccountMoney(account, math.floor(amount), reason or "illegal")
-    return true
+    local acc = xPlayer.getAccount(account)
+    return acc ~= nil
 end
 
 function IL.TakeMoney(xPlayer, account, amount, reason)

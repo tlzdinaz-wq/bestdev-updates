@@ -253,7 +253,11 @@ end)
 
 function StaffMenu.RedoMugshotsForChars(charIds)
     if imageManagerProcessing then return false end
-    if type(charIds) ~= "table" then return false end
+    if type(charIds) ~= "table" then
+        local singleId = tonumber(charIds)
+        if not singleId then return false end
+        charIds = { singleId }
+    end
 
     local ids = {}
     for i = 1, #charIds do
@@ -321,6 +325,7 @@ function StaffMenu.RedoMugshotsForChars(charIds)
                 Wait(800)
 
                 local mugshotDone = false
+                local startedAt = GetGameTimer()
                 CaptureFastMugshotWithCallback(function(success, url)
                     if success and url and url ~= "" then
                         TriggerServerEvent("vfw:server:setMugshotForChar", charId, url)
@@ -329,8 +334,15 @@ function StaffMenu.RedoMugshotsForChars(charIds)
                     mugshotDone = true
                 end, false)
 
-                while not mugshotDone do
+                while not mugshotDone and GetGameTimer() - startedAt < 30000 do
                     Wait(100)
+                end
+
+                if not mugshotDone then
+                    VFW.ShowNotification({
+                        type = "STAFF", variant = "ERROR", subtitle = "Images",
+                        message = string.format("Capture mugshot ID %d expirée.", charId)
+                    })
                 end
 
                 Wait(500)
@@ -386,7 +398,7 @@ function StaffMenu.RedoMugshotsForChars(charIds)
 end
 
 RegisterNUICallback("imageManager:redoMugshots", function(data, cb)
-    local ok = StaffMenu.RedoMugshotsForChars(data and data.charIds)
+    local ok = StaffMenu.RedoMugshotsForChars(data and (data.charIds or data.charId or data.id))
     cb({ ok = ok == true })
 end)
 

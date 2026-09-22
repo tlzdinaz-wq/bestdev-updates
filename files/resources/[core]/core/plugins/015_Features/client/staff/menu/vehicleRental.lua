@@ -27,6 +27,7 @@ end
 local function fcSpawnPreview(sType, sModel, tPos, iNumber)
     local eEntity
     fcDeletePreview(sType, iNumber)
+    if not tPos or not tPos.x or not tPos.y or not tPos.z then return nil end
 
     if sType == "ped" then
         eEntity = VFW.CreatePed(tPos, sModel)
@@ -34,11 +35,14 @@ local function fcSpawnPreview(sType, sModel, tPos, iNumber)
 
     elseif sType == "vehicle" then
         eEntity = VFW.Game.SpawnVehicle(sModel, tPos, tPos.w, nil, false)
+        if not eEntity or not DoesEntityExist(eEntity) then return nil end
         SetVehicleOnGroundProperly(eEntity)
         FreezeEntityPosition(eEntity, true)
 
         eCurrentVehicle[iNumber] = eEntity
     end
+
+    if not eEntity or not DoesEntityExist(eEntity) then return nil end
 
     SetEntityAlpha(eEntity, 200, false)
     SetEntityCollision(eEntity, false, true)
@@ -64,16 +68,26 @@ local function fcGetDefaultValue()
     return {
         iType = 1,
         sName = nil,
-        tPos = {x = 0.0, y = 0.0, z = 0.0, w = 0.0},
+        tPos = nil,
         sPedModel = "a_m_y_smartcaspat_01",
         tVehiclePos = {},
         bIsValid = false,
     }
 end
 
+local tData
+
+local function fcHasCoords(tPos)
+    return type(tPos) == "table" and tonumber(tPos.x) and tonumber(tPos.y) and tonumber(tPos.z)
+end
+
+local function fcHasVehicleSpawn(iIndex)
+    return type(tData.tVehiclePos) == "table" and fcHasCoords(tData.tVehiclePos[iIndex])
+end
 
 
-local tData = fcGetDefaultValue()
+
+tData = fcGetDefaultValue()
 local adminBanner <const> = GetVUIBanner("admin")
 RentalBuilder = VUI:CreateSubMenu(StaffMenu.builderCarRental, "CRÉER UNE LOCATION DE VEHICULE", adminBanner, true)
 RentalManager = VUI:CreateSubMenu(StaffMenu.builderCarRental, "GÉRER LES LOCATIONS DE VEHICULE", adminBanner, true)
@@ -131,7 +145,7 @@ local function fcBuildRentalMenu(Menu)
             fcRefresh(Menu)
         end)
 
-        Menu.Button("POSITION", tData.tPos and "Définie" or "Non définie", nil, fcGetIcon(DoesEntityExist(eCurrentPed)), false, function()
+        Menu.Button("POSITION", fcHasCoords(tData.tPos) and "Définie" or "Non définie", nil, fcGetIcon(fcHasCoords(tData.tPos)), false, function()
             local tPos = GetEntityCoords(PlayerPedId()) - vector3(0.0, 0.0, 1.0)
             tData.tPos = {x = tPos.x, y = tPos.y, z = tPos.z, w = GetEntityHeading(PlayerPedId())}
 
@@ -145,13 +159,15 @@ local function fcBuildRentalMenu(Menu)
             fcRefresh(Menu)
         end)
 
-        Menu.Button("ORIENTATION DU PED", tostring(tData.tPos.w) .. "°", nil, fcGetIcon(DoesEntityExist(eCurrentPed)), false, function()
+        Menu.Button("ORIENTATION DU PED", tostring(tData.tPos and tData.tPos.w or 0) .. "°", nil, fcGetIcon(fcHasCoords(tData.tPos)), false, function()
             local sInput = VFW.Nui.KeyboardInput(true, "Entrer l'orientation du ped (0-360)")
-            if sInput == "" or not tonumber(sInput) or not DoesEntityExist(eCurrentPed) then return end
+            if sInput == "" or not tonumber(sInput) or not fcHasCoords(tData.tPos) then return end
 
             tData.tPos.w = math.max(0, math.min(360, tonumber(sInput)))
 
-            SetEntityHeading(eCurrentPed, tData.tPos.w + 0.0)
+            if DoesEntityExist(eCurrentPed) then
+                SetEntityHeading(eCurrentPed, tData.tPos.w + 0.0)
+            end
 
             fcRefresh(Menu)
         end)
@@ -179,21 +195,23 @@ local function fcBuildRentalMenu(Menu)
 
         for i=1,2 do
 
-            Menu.Button("Définir Spawn "..i, DoesEntityExist(eCurrentVehicle[i]) and "Définie" or "Non définie", nil, fcGetIcon(eCurrentVehicle[i]), false, function()
+            Menu.Button("Définir Spawn "..i, fcHasVehicleSpawn(i) and "Définie" or "Non définie", nil, fcGetIcon(fcHasVehicleSpawn(i)), false, function()
                 local tPos = GetEntityCoords(PlayerPedId()) - vector3(0.0, 0.0, 1.0)
                 tData.tVehiclePos[i] = {x = tPos.x, y = tPos.y, z = tPos.z, w = GetEntityHeading(PlayerPedId())}
                 fcSpawnPreview("vehicle", "cog55", tData.tVehiclePos[i], i)
                 fcRefresh(Menu)
             end)
 
-            Menu.Button("Orientation Spawn "..i, tostring(tData.tVehiclePos[i] and tData.tVehiclePos[i].w or 0) .. "°", nil, fcGetIcon(DoesEntityExist(eCurrentVehicle[i])), false, function()
-                if not tData.tVehiclePos[i] or not DoesEntityExist(eCurrentVehicle[i]) then return end
+            Menu.Button("Orientation Spawn "..i, tostring(tData.tVehiclePos[i] and tData.tVehiclePos[i].w or 0) .. "°", nil, fcGetIcon(fcHasVehicleSpawn(i)), false, function()
+                if not fcHasVehicleSpawn(i) then return end
 
                 local sInput = VFW.Nui.KeyboardInput(true, "Entrer l'orientation de la voiture (0-360)")
                 if sInput == "" or not tonumber(sInput) then return end
 
                 tData.tVehiclePos[i].w = math.max(0, math.min(360, tonumber(sInput)))
-                SetEntityHeading(eCurrentVehicle[i], tData.tVehiclePos[i].w + 0.0)
+                if DoesEntityExist(eCurrentVehicle[i]) then
+                    SetEntityHeading(eCurrentVehicle[i], tData.tVehiclePos[i].w + 0.0)
+                end
 
                 fcRefresh(Menu)
             end)
@@ -215,16 +233,15 @@ RentalBuilder.OnOpen(function()
     RentalBuilder.Separator("ACTIONS")
 
     local sStatusMessage = ""
-  if not tData.sName then
+    tData.bIsValid = false
+  if not tData.sName or tostring(tData.sName):gsub("%s+", "") == "" then
         sStatusMessage = "Nom manquant"
   elseif not tData.iType then
         sStatusMessage = "Type de location manquant"
-  elseif not DoesEntityExist(eCurrentPed) then
+  elseif not fcHasCoords(tData.tPos) then
         sStatusMessage = "Position du ped manquante"
-  elseif not DoesEntityExist(eCurrentVehicle[1]) then
+  elseif not fcHasVehicleSpawn(1) then
         sStatusMessage = "Position du spawn 1 manquante"
-  elseif not DoesEntityExist(eCurrentVehicle[2]) then
-        sStatusMessage = "Position du spawn 2 manquante"
   else
         tData.bIsValid = true
         sStatusMessage = "Tous les champs sont remplis"
@@ -232,11 +249,15 @@ RentalBuilder.OnOpen(function()
 
     local sIcon = tData.bIsValid and "check" or "lock"
 
-  RentalBuilder.Button(":check: Créer la location", sStatusMessage, nil, sIcon, not tData.bIsValid, function()
+  RentalBuilder.Button(":check: Créer la location", sStatusMessage, nil, sIcon, false, function()
         if not tData.bIsValid then
+            if sStatusMessage == "Position du spawn 1 manquante" then
+                iCurrentCategory = 2
+                fcRefresh(RentalBuilder)
+            end
             VFW.ShowNotification({
                 type = 'STAFF', variant = 'ERROR', subtitle = 'Location Véhicules',
-                message = "~r~Vous devez définir tous les paramètres de la location.~s~"
+                message = "~r~" .. sStatusMessage .. ".~s~"
           })
             return
         end

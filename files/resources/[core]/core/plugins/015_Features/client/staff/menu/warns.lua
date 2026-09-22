@@ -17,7 +17,7 @@ local sanctionConfig = {
 function StaffMenu.BuildPlayerSanctionsMenu()
     local selected = StaffMenu.data.selectedPlayer
     local info = StaffMenu.data.playerInfo or {}
-    if selected and StaffMenu._sanctionsFor ~= selected then
+    if selected then
         StaffMenu.data.sanctionsPlayerList = TriggerServerCallback("vfw:staff:getPlayerSanctions",
             selected, info.identifier, info.discord) or {}
         StaffMenu._sanctionsFor = selected

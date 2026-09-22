@@ -129,7 +129,7 @@ local function seedItems()
                     ]], {
                         category, spawnName, item.name or spawnName,
                         math.floor(tonumber(item.price) or 0),
-                        tonumber(item.originalPrice),
+                        tonumber(item.originalPrice) or 0,
                         item.image or "",
                         json.encode(item.tags or {}),
                         item.description or "",

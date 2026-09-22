@@ -344,27 +344,58 @@ RegisterNetEvent("garage:removeVehicleFromGroup", function(plate, garageId)
     end
 end)
 
-RegisterNetEvent("core:createGarage", function(payload)
-    local source = source
+local function createGarageFromPayload(source, payload)
     local xPlayer = VFW.GetPlayerFromId(source)
-    if not xPlayer then return end
+    if not xPlayer then return false, "Joueur introuvable." end
 
     local data = Garages.Sanitize(payload)
     if not data then
-        Vehicles.Notify(source, "ROUGE", "Garage", "Ces données de garage ne sont pas valides.")
-        return
+        return false, "Ces données de garage ne sont pas valides."
     end
 
-    if not Garages.CanEdit(xPlayer, data.type) then return end
+    if not Garages.CanEdit(xPlayer, data.type) then
+        return false, "Vous n'avez pas la permission de créer ce garage."
+    end
 
     local id = Garages.Insert(data)
     if not id then
-        Vehicles.Notify(source, "ROUGE", "Garage", "Création du garage impossible.")
-        return
+        return false, "Création du garage impossible."
+    end
+
+    if type(payload) == "table" and type(payload.vehicles) == "table" then
+        local expectedKind = data.type == "society" and "society" or ((data.type == "faction" or data.type == "gang") and "faction" or nil)
+        if expectedKind and Garages.AddGroupVehicle then
+            for i = 1, #payload.vehicles do
+                local vehicle = payload.vehicles[i]
+                if type(vehicle) == "table" then
+                    Garages.AddGroupVehicle(source, id, vehicle.model or vehicle.vehName or vehicle.name, vehicle.label, expectedKind)
+                end
+            end
+        end
     end
 
     Garages.SendGarageEvent("garage:add:list", id, data)
+    return true, id
+end
+
+RegisterNetEvent("core:createGarage", function(payload)
+    local source = source
+    local ok, result = createGarageFromPayload(source, payload)
+    if not ok then
+        Vehicles.Notify(source, "ROUGE", "Garage", result or "Création du garage impossible.")
+        return
+    end
+
     Vehicles.Notify(source, "VERT", "Garage", "Garage créé.")
+end)
+
+RegisterServerCallback("core:createGarage", function(source, payload)
+    local ok, result = createGarageFromPayload(source, payload)
+    if not ok then
+        return { ok = false, error = result or "Création du garage impossible." }
+    end
+
+    return { ok = true, id = result }
 end)
 
 RegisterNetEvent("core:deleteGarage", function(garageId)

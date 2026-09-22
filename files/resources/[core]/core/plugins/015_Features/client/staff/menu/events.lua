@@ -623,6 +623,10 @@ end
 
 --- .BuildEventsMenu
 function StaffMenu.BuildEventsMenu()
+    StaffMenu.events.Button(":bolt: EFFETS SPÉCIAUX", "Blackout, incendie, séisme et feu d'artifice", nil, "chevron", false, function()
+        StaffMenu.specialEffects.parent = StaffMenu.events
+    end, StaffMenu.specialEffects)
+
     StaffMenu.events.Button(":globe: Afficher", "la liste des points TP", nil, "chevron", false, function()
     end, StaffMenu.eventsTpIpl)
 

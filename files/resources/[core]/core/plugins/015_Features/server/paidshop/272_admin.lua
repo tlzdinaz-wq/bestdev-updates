@@ -1,16 +1,21 @@
 Feat27 = Feat27 or {}
 
+local function trim(value)
+    if type(value) ~= "string" then return value end
+    return value:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
 local function sanitizeItem(item)
     if type(item) ~= "table" then return nil end
 
     local out = {
-        spawnName = type(item.spawnName) == "string" and item.spawnName or nil,
-        name = type(item.name) == "string" and item.name or nil,
+        spawnName = type(item.spawnName) == "string" and trim(item.spawnName) or nil,
+        name = type(item.name) == "string" and trim(item.name) or nil,
         price = math.floor(tonumber(item.price) or 0),
-        originalPrice = tonumber(item.originalPrice),
-        image = type(item.image) == "string" and item.image or "",
+        originalPrice = tonumber(item.originalPrice) or 0,
+        image = type(item.image) == "string" and trim(item.image) or "",
         tags = type(item.tags) == "table" and item.tags or {},
-        description = type(item.description) == "string" and item.description or "",
+        description = type(item.description) == "string" and trim(item.description) or "",
         rarity = type(item.rarity) == "string" and item.rarity or "common",
         content = type(item.content) == "table" and item.content or nil,
     }
@@ -32,6 +37,40 @@ local function generateSpawnName(category, name)
     return ("%s_%s_%d"):format(category, base, math.random(1000, 9999))
 end
 
+local function normalizeSpawnName(categoryConfig, spawnName)
+    local value = trim(spawnName)
+    if type(value) ~= "string" or value == "" then return value end
+    if categoryConfig and categoryConfig.itemType == "weapon" then
+        return value:lower()
+    end
+    if value:sub(1, 7):lower() == "weapon_" then
+        return value:lower()
+    end
+    return value
+end
+
+local function isDisabled(value)
+    return value == false or value == 0 or value == "0"
+end
+
+local function saveExistingDisabledItem(id, clean)
+    MySQL.update.await([[
+        UPDATE paidshop_items SET
+            `name` = ?, `price` = ?, `original_price` = ?, `image` = ?, `tags` = ?,
+            `description` = ?, `rarity` = ?, `content` = ?, `extra` = ?, `enabled` = 1
+        WHERE `id` = ?
+    ]], {
+        clean.name or clean.spawnName, clean.price, clean.originalPrice, clean.image,
+        json.encode(clean.tags), clean.description, clean.rarity,
+        clean.content and json.encode(clean.content) or nil,
+        json.encode(clean.extra),
+        id,
+    })
+
+    PaidShop.LoadItems(true)
+    return true, "Article ajouté"
+end
+
 RegisterServerCallback("paidshop:addItemServer", function(source, item, category)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not PaidShop.IsAdmin(xPlayer) then return false, "Non autorisé" end
@@ -51,9 +90,23 @@ RegisterServerCallback("paidshop:addItemServer", function(source, item, category
         end
     end
 
-    if not clean.name then clean.name = clean.spawnName end
+    clean.spawnName = normalizeSpawnName(categoryConfig, clean.spawnName)
+    if not clean.name or clean.name == "" then clean.name = clean.spawnName end
 
-    local ok = pcall(MySQL.insert.await, [[
+    local existing = MySQL.single.await([[
+        SELECT `id`, `enabled` FROM paidshop_items
+        WHERE `category` = ? AND LOWER(`spawn_name`) = LOWER(?)
+        LIMIT 1
+    ]], { category, clean.spawnName })
+
+    if existing then
+        if isDisabled(existing.enabled) then
+            return saveExistingDisabledItem(existing.id, clean)
+        end
+        return false, "Cet article existe déjà"
+    end
+
+    local ok, err = pcall(MySQL.insert.await, [[
         INSERT INTO paidshop_items
             (`category`, `spawn_name`, `name`, `price`, `original_price`, `image`, `tags`, `description`, `rarity`, `content`, `extra`, `enabled`)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
@@ -64,7 +117,10 @@ RegisterServerCallback("paidshop:addItemServer", function(source, item, category
         json.encode(clean.extra),
     })
 
-    if not ok then return false, "Cet article existe déjà" end
+    if not ok then
+        print(("[paidshop] Impossible d'ajouter l'article %s/%s: %s"):format(category, clean.spawnName, tostring(err)))
+        return false, "Ajout impossible, vérifie la console serveur"
+    end
 
     PaidShop.LoadItems(true)
     return true, "Article ajouté"

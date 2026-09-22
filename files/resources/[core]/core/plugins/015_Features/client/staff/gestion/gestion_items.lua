@@ -7,6 +7,7 @@ function VFW.SendItemGestionData()
 
     for itemName, item in pairs(VFW.Items) do
         if type(item) == "table" and item.type and item.type ~= "keys" and item.type ~= "clothes" then
+            local itemData = type(item.data) == "table" and item.data or {}
             local typeI
             if item.data then
                 if item.data.type == nil then
@@ -36,16 +37,16 @@ function VFW.SendItemGestionData()
                 image = item.image,
                 premium = item.premium,
                 permanent = item.perm,
-                drop = item.data?.drop,
-                buyPrice = item.data?.buyPrice,
-                effect = item.data?.effect,
-                duration = item.data?.duration,
-                hunger = item.data?.hunger,
-                thirst = item.data?.thirst,
-                expiration = item.data?.expiration,
-                anim = item.data?.anim,
-                prop = item.data?.prop,
-                ammoType = item.data?.ammoType
+                drop = itemData.drop,
+                buyPrice = itemData.buyPrice,
+                effect = itemData.effect,
+                duration = itemData.duration,
+                hunger = itemData.hunger,
+                thirst = itemData.thirst,
+                expiration = itemData.expiration,
+                anim = itemData.anim,
+                prop = itemData.prop,
+                ammoType = itemData.ammoType
             }
         end
     end

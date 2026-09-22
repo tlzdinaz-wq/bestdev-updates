@@ -6,6 +6,21 @@ local function findAccount(accounts, name)
     end
 end
 
+local function ensureAccount(accounts, name)
+    local account = findAccount(accounts, name)
+    if account then return account end
+
+    local cfg = Config.Accounts and Config.Accounts[name] or {}
+    account = {
+        name = name,
+        money = Config.StartingAccountMoney[name] or 0,
+        label = cfg.label or name,
+        round = cfg.round ~= false,
+    }
+    accounts[#accounts + 1] = account
+    return account
+end
+
 function VFW.CreateExtendedPlayer(source, row, account)
     source = tonumber(source)
 
@@ -31,6 +46,10 @@ function VFW.CreateExtendedPlayer(source, row, account)
     self.skin = row.skin or {}
     self.tattoos = row.tattoos or {}
     self.accounts = row.accounts or {}
+    for name in pairs(Config.Accounts or {}) do
+        ensureAccount(self.accounts, name)
+    end
+    ensureAccount(self.accounts, "money")
     self.inventory = row.inventory or {}
     self.loadout = row.loadout or {}
     self.licenses = row.licenses or {}
@@ -191,8 +210,7 @@ function VFW.CreateExtendedPlayer(source, row, account)
         money = math.floor(money + 0.5)
         if money < 0 then money = 0 end
 
-        local account = findAccount(self.accounts, name)
-        if not account then return end
+        local account = ensureAccount(self.accounts, name)
 
         account.money = money
         push("vfw:setAccountMoney", account)
@@ -201,8 +219,7 @@ function VFW.CreateExtendedPlayer(source, row, account)
 
     function self.addAccountMoney(name, money, reason)
         if money <= 0 then return end
-        local account = findAccount(self.accounts, name)
-        if not account then return end
+        local account = ensureAccount(self.accounts, name)
         self.setAccountMoney(name, account.money + money, reason)
     end
 

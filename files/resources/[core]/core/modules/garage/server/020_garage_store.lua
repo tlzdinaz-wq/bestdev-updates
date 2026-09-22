@@ -214,13 +214,13 @@ function Garages.Sanitize(payload, fallbackType)
     if type(payload) ~= "table" then return nil end
 
     local position = type(payload.position) == "table" and payload.position or nil
-    if not position or tonumber(position.x) == nil then return nil end
+    if not position or tonumber(position.x) == nil or tonumber(position.y) == nil or tonumber(position.z) == nil then return nil end
 
     local spawnPosition = {}
     if type(payload.spawnPosition) == "table" then
         for i = 1, #payload.spawnPosition do
             local sp = payload.spawnPosition[i]
-            if type(sp) == "table" and tonumber(sp.x) then
+            if type(sp) == "table" and tonumber(sp.x) and tonumber(sp.y) and tonumber(sp.z) then
                 spawnPosition[#spawnPosition + 1] = {
                     x = tonumber(sp.x) + 0.0,
                     y = tonumber(sp.y) + 0.0,
@@ -233,7 +233,7 @@ function Garages.Sanitize(payload, fallbackType)
     if #spawnPosition == 0 then return nil end
 
     local deletePosition = type(payload.deletePosition) == "table" and payload.deletePosition or nil
-    if not deletePosition or tonumber(deletePosition.x) == nil then return nil end
+    if not deletePosition or tonumber(deletePosition.x) == nil or tonumber(deletePosition.y) == nil or tonumber(deletePosition.z) == nil then return nil end
 
     local garageType = tostring(payload.type or fallbackType or "public")
     if garageType ~= "public" and garageType ~= "society" and garageType ~= "gang" and garageType ~= "faction" then

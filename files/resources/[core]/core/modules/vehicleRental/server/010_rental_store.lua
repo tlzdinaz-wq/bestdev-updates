@@ -154,7 +154,7 @@ function Rental.SanitizePoint(payload)
     if type(payload) ~= "table" then return nil end
 
     local tPos = type(payload.tPos) == "table" and payload.tPos or nil
-    if not tPos or tonumber(tPos.x) == nil then return nil end
+    if not tPos or tonumber(tPos.x) == nil or tonumber(tPos.y) == nil or tonumber(tPos.z) == nil then return nil end
 
     local iType = tonumber(payload.iType) or 1
     if iType < 1 or iType > 3 then iType = 1 end
@@ -163,7 +163,7 @@ function Rental.SanitizePoint(payload)
     if type(payload.tVehiclePos) == "table" then
         for i = 1, #payload.tVehiclePos do
             local vp = payload.tVehiclePos[i]
-            if type(vp) == "table" and tonumber(vp.x) then
+            if type(vp) == "table" and tonumber(vp.x) and tonumber(vp.y) and tonumber(vp.z) then
                 vehiclePos[#vehiclePos + 1] = {
                     x = tonumber(vp.x) + 0.0,
                     y = tonumber(vp.y) + 0.0,

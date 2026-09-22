@@ -8,6 +8,12 @@ local DespawnTimer = nil
 local VehicleBlip = nil
 local CarryingBox = false
 local AmbientNotifThread = nil
+local VUI = exports["VUI"]
+local GoFastMenu = VUI:CreateMenu("Go Fast", exports["core"]:GetVUIBanner("illegal"), true)
+local GoFastMenuData = {
+    region = nil,
+    categories = {},
+}
 
 -- Messages d'ambiance aléatoires pendant le Go Fast
 local AmbientMessages = {
@@ -108,11 +114,19 @@ end
 local NorthNPC = nil
 local SouthNPC = nil
 
-CreateThread(function()
-    while not NPCData.NORTH do
-        Wait(1000)
+local function DeleteStartNPCs()
+    if NorthNPC then
+        DeleteEntity(NorthNPC)
+        NorthNPC = nil
     end
+    if SouthNPC then
+        DeleteEntity(SouthNPC)
+        SouthNPC = nil
+    end
+end
 
+local function SpawnStartNPCs()
+    DeleteStartNPCs()
     if NPCData.NORTH and NPCData.NORTH.enabled then
         NorthNPC = SpawnNPC(NPCData.NORTH.position, NPCData.NORTH.model or "g_m_y_mexgang_01")
     end
@@ -120,6 +134,14 @@ CreateThread(function()
     if NPCData.SOUTH and NPCData.SOUTH.enabled then
         SouthNPC = SpawnNPC(NPCData.SOUTH.position, NPCData.SOUTH.model or "g_m_y_mexgang_01")
     end
+end
+
+CreateThread(function()
+    while next(NPCData) == nil do
+        Wait(1000)
+    end
+
+    SpawnStartNPCs()
 end)
 
 -- Cache pour éviter de spammer les vérifications serveur
@@ -142,6 +164,50 @@ local function CheckCanStartMission(region)
 
     return result
 end
+
+local function FormatGoFastPrice(category)
+    local min = tonumber(category.priceMin or category.price) or 0
+    local max = tonumber(category.priceMax) or min
+
+    if max > min then
+        return ("%d$ - %d$"):format(min, max)
+    end
+
+    return ("%d$"):format(min)
+end
+
+local function BuildGoFastMenu()
+    GoFastMenu.Separator("VEHICULES DISPONIBLES")
+
+    if not GoFastMenuData.categories or #GoFastMenuData.categories == 0 then
+        GoFastMenu.Button("Aucune categorie disponible", nil, nil, nil, true, function() end)
+        return
+    end
+
+    for i = 1, #GoFastMenuData.categories do
+        local category = GoFastMenuData.categories[i]
+        local categoryName = category.name or category.id
+        local label = category.label or categoryName or ("Categorie " .. i)
+        local price = FormatGoFastPrice(category)
+
+        GoFastMenu.Button(label, "Lancer un Go Fast avec cette categorie.", price, "chevron", false, function()
+            GoFastMenu.close()
+
+            if GoFastMenuData.region and categoryName then
+                TriggerServerEvent("core:gofast:startMission", GoFastMenuData.region, categoryName)
+            end
+        end)
+    end
+end
+
+GoFastMenu.OnOpen(function()
+    BuildGoFastMenu()
+end)
+
+GoFastMenu.OnClose(function()
+    GoFastMenuData.region = nil
+    GoFastMenuData.categories = {}
+end)
 
 local function StartMission(region)
     if CurrentMission then
@@ -174,17 +240,9 @@ local function StartMission(region)
     -- Les catégories sont toujours actives (hardcodées côté serveur)
     local activeCategories = categories
 
-    local npcId = region == "NORTH" and (NPCData.NORTH and NPCData.NORTH.id or 1) or (NPCData.SOUTH and NPCData.SOUTH.id or 2)
-
-    SendNUIMessage({
-        action = 'nui:gofast-menu:open',
-        data = {
-            npcId = npcId,
-            region = region,
-            categories = activeCategories
-        }
-    })
-    VFW.Nui.Focus(true, false)
+    GoFastMenuData.region = region
+    GoFastMenuData.categories = activeCategories
+    GoFastMenu.open()
 end
 
 CreateThread(function()
@@ -519,6 +577,33 @@ AddEventHandler("core:gofast:missionStarted", function(data)
             -- Démarrer les notifications d'ambiance
             StartAmbientNotifications()
         end)
+    else
+        CarryingBox = true
+        TriggerServerEvent("core:gofast:loadCargo", CurrentMission.missionId)
+
+        FreezeEntityPosition(MissionVehicle, false)
+        SetVehicleEngineOn(MissionVehicle, false, false, false)
+        SetVehicleUndriveable(MissionVehicle, false)
+        SetVehicleDoorsLocked(MissionVehicle, 0)
+        SetVehicleDoorsLockedForAllPlayers(MissionVehicle, false)
+
+        local deliveryPos = CurrentMission.deliveryPosition
+        DeliveryBlip = AddBlipForCoord(deliveryPos.x, deliveryPos.y, deliveryPos.z)
+        SetBlipSprite(DeliveryBlip, 1)
+        SetBlipColour(DeliveryBlip, 5)
+        SetBlipScale(DeliveryBlip, 0.5)
+        SetBlipRoute(DeliveryBlip, true)
+        SetBlipRouteColour(DeliveryBlip, 5)
+        BeginTextCommandSetBlipName("STRING")
+        AddTextComponentString("Livraison Go Fast")
+        EndTextCommandSetBlipName(DeliveryBlip)
+
+        VFW.ShowNotification({
+            type = 'ILLEGAL',
+            message = string.format("Marchandise chargée ! Livrez-la pour %s", VFW.Math.FormatMoney(CurrentMission.vehiclePrice))
+        })
+
+        StartAmbientNotifications()
     end
 end)
 
@@ -773,24 +858,7 @@ AddEventHandler("core:gofast:reloadConfig", function()
         NPCData[npc.region] = npc
     end
 
-    -- Supprimer les anciens NPCs pour les respawner aux nouvelles positions
-    if NorthNPC then
-        DeleteEntity(NorthNPC)
-        NorthNPC = nil
-    end
-    if SouthNPC then
-        DeleteEntity(SouthNPC)
-        SouthNPC = nil
-    end
-
-    -- Respawner aux nouvelles positions
-    if NPCData.NORTH and NPCData.NORTH.enabled then
-        NorthNPC = SpawnNPC(NPCData.NORTH.position, NPCData.NORTH.model or "g_m_y_mexgang_01")
-    end
-
-    if NPCData.SOUTH and NPCData.SOUTH.enabled then
-        SouthNPC = SpawnNPC(NPCData.SOUTH.position, NPCData.SOUTH.model or "g_m_y_mexgang_01")
-    end
+    SpawnStartNPCs()
 end)
 
 RegisterNUICallback("nui:gofast-menu:select", function(data, cb)

@@ -250,7 +250,7 @@ end
 
 
 RegisterNetEvent("vfw:tig:start", function(data)
-    if not data?.total or not data?.completed then
+    if type(data) ~= "table" or data.total == nil or data.completed == nil then
         return
     end
 

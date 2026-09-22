@@ -208,9 +208,22 @@ StaffMenu.createGarageSocietyData.OnOpen(function()
             return
         end
 
-        TriggerServerEvent("core:createGarage", garageSelected)
+        local result = TriggerServerCallback("core:createGarage", garageSelected)
+        if not result or not result.ok then
+            VFW.ShowNotification({
+                type = 'STAFF', variant = 'ERROR', subtitle = 'Garage Société',
+                message = result and result.error or "Création du garage impossible."
+          })
+            return
+        end
+
+        VFW.ShowNotification({
+            type = 'STAFF', variant = 'SUCCESS', subtitle = 'Garage Société',
+            message = "Garage créé."
+      })
         garageSelected = getGarageDefaultData()
         StaffMenu.createGarageSocietyData.close()
+        StaffMenu.createGarageSociety.open()
     end)
 end)
 
@@ -314,7 +327,7 @@ StaffMenu.addVehicleToGarageSocietyData.OnOpen(function()
             type = currentVehicle.type or 1,
         }
 
-        currentVehicle = {}
+        garageSelected.currentVehicle = {}
 
         StaffMenu.addVehicleToGarageSociety.open()
     end)

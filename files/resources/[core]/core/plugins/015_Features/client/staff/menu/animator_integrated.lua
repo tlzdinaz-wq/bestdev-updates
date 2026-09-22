@@ -951,12 +951,6 @@ function StaffMenu.BuildAnimatorVehiclesMenu(isStandalone)
         end
 
         TriggerServerEvent("vfw:animator:spawnVehicle", model)
-        VFW.ShowNotification({
-            type = 'STAFF',
-            variant = 'SUCCESS',
-            title = 'EVE Animateur', subtitle = 'Mode Animateur',
-            message = "Véhicule " .. model .. " est apparu."
-      })
     end)
 
     vehiclesMenu.Button(":trash: DV VÉHICULE", "Supprime le véhicule le plus proche dans un rayon de 2 mètres", nil, nil, false, function()

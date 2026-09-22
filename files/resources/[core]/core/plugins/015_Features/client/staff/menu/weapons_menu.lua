@@ -82,6 +82,14 @@ local weaponData = {
     maxAmmo = false
 }
 
+local function GetWeaponTarget()
+    if weaponData.giveToSelf then
+        return GetPlayerServerId(PlayerId()), true
+    end
+
+    return tonumber(weaponData.targetPlayer), false
+end
+
 function StaffMenu.BuildWeaponsMenu()
     local categories = BuildWeaponCategories()
 
@@ -132,7 +140,7 @@ function StaffMenu.BuildWeaponsMenu()
     StaffMenu.weapons.Separator("ACTIONS RAPIDES")
 
     StaffMenu.weapons.Button("DONNER TOUTES LES ARMES", "Donner toutes les armes de toutes les categories au joueur selectionne", nil, "check", false, function()
-        local target = weaponData.giveToSelf and PlayerId() or weaponData.targetPlayer
+        local target = GetWeaponTarget()
 
         if target then
             for _, catName in ipairs(categoryOrder) do
@@ -152,7 +160,7 @@ function StaffMenu.BuildWeaponsMenu()
     end)
 
     StaffMenu.weapons.Button("RETIRER TOUTES LES ARMES", "Retirer immediatement toutes les armes du joueur selectionne", nil, "trash", false, function()
-        local target = weaponData.giveToSelf and PlayerId() or weaponData.targetPlayer
+        local target = GetWeaponTarget()
 
         if target then
             if weaponData.giveToSelf then
@@ -181,7 +189,7 @@ function StaffMenu.BuildWeaponsListMenu()
 
     for _, weapon in ipairs(weapons) do
         StaffMenu.weaponsList.Button(weapon.name, weapon.model, nil, "chevron", false, function()
-            local target = weaponData.giveToSelf and PlayerId() or weaponData.targetPlayer
+            local target = GetWeaponTarget()
 
             if target then
                 StaffMenu.GiveWeapon(target, weapon.model)
@@ -197,8 +205,9 @@ end
 
 function StaffMenu.GiveWeapon(target, weaponModel)
     local weaponHash = GetHashKey(weaponModel)
+    local selfServerId = GetPlayerServerId(PlayerId())
 
-    if target == PlayerId() then
+    if tonumber(target) == selfServerId then
         local playerPed = PlayerPedId()
         GiveWeaponToPed(playerPed, weaponHash, weaponData.maxAmmo and 999 or 250, false, false)
 
