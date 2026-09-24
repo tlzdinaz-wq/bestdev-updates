@@ -34,6 +34,35 @@ RegisterNUICallback('nui:gasstation:purchase', function(data, cb)
     end
 
     data.vehicleNetId = validatedNetId
+
+    -- Mode test (/pumpdebug, staff) : rien n'est facturé, le remplissage part en local.
+    if PumpDisplay and PumpDisplay.IsDebug and PumpDisplay.IsDebug() then
+        cb('ok')
+
+        gasStationOpen = false
+        VFW.Nui.Focus(false)
+        SendNUIMessage({ action = 'nui:gasstation:visible', data = { visible = false } })
+
+        local liters = tonumber(data.liters) or 0
+        VFW.ShowNotification({
+            type = 'JAUNE',
+            subtitle = 'Station Essence',
+            message = ("Mode test : %.1f L offerts."):format(liters)
+        })
+
+        TriggerEvent('fl_gasstation:beginFuelingProcess', {
+            vehicleNetId = validatedNetId,
+            liters = liters,
+            pumpCoords = PumpInteraction.GetCurrentPumpCoords(),
+            pricePerLiter = tonumber(data.pricePerLiter) or 0,
+            totalCost = 0
+        })
+
+        PumpInteraction.ClearCurrentPumpCoords()
+        PumpInteraction.ClearCurrentVehicleNetId()
+        return
+    end
+
     TriggerServerEvent('fl_gasstation:purchaseFuel', data)
     cb('ok')
 end)

@@ -28,6 +28,9 @@ files {
     "interface/boutique/**/*",
     "interface/documents/index.html",
     "interface/documents/**/*",
+    -- Écran 3D des pompes à essence (DUI posé sur un scaleform)
+    "interface/gasstation/index.html",
+    "interface/gasstation/**/*",
     'modules/dui/index.html',
     'modules/dui/assets/*',
     'modules/dui/icons/*.svg',

@@ -97,89 +97,11 @@ end)
 
 local vehicleOpenDebounce = {}
 
-local function plateVariants(vehicle)
-    local raw = GetVehicleNumberPlateText(vehicle)
-    if type(raw) ~= "string" then return nil, nil end
-
-    local trimmed = raw:gsub("^%s+", ""):gsub("%s+$", "")
-    if trimmed == "" then return nil, nil end
-
-    local normalized = VFW.Vehicles and VFW.Vehicles.NormalizePlate
-        and VFW.Vehicles.NormalizePlate(trimmed) or trimmed
-
-    return trimmed, normalized
-end
-
-local function ownedVehicleAllows(xPlayer, row)
-    if VFW.Vehicles.OwnsVehicle(xPlayer, row) then return true end
-
-    local groupType = row.group_type
-    if type(groupType) ~= "string" or groupType == "" then return false end
-
-    local groupName = tostring(row.group_name or "")
-    if groupName == "" then return false end
-
-    if groupType == "society" then
-        local jobName = VFW.Vehicles.GetJob(xPlayer)
-        return jobName == groupName
-    end
-
-    local factionName = VFW.Vehicles.GetFaction(xPlayer)
-    return factionName ~= "" and factionName == groupName
-end
-
-local function hasKeyItem(xPlayer, trimmed, normalized)
-    local inventory = xPlayer.inventory
-    if type(inventory) ~= "table" then return false end
-
-    for i = 1, #inventory do
-        local entry = inventory[i]
-        if entry.name == "keys" and type(entry.meta) == "table" then
-            local owned = entry.meta.plate
-            if owned == trimmed or owned == normalized then return true end
-        end
-    end
-
-    return false
-end
-
-local function hasTemporaryKey(source, xPlayer, trimmed, normalized)
-    local state = Player(source).state
-    if state["tempVehicleKey:" .. trimmed] ~= nil then return true end
-    if state["tempVehicleKey:" .. normalized] ~= nil then return true end
-
-    if Staff29 and Staff29.HasTemporaryVehicleKey then
-        if Staff29.HasTemporaryVehicleKey(trimmed, xPlayer.identifier) then return true end
-        if Staff29.HasTemporaryVehicleKey(normalized, xPlayer.identifier) then return true end
-    end
-
-    return false
-end
-
-local function hasKeyDuplicate(xPlayer, trimmed, normalized)
-    local concess = VFW.Concess
-    if not concess or not concess.HasKeyDuplicate then return false end
-
-    if concess.HasKeyDuplicate(trimmed, xPlayer.identifier) then return true end
-    return concess.HasKeyDuplicate(normalized, xPlayer.identifier) == true
-end
-
-local function canOpenVehicle(source, xPlayer, vehicle)
-    if not VFW.Vehicles then return false end
-
-    local trimmed, normalized = plateVariants(vehicle)
-    if not trimmed then return true end
-
-    local row = VFW.Vehicles.GetByPlate(normalized) or VFW.Vehicles.GetByPlate(trimmed)
-    if not row then return true end
-
-    if ownedVehicleAllows(xPlayer, row) then return true end
-    if hasKeyItem(xPlayer, trimmed, normalized) then return true end
-    if hasTemporaryKey(source, xPlayer, trimmed, normalized) then return true end
-    if hasKeyDuplicate(xPlayer, trimmed, normalized) then return true end
-
-    return false
-end
+-- Les clés d'un véhicule sont vérifiées à un seul endroit : Staff29.PlayerHasVehicleKey
+-- (alias VFW.PlayerHasVehicleKey, plugins/015_Features/server/staff/301_vehicles.lua), qui
+-- couvre propriétaire, véhicule de job / faction, objet « keys », clé temporaire et double
+-- de concession. Cette logique était recopiée ici, elle divergeait du menu contextuel et du
+-- menu staff : on appelle désormais la source unique.
 
 RegisterNetEvent("vfw:vehicle:open", function()
     local source = source
@@ -212,17 +134,22 @@ RegisterNetEvent("vfw:vehicle:open", function()
         return
     end
 
-    if not canOpenVehicle(source, xPlayer, closest) then
+    local plate = GetVehicleNumberPlateText(closest)
+    if not VFW.PlayerHasVehicleKey or not VFW.PlayerHasVehicleKey(source, plate) then
         Feat27.NotifyError(source, "Vous n'avez pas les clés de ce véhicule.")
         return
     end
 
-    local state = Entity(closest).state
-    local locked = state.doorsLocked == true
-    local newState = not locked
+    local newState = not (Entity(closest).state.doorsLocked == true)
 
-    state:set("doorsLocked", newState, true)
-    TriggerEvent("vfw:vehicle:lockToggled", source, NetworkGetNetworkIdFromEntity(closest), newState)
+    -- VFW.SetVehicleLocked pose le state bag, applique le natif serveur en garde-fou et
+    -- déclenche l'animation de clé (vfw:vehicle:lockToggled).
+    if VFW.SetVehicleLocked then
+        VFW.SetVehicleLocked(closest, newState, source)
+    else
+        Entity(closest).state:set("doorsLocked", newState, true)
+        TriggerEvent("vfw:vehicle:lockToggled", source, NetworkGetNetworkIdFromEntity(closest), newState)
+    end
 
     Feat27.Notify(source, {
         type = "VERT",

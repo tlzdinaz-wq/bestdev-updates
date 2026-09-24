@@ -116,6 +116,21 @@ local function Open()
     else
         SetNuiFocus(true, true)
     end
+
+    -- Filet : si une autre interface relâche le curseur pendant que le menu est ouvert
+    -- (menu contextuel qui se ferme, inventaire…), on le reprend.
+    CreateThread(function()
+        while menuOpen do
+            Wait(250)
+            if menuOpen and VFW.Nui and VFW.Nui.HasCursor and not VFW.Nui.HasCursor() then
+                if VFW.Nui.Focus then
+                    VFW.Nui.Focus(true)
+                else
+                    SetNuiFocus(true, true)
+                end
+            end
+        end
+    end)
 end
 
 local function Toggle()

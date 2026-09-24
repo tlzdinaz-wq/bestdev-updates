@@ -185,6 +185,16 @@ RegisterServerCallback("fl_gasstation:getPumpsNear", function(source, playerPos,
     return out
 end)
 
+--- Mode test des pompes (/pumpdebug) : écran en approche et plein gratuit, donc réservé
+--- à ceux qui peuvent déjà configurer les stations.
+RegisterServerCallback("fl_gasstation:canDebug", function(source)
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not xPlayer then return false end
+    return xPlayer.hasPermission("builder_gas_station")
+        or xPlayer.hasPermission("builder")
+        or xPlayer.hasPermission("admin") or false
+end)
+
 RegisterServerCallback("fl_gasstation:getPlayerMoneyAndPrice", function(source)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer then

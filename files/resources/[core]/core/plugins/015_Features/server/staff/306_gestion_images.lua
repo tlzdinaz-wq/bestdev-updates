@@ -39,6 +39,10 @@ local function cacheSet(scope, key, url)
     VFW.GestionImages.Cache[scope][key] = url or ""
 end
 
+-- Déclaration avant VFW.GestionImages.Persist : sinon `persistSetting` y est compilé en
+-- variable globale (nil à l'appel) au lieu de pointer sur la locale définie plus bas.
+local persistSetting, loadSettingsCache, applyPersistedImages
+
 function VFW.GestionImages.Get(scope, key)
     return cacheGet(scope, key)
 end
@@ -46,8 +50,6 @@ end
 function VFW.GestionImages.Persist(scope, key, url)
     return persistSetting(scope, key, url)
 end
-
-local persistSetting, loadSettingsCache, applyPersistedImages
 
 local function staffOk(source)
     local xPlayer = VFW.GetPlayerFromId(source)

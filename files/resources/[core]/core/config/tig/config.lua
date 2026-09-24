@@ -10,9 +10,9 @@ TIGConfig = {}
 
 -- Zone de confinement (spawn + anti-sortie)
 TIGConfig.Zone = {
-    center = vector3(3948.42, 36.24, 23.88),
-    radius = 110.0,
-    welcomeText = vector3(3948.42, 40.0, 25.5),
+    center = vector3(238.06, -888.70, 29.49),
+    radius = 65.0,
+    welcomeText = vector3(238.06, -888.70, 31.10),
 }
 
 -- Téléports de sortie
@@ -38,11 +38,11 @@ TIGConfig.Tasks = {
         },
         duration = 10000,
         positions = {
-            vector3(3978.30, 42.08, 22.36),
-            vector3(3951.19, 48.21, 22.35),
-            vector3(3963.50, 54.55, 22.34),
-            vector3(3989.72, 30.78, 22.34),
-            vector3(3990.91, 52.58, 22.34),
+            vector3(231.80, -887.10, 29.49),
+            vector3(242.10, -892.20, 29.49),
+            vector3(249.30, -884.60, 29.49),
+            vector3(235.20, -876.80, 29.49),
+            vector3(225.70, -896.40, 29.49),
         },
     },
     {
@@ -58,8 +58,8 @@ TIGConfig.Tasks = {
         },
         duration = 8000,
         positions = {
-            vector3(3978.13, 19.93, 20.48),
-            vector3(4017.54, 27.30, 22.94),
+            vector3(251.20, -898.60, 29.49),
+            vector3(220.80, -883.30, 29.49),
         },
     },
     {
@@ -75,8 +75,8 @@ TIGConfig.Tasks = {
         },
         duration = 12000,
         positions = {
-            vector3(3903.76, 3.32, 17.73),
-            vector3(3907.64, 38.02, 23.89),
+            vector3(238.60, -904.80, 29.49),
+            vector3(256.40, -878.90, 29.49),
         },
     },
     {
@@ -92,9 +92,9 @@ TIGConfig.Tasks = {
         },
         duration = 15000,
         positions = {
-            vector3(4006.68, 33.17, 19.87),
-            vector3(4003.16, 28.41, 20.04),
-            vector3(3967.49, 24.53, 21.08),
+            vector3(213.90, -890.70, 29.49),
+            vector3(245.60, -869.50, 29.49),
+            vector3(260.10, -894.20, 29.49),
         },
     },
     {
@@ -110,9 +110,9 @@ TIGConfig.Tasks = {
         },
         duration = 11000,
         positions = {
-            vector3(4010.31, 9.11, 20.89),
-            vector3(4034.72, 16.08, 21.07),
-            vector3(4049.36, 24.06, 20.28),
+            vector3(227.30, -870.40, 29.49),
+            vector3(267.80, -884.70, 29.49),
+            vector3(240.70, -862.90, 29.49),
         },
     },
 }

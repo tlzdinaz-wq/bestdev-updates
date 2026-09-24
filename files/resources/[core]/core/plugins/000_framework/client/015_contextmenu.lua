@@ -396,8 +396,8 @@ local function applyContextFocus()
     SetNuiFocusKeepInput(true)
     SetNuiFocus(true, true)
 
-    VFW.Nui._onExternalFocus = function()
-        closeContextMenu()
+    VFW.Nui._onExternalFocus = function(externalFocus)
+        closeContextMenu(externalFocus)
     end
 end
 
@@ -494,7 +494,9 @@ openContextMenu = function()
 end
 
 -- Close the context menu (idempotent).
-closeContextMenu = function()
+---@param keepCursor boolean|nil vrai quand une autre UI vient de prendre le focus : on lui
+--- laisse le curseur au lieu de le relâcher en sortant.
+closeContextMenu = function(keepCursor)
     if not mouseActive then return end
     mouseActive = false
     contextMenuHasFocus = false
@@ -508,7 +510,7 @@ closeContextMenu = function()
     -- Only release the cursor if no other UI had it before we opened.
     -- (_hasCursor is currently true because WE set it on open; it cannot be
     -- used as a guard here.)
-    if not prevHadCursor then
+    if not prevHadCursor and not keepCursor then
         SetNuiFocus(false, false)
     end
     DisablePlayerFiring(PlayerId(), false)

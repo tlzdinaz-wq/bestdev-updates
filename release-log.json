@@ -1,22 +1,36 @@
 {
- "version": "1.12.45",
- "date": "2026-09-22T16:37:34.265Z",
- "notes": "**Outils de modération** — les boutons **TIG CONNECTÉ** et **UNTIG CONNECTÉ** fonctionnent de nouveau depuis le menu staff, avec retour d'erreur clair si l'ID joueur, le nombre de tâches ou la cible ne sont pas valides.\n\n**Give d'arme** — le bouton **DONNER DES ARMES** demande maintenant l'ID du joueur avant d'ouvrir le menu, affiche la cible choisie et valide mieux les noms d'armes côté serveur. Le menu ne reste plus bloqué en mode « soi-même » quand on veut donner une arme à un joueur.\n\n**Refaire mugshot** — le bouton du menu outils n'appelle plus l'ancienne commande `/mugshot`. Il récupère le personnage actif du joueur ciblé puis lance directement la recapture utilisée par la gestion des images.\n\n**Casier joueur** — l'historique des sanctions ne dépend plus d'un filtre texte fragile dans les logs. Les warns et autres sanctions s'affichent même si l'ID compte a été enregistré en nombre dans le payload.\n\n**PNJ Go Fast** — la position enregistrée par les menus staff ne descend plus le PNJ sous le sol, et le spawn côté client recale le PNJ sur le sol réel au chargement.\n\n**Menu animateur** — les outils du **Menu Event** acceptent maintenant les permissions animateur (`menu_anim` / `menu_event`). Le don temporaire d'item animateur est aussi branché côté serveur, y compris l'option « Jusqu'au reboot ».\n\n**Spawn véhicule animateur** — le spawn véhicule renvoie maintenant un vrai résultat au client. Le menu n'affiche plus de faux succès si le véhicule n'est pas visible ou si le serveur refuse le modèle.\n\n**Commande `/car`** — les staff avec la permission `spawn_veh` peuvent maintenant faire apparaître un véhicule directement depuis le chat avec `/car <modèle>`.\n\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L'archive des fichiers modifiés est jointe.",
- "added": [],
+ "version": "1.12.46",
+ "date": "2026-09-24T17:02:40.379Z",
+ "notes": "**Menu pause** — nouvelle mise en page : en-tête avec logo, identité du personnage et raccourci de fermeture, tuiles avec icône et sous-titre, navigation au clavier (flèches, 1 à 5, Entrée), pied de page avec le Discord. Formulaire de signalement retravaillé.\n\n**Coiffeur** — écran refait : les coupes et les barbes s'affichent en grille de vignettes, avec onglets Cheveux / Barbe, variantes, palette de couleurs, opacité de la barbe et cadrages caméra. `Q` / `D` font défiler les modèles.\n\n**Tatoueur** — même traitement : onglets Acheter / Mes tatouages, zones au choix (rail ou silhouette), grille de motifs avec prix, panier, et gestion des tatouages posés.\n\n**Station essence** — la pompe affiche un compteur à chiffres roulants pendant le plein, Prix et Carburant, directement sur son écran. Mode test staff `/pumpdebug` (écran en approche + plein gratuit) et réglage `/pumpui`.\n\n**Écran flou bloqué** — la caméra du coiffeur laissait tout l'écran flou après la sortie du salon. Corrigé, et le flou, les filtres et le gel du joueur sont maintenant remis à zéro au démarrage et à l'arrêt de la ressource. Dépannage : `/unblur`, `/debloque`.\n\n**Curseur** — ouvrir une interface pendant que le menu contextuel (ALT) était actif faisait disparaître le curseur. Corrigé pour toutes les interfaces.\n\n**Clés de véhicule** — le verrouillage s'applique dès l'apparition du véhicule, et la touche U utilise la même vérification que le menu contextuel et le menu staff (propriétaire, job/faction, objet clé, clé temporaire, double de concession).\n\n**Images du hub Gestion** — l'enregistrement des images échouait avec une erreur serveur. Réparé.\n\n**Noclip F2** — la touche F2 déclenche de nouveau le noclip quand le mode staff ou animateur est actif. La commande `/noclip` fonctionne aussi depuis le chat.\n\n**Zone TIG** — les joueurs envoyés en TIG sont confinés autour de `238.06, -888.70, 29.49`, avec les tâches replacées dans ce secteur.\n\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L'archive des fichiers modifiés est jointe.",
+ "added": [
+  "resources/[core]/core/interface/build/skin/salon.css",
+  "resources/[core]/core/interface/gasstation/index.html",
+  "resources/[core]/core/interface/gasstation/script.js",
+  "resources/[core]/core/interface/gasstation/styles.css",
+  "resources/[core]/core/plugins/015_Features/fl_gasstation/client/pump_display.lua",
+  "resources/[core]/core/plugins/015_Features/server/staff/307_spacemarket_admin.lua",
+  "resources/[core]/core/stream/generic_texture_renderer_2.gfx",
+  "resources/[core]/core/stream/generic_texture_renderer.gfx"
+ ],
  "changed": [
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/animator_integrated.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/builders.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_gofast.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/outils.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/weapons_menu.lua",
-  "resources/[core]/core/plugins/015_Features/fl_illegal/client/gofast/cl_gofast.lua",
-  "resources/[core]/core/plugins/015_Features/server/multicharacter.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/298_sanctions.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/300_tools_world.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/301_vehicles.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/302_items.lua"
+  "resources/[core]/core/config/tig/config.lua",
+  "resources/[core]/core/fxmanifest.lua",
+  "resources/[core]/core/interface/build/assets/index-CgLoM61l.js",
+  "resources/[core]/core/interface/build/index.html",
+  "resources/[core]/core/interface/pausemenu/assets/index.js",
+  "resources/[core]/core/interface/pausemenu/assets/style.css",
+  "resources/[core]/core/plugins/000_framework/client/005_events.lua",
+  "resources/[core]/core/plugins/000_framework/client/010_nui.lua",
+  "resources/[core]/core/plugins/000_framework/client/015_contextmenu.lua",
+  "resources/[core]/core/plugins/015_Features/client/cloths/barber_shop.lua",
+  "resources/[core]/core/plugins/015_Features/client/pausemenu.lua",
+  "resources/[core]/core/plugins/015_Features/fl_gasstation/client/main.lua",
+  "resources/[core]/core/plugins/015_Features/fl_gasstation/client/pump_interaction.lua",
+  "resources/[core]/core/plugins/015_Features/fl_gasstation/server/270_stations.lua",
+  "resources/[core]/core/plugins/015_Features/fl_interim/server/271_service.lua",
+  "resources/[core]/core/plugins/015_Features/server/staff/306_gestion_images.lua"
  ],
  "removed": [],
- "total": 292419052,
- "fileCount": 3368
+ "total": 292522041,
+ "fileCount": 3376
 }

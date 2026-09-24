@@ -260,6 +260,22 @@ AddStateBagChangeHandler("OwnedVehicle", nil, function(bagName, _, value)
     end)
 end)
 
+-- Verrouillage : l'état de référence est le state bag `doorsLocked` (posé par le serveur,
+-- plugins/015_Features/server/vehicle_lock.lua). Chaque client l'applique localement, ce qui
+-- reste cohérent quel que soit le propriétaire réseau du véhicule.
+local function applyDoorLock(vehicle, locked)
+    if not vehicle or vehicle == 0 or not DoesEntityExist(vehicle) then return end
+    if GetEntityType(vehicle) ~= 2 then return end
+    local status = GetVehicleDoorLockStatus(vehicle)
+    if locked then
+        if status ~= 2 then SetVehicleDoorsLocked(vehicle, 2) end
+        SetVehicleDoorsLockedForAllPlayers(vehicle, true)
+    else
+        if status ~= 1 then SetVehicleDoorsLocked(vehicle, 1) end
+        SetVehicleDoorsLockedForAllPlayers(vehicle, false)
+    end
+end
+
 -- Instant pin on stream-in : fires every time an entity is created locally,
 -- including when it re-enters the player's scope after going away. Closes the
 -- race window where a vehicle could be despawned by the GTA population manager
@@ -276,22 +292,6 @@ AddEventHandler("entityCreated", function(entity)
         applyDoorLock(entity, state.doorsLocked == true)
     end
 end)
-
--- Verrouillage : l'état de référence est le state bag `doorsLocked` (posé par le serveur,
--- plugins/015_Features/server/vehicle_lock.lua). Chaque client l'applique localement, ce qui
--- reste cohérent quel que soit le propriétaire réseau du véhicule.
-local function applyDoorLock(vehicle, locked)
-    if not vehicle or vehicle == 0 or not DoesEntityExist(vehicle) then return end
-    if GetEntityType(vehicle) ~= 2 then return end
-    local status = GetVehicleDoorLockStatus(vehicle)
-    if locked then
-        if status ~= 2 then SetVehicleDoorsLocked(vehicle, 2) end
-        SetVehicleDoorsLockedForAllPlayers(vehicle, true)
-    else
-        if status ~= 1 then SetVehicleDoorsLocked(vehicle, 1) end
-        SetVehicleDoorsLockedForAllPlayers(vehicle, false)
-    end
-end
 
 ---@diagnostic disable-next-line: param-type-mismatch
 AddStateBagChangeHandler("doorsLocked", nil, function(bagName, _, value)

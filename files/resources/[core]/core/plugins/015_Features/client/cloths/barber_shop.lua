@@ -372,6 +372,10 @@ function closeUI()
     -- La animación de levantarse que ya tenías programada
     loadBarberAnimOut()
 
+    -- La caméra du fauteuil est en Dof : tant qu'elle existe, VFW.Cam appelle SetUseHiDof()
+    -- à chaque frame et tout l'écran reste flou une fois le salon quitté.
+    VFW.Cam:Destroy('cam_barber')
+
     -- Reset de variables de barbería
     sex = "Homme"
     lastCategory = nil

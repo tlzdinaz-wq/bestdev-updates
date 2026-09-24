@@ -103,6 +103,15 @@ function PumpInteraction.Start()
 
             nearVehicleFound = false
 
+            -- Mode test : l'écran de la pompe s'allume dès qu'on approche, sans plein en cours.
+            if PumpDisplay and PumpDisplay.IsDebug and PumpDisplay.IsDebug() and not FuelingProcess.IsActive() then
+                if nearestPump then
+                    PumpDisplay.Preview(nearestPump.coords)
+                elseif PumpDisplay.IsPreview() then
+                    PumpDisplay.Hide()
+                end
+            end
+
             if nearestPump then
                 local playerInVehicle = IsPedInAnyVehicle(playerPed, false)
                 local hasPumpInHand = PumpObject.IsAttached()

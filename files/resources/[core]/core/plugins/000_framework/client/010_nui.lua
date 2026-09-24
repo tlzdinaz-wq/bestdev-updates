@@ -15,7 +15,13 @@ SetNuiFocus = function(hasFocus, hasCursor)
     VFW.Nui._hasFocus = hasFocus or hasCursor
     VFW.Nui._hasCursor = hasCursor
     if hasFocus and VFW.Nui._onExternalFocus then
-        VFW.Nui._onExternalFocus()
+        -- L'argument prévient l'UI sortante qu'une autre prend le focus : elle ne doit pas
+        -- relâcher le curseur derrière elle.
+        VFW.Nui._onExternalFocus(true)
+        -- Cette fermeture a pu rappeler SetNuiFocus(false) : on repose l'état demandé ici,
+        -- sinon _hasFocus/_hasCursor restent à faux alors que le curseur est bien affiché.
+        VFW.Nui._hasFocus = hasFocus or hasCursor
+        VFW.Nui._hasCursor = hasCursor
     end
     return _originalSetNuiFocus(hasFocus, hasCursor)
 end
@@ -1542,3 +1548,61 @@ RegisterNUICallback("debug:globalError", function(data, cb)
 end)
 
 
+-- ── Filet de sécurité : effets d'écran et contrôles ────────────────────────
+-- Le flou d'écran (TriggerScreenblur), les timecycles ("hud_def_blur" de l'inventaire,
+-- "spectator5" des items…) et le gel du joueur (SetPlayerControl) appartiennent au jeu,
+-- pas à la ressource : ils survivent à un `restart core`. Une ressource coupée pendant
+-- qu'un effet est posé laissait l'écran flou ou le joueur bloqué, sans moyen d'en sortir
+-- (seule une mort + réanimation nettoyait le flou).
+local function clearScreenEffects()
+    ClearTimecycleModifier()
+    SetTimecycleModifierStrength(0.0)
+    TriggerScreenblurFadeOut(0)
+end
+
+local function restorePlayerControl()
+    local ped = PlayerPedId()
+    SetPlayerControl(PlayerId(), true, 0)
+    FreezeEntityPosition(ped, false)
+end
+
+AddEventHandler("onResourceStop", function(resource)
+    if resource ~= GetCurrentResourceName() then return end
+    clearScreenEffects()
+    restorePlayerControl()
+end)
+
+AddEventHandler("onClientResourceStart", function(resource)
+    if resource ~= GetCurrentResourceName() then return end
+    clearScreenEffects()
+    restorePlayerControl()
+
+    -- Second passage : la séquence de démarrage (écran de chargement, multichar, spawn)
+    -- peut reposer un effet juste après. On ne repasse que si rien n'est ouvert.
+    CreateThread(function()
+        Wait(4000)
+        local busy = (VFW.Nui and VFW.Nui._hasFocus) or (Death and Death.isDead)
+        if not busy then
+            clearScreenEffects()
+            restorePlayerControl()
+        end
+    end)
+end)
+
+--- Remet l'écran à plat (flou + timecycle) et rend la main au joueur.
+function VFW.ClearScreenEffects()
+    clearScreenEffects()
+    restorePlayerControl()
+end
+
+RegisterCommand("unblur", function()
+    clearScreenEffects()
+    restorePlayerControl()
+end, false)
+
+-- Sortie de secours quand un script laisse le joueur figé.
+RegisterCommand("debloque", function()
+    clearScreenEffects()
+    restorePlayerControl()
+    ClearPedTasks(PlayerPedId())
+end, false)
