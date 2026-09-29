@@ -1,20 +1,12 @@
+-- Densité des PNJ et du trafic : gérée par plugins/015_Features/client/world_density.lua
+-- (réglable en direct depuis Gestion > Serveur > Densité du monde). Ce fichier ne garde que
+-- les évènements aléatoires, qui ne dépendent pas d'un multiplicateur de densité.
 CreateThread(function()
     while true do
-        Wait(0)
-
-        -- Désactive les PNJ civils
-        SetPedDensityMultiplierThisFrame(0.0)
-        SetScenarioPedDensityMultiplierThisFrame(0.0, 0.0)
-
-        -- Désactive les véhicules PNJ
-        SetVehicleDensityMultiplierThisFrame(0.0)
-        SetRandomVehicleDensityMultiplierThisFrame(0.0)
-        SetParkedVehicleDensityMultiplierThisFrame(0.0)
-
-        -- Désactive les événements aléatoires (ambulance, police, etc.)
         SetRandomBoats(false)
         SetGarbageTrucks(false)
         SetRandomTrains(false)
+        Wait(10000)
     end
 end)
 

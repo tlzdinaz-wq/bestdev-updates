@@ -169,9 +169,8 @@ end
 local lastTattoos = {}
 local creatorActive = false
 
--- Catalogues (vêtements, tatouages, boutons, peds) mémorisés par sexe : leur calcul enchaîne des
--- milliers de natives puis un envoi NUI très lourd. On ne le refait pas quand le joueur rebascule
--- Homme / Femme ; vidé à la fermeture du créateur.
+-- Les données statiques du créateur sont mémorisées pendant toute la durée de vie de la ressource.
+-- Les fermer/réouvrir ne change ni les tatouages, ni les visages, ni les peds disponibles.
 local creatorCache = {}
 local creatorSwitching = false
 local creatorPendingChoice = nil
@@ -317,7 +316,6 @@ end
 
 local function LoadTattooCatalogue()
     local tattoos = GetTattoos()
-    creaPersoData.tattoos = {}
 
     for _, tattoo in ipairs(tattoos) do
         local hashName = temporaryDatas.playerType == "Femme" and tattoo.HashNameFemale or tattoo.HashNameMale
@@ -334,11 +332,8 @@ local function LoadTattooCatalogue()
                 HashNameFemale = tattoo.HashNameFemale -- 👈 añade hash female
             }
 
-
-            -- Guardar en tattoos
-            table.insert(creaPersoData.tattoos, tempCatalogue)
-
-            -- 🔹 Insertar también en catalogue
+            -- Le NUI lit les tatouages depuis le catalogue. Garder une seconde copie dans
+            -- `tattoos` doublait inutilement la taille du message JSON.
             table.insert(creaPersoData.catalogue, tempCatalogue)
         end
     end
@@ -702,50 +697,29 @@ local function LoadDataForCreator(sex, switching)
     local cached = creatorCache[temporaryDatas.playerType]
     if cached then
         creaPersoData.catalogue = cached.catalogue
-        creaPersoData.tattoos = cached.tattoos
-        creaPersoData.buttons = cached.buttons
         creaPersoData.peds = cached.peds
         creaPersoData.hideItemList = cached.hideItemList
     else
     creaPersoData.catalogue = {}
     creaPersoData.peds = {}
 
-    local baseURL = temporaryDatas.playerSex
-
     creaPersoData.hideItemList = { 'Variations 3' }
-
-    if temporaryDatas.playerType == "Homme" then
-        creaPersoData.catalogue[#creaPersoData.catalogue + 1] = { id = 61, label = "Aucun", image =
-        "https://cfx-nui-core/interface/brand/outfits_greenscreener/aucun.svg", category = "Bas", subCategory = "Bas", idVariation = 61 }
-    else
-        creaPersoData.catalogue[#creaPersoData.catalogue + 1] = { id = 17, label = "Aucun", image =
-        "https://cfx-nui-core/interface/brand/outfits_greenscreener/aucun.svg", category = "Bas", subCategory = "Bas", idVariation = 17 }
-    end
-
-    if temporaryDatas.playerType == "Homme" then
-        creaPersoData.catalogue[#creaPersoData.catalogue + 1] = { id = 34, label = "Aucun", image =
-        "https://cfx-nui-core/interface/brand/outfits_greenscreener/aucun.svg", category = "Chaussures", subCategory = "Chaussures", idVariation = 34 }
-    else
-        creaPersoData.catalogue[#creaPersoData.catalogue + 1] = { id = 35, label = "Aucun", image =
-        "https://cfx-nui-core/interface/brand/outfits_greenscreener/aucun.svg", category = "Chaussures", subCategory = "Chaussures", idVariation = 35 }
-    end
 
     LoadFaceFeatures()
     LoadPedsFeatures()
-    LoadButtonsCreaPerso()
     LoadTattooCatalogue()
-    LoadClothesForCreator(baseURL)
+
+    -- Les vêtements sont désormais pilotés par les sliders NUI et leurs callbacks dynamiques.
+    -- Générer ici chaque drawable + chaque texture créait des milliers de tables et un énorme
+    -- message JSON qui n'était plus lu par l'interface.
 
     creatorCache[temporaryDatas.playerType] = {
         catalogue = creaPersoData.catalogue,
-        tattoos = creaPersoData.tattoos,
-        buttons = creaPersoData.buttons,
         peds = creaPersoData.peds,
         hideItemList = creaPersoData.hideItemList,
     }
     end
 
-    if not switching then Wait(250) end
     creatorActive = true
     TriggerEvent("pma-voice:toggleUi", false)
     VFW.Nui.Creator(true, creaPersoData)
@@ -762,18 +736,17 @@ local function LoadDataForCreator(sex, switching)
 
     if switching then return end
 
-    -- Fade in after UI is loaded
-    Wait(100)
-    DoScreenFadeIn(500)
+    DoScreenFadeIn(350)
 end
 
 ---Load NewCharCreator
 function LoadNewCharCreator()
-    while VFW.PlayerGlobalData == nil do Wait(1000) end
+    while VFW.PlayerGlobalData == nil do Wait(50) end
 
     local p = promise.new()
 
     VFW.Nui.HudVisible(false)
+    PreloadFreemodeModels()
 
     TriggerEvent("skinchanger:loadSkin", { sex = 0 }, function()
         p:resolve()
@@ -784,14 +757,14 @@ function LoadNewCharCreator()
     TriggerServerEvent("core:server:instanceCreator", true)
 
     local playerPed = PlayerPedId()
+    RequestCollisionAtCoord(Config.CharCreator[1].COH.x, Config.CharCreator[1].COH.y, Config.CharCreator[1].COH.z)
     SetEntityCoords(playerPed, Config.CharCreator[1].COH.x, Config.CharCreator[1].COH.y, Config.CharCreator[1].COH.z - 1)
     SetEntityHeading(playerPed, Config.CharCreator[1].COH.w)
     SetEntityAsMissionEntity(playerPed, true, true)
 
-    Wait(500)
-
     creaPersoData.vip = VFW.PlayerGlobalData.permissions["vip_bronze"] or
     VFW.PlayerGlobalData.permissions["vip_silver"] or VFW.PlayerGlobalData.permissions["vip_gold"]
+    creaPersoData.recoverableCharacters = {}
 
     if creaPersoData.vip then
         local characters = TriggerServerCallback('core:server:characterCreator')
@@ -826,7 +799,6 @@ function LoadNewCharCreator()
     SetWeatherTypeNowPersist('CLEAR')
 
     LoadDataForCreator(0)
-    PreloadFreemodeModels()
 end
 
 ---Load VariationForPed
@@ -2073,7 +2045,6 @@ local function Thread(state)
 
     if not state then
         creatorActive = false
-        creatorCache = {}
         TriggerEvent("pma-voice:toggleUi", true)
     end
 
@@ -2564,7 +2535,6 @@ RegisterNuiCallback("nui:char-creator:spawnpoint", function(data)
     if data.spawnPoint ~= nil then
         EmoteCancel()
         creatorActive = false
-        creatorCache = {}
         TriggerEvent("pma-voice:toggleUi", true)
         VFW.Nui.Creator(false)
         lastLoadedPedId = nil -- Reset du cache PED

@@ -6,16 +6,7 @@ cEntity = {}
 
 
 
-local disableDensity = GetConvar('entity_disable_density', 'true') == 'true'
-
-if disableDensity then
-    Citizen.CreateThread(function()
-        while true do
-            SetPedDensityMultiplierThisFrame(0.0)
-            SetScenarioPedDensityMultiplierThisFrame(0.0, 0.0)
-            SetVehicleDensityMultiplierThisFrame(0.0)
-            SetRandomVehicleDensityMultiplierThisFrame(0.0)
-            Wait(0)
-        end
-    end)
-end
+-- Densité : pilotée par plugins/015_Features/client/world_density.lua depuis
+-- Gestion > Serveur > Densité du monde. Le convar `entity_disable_density` sert encore de
+-- valeur par défaut au premier démarrage (true = monde vide), ensuite c'est le réglage
+-- enregistré qui fait foi.

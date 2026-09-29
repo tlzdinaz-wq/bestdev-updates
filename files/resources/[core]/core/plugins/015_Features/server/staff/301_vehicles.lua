@@ -940,7 +940,7 @@ RegisterNetEvent("vfw:staff:menu:spawnVehicle", function(model)
     logStaff(source, "vehicle_spawn_menu", { model = cleaned, coords = coords })
 end)
 
-VFW.RegisterCommand("car", "spawn_veh", function(source, xPlayer, args)
+local function spawnCarCommand(source, xPlayer, args)
     if not rateOk(source, "staff:commandCar", 1000) then return end
 
     local cleaned = cleanModel(args and args[1])
@@ -984,12 +984,18 @@ VFW.RegisterCommand("car", "spawn_veh", function(source, xPlayer, args)
 
     notify(source, "SUCCESS", ("Véhicule %s apparu."):format(cleaned))
     logStaff(source, "vehicle_spawn_command", { model = cleaned, coords = coords })
-end, {
-    help = "Faire apparaître un véhicule staff",
-    params = {
-        { name = "modele", help = "Nom spawn du véhicule (ex: sultan)" },
-    },
-})
+end
+
+-- Même commande sous trois noms : le véhicule apparaît devant le staff et il est
+-- directement placé au volant.
+for _, name in ipairs({ "car", "veh", "spawncar" }) do
+    VFW.RegisterCommand(name, "spawn_veh", spawnCarCommand, {
+        help = "Faire apparaître un véhicule staff (vous montez dedans)",
+        params = {
+            { name = "modele", help = "Nom spawn du véhicule (ex: sultan)" },
+        },
+    })
+end
 
 RegisterNetEvent("vfw:animator:spawnVehicle", function(model)
     local source = source

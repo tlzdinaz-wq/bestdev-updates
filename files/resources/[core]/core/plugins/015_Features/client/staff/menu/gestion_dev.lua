@@ -1219,6 +1219,31 @@ CALL.starterpack = function(action, a)
 end
 
 -- ═══════════════════════════════════════════════════════════════
+-- Densité du monde (PNJ, trafic, véhicules garés, scénarios)
+-- ═══════════════════════════════════════════════════════════════
+
+OPEN.density = function()
+    if not Has("server_management", "dev") then return Fail("Permission gestion serveur requise.") end
+    return Ok({ density = TriggerServerCallback("vfw:density:get") or {} })
+end
+
+CALL.density = function(action, a)
+    a = a or {}
+    if action ~= "set" then return Fail("Action inconnue.") end
+
+    local values = {}
+    for _, key in ipairs({ "peds", "vehicles", "parked", "scenarios" }) do
+        local v = tonumber(a[key])
+        if v then values[key] = v end
+    end
+    if not next(values) then return Fail("Aucune valeur à appliquer.") end
+
+    local cfg = TriggerServerCallback("vfw:density:set", values)
+    if not cfg then return Fail("Enregistrement refusé.") end
+    return Ok({ density = cfg })
+end
+
+-- ═══════════════════════════════════════════════════════════════
 -- État des toggles dev (mode dev, print props, poids)
 -- ═══════════════════════════════════════════════════════════════
 

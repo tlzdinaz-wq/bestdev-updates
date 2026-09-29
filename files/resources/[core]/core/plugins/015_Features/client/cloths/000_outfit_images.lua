@@ -98,6 +98,10 @@ local function collectionCount(ped)
     return 0
 end
 
+-- Les limites d'un modèle ne changent pas pendant une session. Le calcul par collections est
+-- coûteux (plusieurs natives par pack), donc on le fait une seule fois par modèle/composant.
+local drawableCountCache = {}
+
 --- Nombre de drawables (vêtement ou prop) visibles sur ce ped.
 ---@param ped number
 ---@param kind string "clothing" | "props"
@@ -106,6 +110,11 @@ end
 function VFW.PedDrawableCount(ped, kind, index)
     if not ped or not DoesEntityExist(ped) or index == nil then return 0 end
     local isProp = kind == "props"
+    local model = GetEntityModel(ped)
+    local cacheKey = tostring(model) .. ":" .. (isProp and "p" or "c") .. ":" .. tostring(index)
+    local cached = drawableCountCache[cacheKey]
+    if cached ~= nil then return cached end
+
     local n = 0
     if isProp then
         n = GetNumberOfPedPropDrawableVariations(ped, index) or 0
@@ -114,7 +123,10 @@ function VFW.PedDrawableCount(ped, kind, index)
     end
 
     local cols = collectionCount(ped)
-    if cols <= 0 then return n end
+    if cols <= 0 then
+        drawableCountCache[cacheKey] = n
+        return n
+    end
 
     local maxG = n
     for i = 0, cols - 1 do
@@ -143,6 +155,7 @@ function VFW.PedDrawableCount(ped, kind, index)
             end
         end
     end
+    drawableCountCache[cacheKey] = maxG
     return maxG
 end
 

@@ -446,17 +446,10 @@ function Adjustments:RemoveCops()
     end)
 end
 
+--- Anciennement : mise à zéro de la densité à chaque frame. La densité est désormais pilotée
+--- par plugins/015_Features/client/world_density.lua (réglable depuis Gestion > Serveur), qui
+--- applique les valeurs du serveur. Garder cette boucle ici les écrasait une frame sur deux.
 function Adjustments:RemoveNPC()
-    CreateThread(function()
-        while true do
-            Wait(0)
-            SetVehicleDensityMultiplierThisFrame(0.0)
-            SetRandomVehicleDensityMultiplierThisFrame(0.0)
-            SetParkedVehicleDensityMultiplierThisFrame(0.0)
-            SetPedDensityMultiplierThisFrame(0.0)
-            SetScenarioPedDensityMultiplierThisFrame(0.0, 0.0)
-        end
-    end)
 end
 
 function Adjustments:RemoveStrafe()

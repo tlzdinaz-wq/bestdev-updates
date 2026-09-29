@@ -2,14 +2,40 @@ local managementBlip = nil
 local managementGeneration = 0
 
 local function hasBossPermissions()
-    local playerJob = VFW.PlayerData.job
+    local playerJob = VFW.PlayerData and VFW.PlayerData.job
     if not playerJob then
         return false
     end
-    if playerJob.grade_is_boss == true or playerJob.grade_is_boss == 1 then
+    if playerJob.grade_is_boss == true or playerJob.grade_is_boss == 1 or playerJob.grade_is_boss == "1"
+        or playerJob.isBoss == true or playerJob.is_boss == true or playerJob.is_boss == 1
+        or playerJob.is_boss == "1" then
         return true
     end
-    return playerJob.grade == 99 or playerJob.grade == 98
+
+    local grade = tonumber(playerJob.grade)
+    if grade == 99 or grade == 98 then return true end
+
+    local gradeName = string.lower(tostring(playerJob.grade_name or ""))
+    local gradeLabel = string.lower(tostring(playerJob.grade_label or ""))
+    if gradeName == "boss" or gradeName == "patron" or gradeName == "owner" or gradeName == "pdg" then
+        return true
+    end
+    if gradeLabel:find("patron", 1, true) or gradeLabel:find("boss", 1, true) or gradeLabel == "pdg" then
+        return true
+    end
+
+    local definition = VFW.Jobs and VFW.Jobs[playerJob.name]
+    local grades = definition and definition.grades
+    if type(grades) == "table" then
+        for _, gradeData in pairs(grades) do
+            if tonumber(gradeData.grade) == grade then
+                return gradeData.isBoss == true or gradeData.is_boss == true
+                    or gradeData.is_boss == 1 or gradeData.is_boss == "1"
+            end
+        end
+    end
+
+    return false
 end
 
 local function removeBlipIfAny()

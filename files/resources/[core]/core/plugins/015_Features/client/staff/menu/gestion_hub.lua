@@ -75,6 +75,7 @@ local directCategories = {
             { label = "Tablette météo", desc = "Zones météo autour de toi ou sur la carte", icon = "globe", perm = "server_management", action = "weather_tablet", opens = "weather" },
             { label = "Météo, heure et stats", desc = "Heure, gel du temps, statistiques serveur", icon = "clock", perm = "server_management", action = "server_panel", opens = "server" },
             { label = "Nettoyer la zone", desc = "Supprimer véhicules, peds et objets autour de vous", icon = "trash", perm = "clean_zone", action = "clear_zone" },
+            { label = "Densité du monde", desc = "PNJ, trafic et véhicules garés — appliqué en direct à tous", icon = "globe", perm = "server_management", opens = "dev", dev = "density" },
             { label = "Gérer les images", desc = "Logo, bannière, pause, items, sociétés, mugshots", icon = "image", opens = "images" },
             { label = "Notifications périodiques", desc = "Notifications automatiques", icon = "megaphone", opens = "notifs" },
             { label = "Starter pack", desc = "Argent et items de départ des nouveaux joueurs", icon = "gift", opens = "dev", dev = "starterpack" },

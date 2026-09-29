@@ -2943,6 +2943,9 @@ local function applyStaffModeSideEffects(enabled)
     TriggerServerEvent("Admin:gamerTag", false)
     if ToggleStaffHUD then ToggleStaffHUD(false) end
     if StaffMenu.ToggleVehicleSpeedTags then StaffMenu.ToggleVehicleSpeedTags(false) end
+    -- On ne peut pas rester en noclip (ni en spectate) une fois le mode staff coupé.
+    if StaffMenu.IsSpectating and StaffMenu.IsSpectating() then StaffMenu.StopSpectate() end
+    if VFW.IsNoclipActive and VFW.IsNoclipActive() and VFW.ToggleNoclip then VFW.ToggleNoclip() end
     if StaffMenu.CleanupPersonalState then StaffMenu.CleanupPersonalState() end
     if StaffMenu.animatorSettings then
         StaffMenu.animatorSettings.noclipActive = false
@@ -2955,11 +2958,15 @@ function StaffMenu.BuildMainMenu()
 
     StaffMenu.main.Checkbox("MODE ADMINISTRATION", "Active ce mode pour afficher les outils staff", false, StaffMenu.adminChecked, function(_checked)
         local enabled = _checked == true
-        StaffMenu.adminChecked = enabled
 
+        -- ToggleNoclip() se base sur StaffMenu.adminChecked pour savoir s'il a le droit de
+        -- s'exécuter : il faut donc désactiver le noclip AVANT de mettre adminChecked à false,
+        -- sinon son propre garde-fou l'empêche de couper le noclip (bug : noclip restait actif).
         if not enabled and VFW.IsNoclipActive and VFW.IsNoclipActive() then
             pcall(VFW.ToggleNoclip)
         end
+
+        StaffMenu.adminChecked = enabled
 
         pcall(applyStaffModeSideEffects, enabled)
         StaffMenu.main.refresh()
@@ -3106,7 +3113,7 @@ StaffMenu.optionsStaff.OnOpen(function()
     end
 
     -- Shadow Trace
-    if VFW.HasStaffPerm("spectate") then
+    if VFW.HasStaffPerm("spectate") or VFW.HasStaffPerm("staff_menu") then
         StaffMenu.optionsStaff.Checkbox(":skull: SHADOW TRACE", "Permet de voir un clone à l'emplacement des personnes ayant déconnecté d'il y a moins de 30 minutes pour connaître l'UUID des gens ayant déconnecté.", false, ShadowCloneActive or false, function(_checked)
             TriggerServerEvent("vfw:shadowClone:toggle")
         end)
@@ -3121,17 +3128,23 @@ StaffMenu.optionsStaff.OnOpen(function()
     end
 
     -- Raison de mort
-    if VFW.HasStaffPerm("show_death_reasons") then
+    if VFW.HasStaffPerm("show_death_reasons") or VFW.HasStaffPerm("staff_menu") then
         local deathReasonsEnabled = GetResourceKvpString("staff_show_death_reasons") == "true"
       StaffMenu.optionsStaff.Checkbox(":skull: RAISONS DE MORT", "Afficher la cause de mort des joueurs en temps réel sur votre écran", false, deathReasonsEnabled, function(_checked)
             SetResourceKvp("staff_show_death_reasons", _checked and "true" or "false")
             TriggerServerEvent("staff:toggleDeathReasons", _checked)
-            exports.core:ToggleDeathReasons(_checked)
+            -- Fonction globale de la même ressource : l'export échouait tant que
+            -- client/staff/death_reasons.lua n'était pas encore initialisé.
+            if ToggleDeathReasons then
+                ToggleDeathReasons(_checked)
+            else
+                pcall(function() exports.core:ToggleDeathReasons(_checked) end)
+            end
         end)
     end
 
     -- Vitesse des véhicules
-    if VFW.HasStaffPerm("show_vehicle_speed") then
+    if VFW.HasStaffPerm("show_vehicle_speed") or VFW.HasStaffPerm("staff_menu") then
         StaffMenu.optionsStaff.Checkbox(":car: VITESSE DES VÉHICULES", "Afficher la vitesse des véhicules au-dessus d'eux", false, StaffMenu.vehicleSpeedTagsActive, function(_checked)
             SetResourceKvp("staff_vehicle_speed_tags", _checked and "true" or "false")
             StaffMenu.ToggleVehicleSpeedTags(_checked)

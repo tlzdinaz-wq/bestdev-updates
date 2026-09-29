@@ -222,14 +222,16 @@ local function teleportPlayerToFloor(floor)
         Wait(0)
     end
 
+    -- Placer d'abord le joueur, puis attendre la collision autour de lui : attendre avant le
+    -- déplacement testait la collision de l'endroit qu'on quitte (déjà chargée) et on
+    -- arrivait parfois sous la map.
+    SetEntityCoords(playerPed, coords.x, coords.y, coords.z, false, false, false, true)
     RequestCollisionAtCoord(coords.x, coords.y, coords.z)
 
     local collisionStart = GetGameTimer()
     while not HasCollisionLoadedAroundEntity(playerPed) and (GetGameTimer() - collisionStart) < 5000 do
         Wait(50)
     end
-
-    SetEntityCoords(playerPed, coords.x, coords.y, coords.z, false, false, false, true)
 
     Wait(CONFIG.POST_TELEPORT_WAIT)
     DoScreenFadeIn(CONFIG.FADE_DURATION)
@@ -281,46 +283,71 @@ end
 
 RegisterNUICallback("nui:elevator:selectFloor", function(data, cb)
     local success, result = pcall(function()
-        if not data.floor or not selectedElevatorIndex or not selectedFloorIndex then
+        -- L'interface renvoie l'index de l'étage ; suivant le navigateur il peut arriver en
+        -- texte, et le joueur a pu se décaler d'un étage entre l'ouverture et son choix.
+        local wanted = tonumber(data and data.floor)
+        if not wanted or not selectedElevatorIndex then
+            console.warn("[ascenseur] étage invalide reçu de l'interface")
             return "error"
-      end
+        end
 
         local elevator = ElevatorsData[selectedElevatorIndex]
         if not elevator or not elevator.floors then
+            console.warn("[ascenseur] ascenseur introuvable")
             return "error"
-      end
+        end
 
-        local currentFloor = elevator.floors[selectedFloorIndex]
-        if not currentFloor or not currentFloor.coords then
-            return "error"
-      end
-
+        -- Distance mesurée sur l'étage le plus proche de cet ascenseur (pas uniquement sur
+        -- celui mémorisé à l'ouverture, sinon un pas de côté annulait la course).
         local playerCoords = GetEntityCoords(PlayerPedId())
-        local floorCoords = vector3(currentFloor.coords.x, currentFloor.coords.y, currentFloor.coords.z)
-        local distance = #(playerCoords - floorCoords)
+        local closest = math.huge
+        for index = 1, #elevator.floors do
+            local floor = elevator.floors[index]
+            local coords = floor and floor.coords
+            if coords and coords.x then
+                local distance = #(playerCoords - vector3(coords.x, coords.y, coords.z))
+                if distance < closest then closest = distance end
+            end
+        end
 
-        if distance > CONFIG.INTERACT_DISTANCE then
+        if closest > CONFIG.INTERACT_DISTANCE then
             closeNUI()
             return "too_far"
-      end
+        end
 
-        local targetFloor = elevator.floors[data.floor]
+        local targetFloor = elevator.floors[wanted]
+
+        -- Repli : certaines interfaces renvoient la position dans la liste affichée plutôt
+        -- que l'index réel de l'étage.
         if not targetFloor then
+            local accessible = buildAccessibleFloorsList(elevator, selectedFloorIndex)
+            local entry = accessible[wanted]
+            targetFloor = entry and elevator.floors[entry.index] or nil
+        end
+
+        if not targetFloor or not targetFloor.coords then
+            console.warn(("[ascenseur] étage %s introuvable"):format(tostring(wanted)))
             return "error"
-      end
+        end
 
         if not isFloorAllowedForPlayer(targetFloor) then
+            VFW.ShowNotification({ type = 'ROUGE', content = "Cet étage vous est interdit." })
+            closeNUI()
             return "error"
-      end
+        end
 
         closeNUI()
 
         if teleportPlayerToFloor(targetFloor) then
             return "ok"
-      else
-            return "error"
-      end
+        end
+
+        return "error"
     end)
+
+    if not success then
+        console.error(("[ascenseur] %s"):format(tostring(result)))
+    end
 
     cb(success and result or "error")
 end)

@@ -120,6 +120,13 @@ VUI_BrandBanner = ""
 VUI_AllMenus = setmetatable({}, { __mode = "k" })
 VUI_LastBackTime = 0 ---@type number Timestamp du dernier back (debounce 200ms)
 
+local VUI_ALWAYS_SHOW_TYPES <const> = {
+    separator = true,
+    textbox = true,
+    imagebox = true,
+    title = true
+}
+
 -- Mode hub : les menus sont rendus par le hub de gestion de `core` (NUI) au lieu du
 -- NUI VUI. Tous les messages "vui:menu*" sont relayés à `core` via l'event local
 -- "vui:hub:message" ; les interactions reviennent par les mêmes callbacks NUI
@@ -1097,21 +1104,20 @@ function CreateMenu(title, banner, autoRefresh)
                 return
             end
 
-            local alwaysShowTypes = {
-                separator = true,
-                textbox = true,
-                imagebox = true,
-                title = true
-            }
+            -- Sépare la construction Lua et la sérialisation NUI sur deux frames afin
+            -- d'éviter le pic resmon lors de l'ouverture des gros menus.
+            Wait(0)
+            if VUI_CurrentMenu ~= menu or not menu.opened or menu._openGen ~= openGen then return end
 
             local _items = {}
             menu.visibleItems = {}
-            for _, item in ipairs(menu.items) do
-                table.insert(_items, {
+            for i = 1, #menu.items do
+                local item = menu.items[i]
+                _items[i] = {
                     type = item.type,
                     props = item.props
-                })
-                table.insert(menu.visibleItems, item)
+                }
+                menu.visibleItems[i] = item
             end
 
             local indexRestored = false
@@ -1129,7 +1135,7 @@ function CreateMenu(title, banner, autoRefresh)
             if not indexRestored and #_items > 1 then
                 menu.index = 1
                 for i, item in ipairs(_items) do
-                    if not alwaysShowTypes[item.type] and not item.props.disabled then
+                    if not VUI_ALWAYS_SHOW_TYPES[item.type] and not item.props.disabled then
                         break
                     end
                     menu.index = menu.index + 1
@@ -1232,21 +1238,18 @@ function CreateMenu(title, banner, autoRefresh)
                 return
             end
 
-            local alwaysShowTypes = {
-                separator = true,
-                textbox = true,
-                imagebox = true,
-                title = true
-            }
+            Wait(0)
+            if VUI_CurrentMenu ~= menu or not menu.opened or menu._openGen ~= openGen then return end
 
             local _items = {}
             menu.visibleItems = {}
-            for _, item in ipairs(menu.items) do
-                table.insert(_items, {
+            for i = 1, #menu.items do
+                local item = menu.items[i]
+                _items[i] = {
                     type = item.type,
                     props = item.props
-                })
-                table.insert(menu.visibleItems, item)
+                }
+                menu.visibleItems[i] = item
             end
 
             local indexRestored = false
@@ -1264,7 +1267,7 @@ function CreateMenu(title, banner, autoRefresh)
             if not indexRestored and #_items > 1 then
                 menu.index = 1
                 for i, item in ipairs(_items) do
-                    if not alwaysShowTypes[item.type] and not item.props.disabled then
+                    if not VUI_ALWAYS_SHOW_TYPES[item.type] and not item.props.disabled then
                         break
                     end
                     menu.index = menu.index + 1

@@ -91,7 +91,11 @@ end
 local formatDescription = function(items)
     local desc = ""
     for i = 1, #items do
-        desc = desc .. items[i].name .. "\n"
+        local item = items[i]
+        local name = type(item) == "table" and item.name or item
+        if name ~= nil then
+            desc = desc .. tostring(name) .. "\n"
+        end
     end
     return desc
 end
@@ -99,7 +103,14 @@ end
 function bossPanelModule.openBossPanel()
 
     local playerData = VFW.PlayerData
-    local job = playerData.job
+    local job = playerData and playerData.job
+    if not job or type(job.name) ~= "string" or job.name == "" then
+        VFW.ShowNotification({
+            type = 'ROUGE',
+            content = "Entreprise introuvable."
+        })
+        return
+    end
 
 
     -- Get employees from server
@@ -133,6 +144,17 @@ function bossPanelModule.openBossPanel()
         })
         return
     end
+
+    -- Les modules coffres/farm/LTD sont optionnels. Une réponse absente ne doit jamais
+    -- empêcher l'ouverture de toute la tablette.
+    employeesServices = type(employeesServices) == "table" and employeesServices or {}
+    jobData = type(jobData) == "table" and jobData or { image = "", grades = {}, perms = {} }
+    jobData.grades = type(jobData.grades) == "table" and jobData.grades or {}
+    jobData.perms = type(jobData.perms) == "table" and jobData.perms or {}
+    societyData = type(societyData) == "table" and societyData or { money = 0 }
+    membersFavoris = type(membersFavoris) == "table" and membersFavoris or {}
+    chests = type(chests) == "table" and chests or {}
+    lockers = type(lockers) == "table" and lockers or {}
 
     local formattedEmployees = {}
     local playerIdCounter = 1
@@ -204,7 +226,7 @@ function bossPanelModule.openBossPanel()
     if employees then
         for _, employee in ipairs(employees) do
 
-            local jobGradeInfo = getGradeFromRank(jobData.grades, employee.rank - 1)
+            local jobGradeInfo = getGradeFromRank(jobData.grades, (tonumber(employee.rank) or 1) - 1)
 
             if jobGradeInfo then
                 -- Check if employee is in favorites
@@ -220,13 +242,14 @@ function bossPanelModule.openBossPanel()
 
                 local isBossGrade = jobGradeInfo.is_boss == 1 or jobGradeInfo.is_boss == true
 
+                local information = type(employee.Information) == "table" and employee.Information or {}
                 local employeeData = {
                     id = employee.identifier,
                     firstname = employee.fname,
                     lastname = employee.lname,
 
-                    onDuty = employee.Information.onDuty,
-                    mugshot = employee.Information.mugshot,
+                    onDuty = information.onDuty == true,
+                    mugshot = information.mugshot or "",
                     role = {
                         name = jobGradeInfo.name or "",
                         label = jobGradeInfo.label or "",
@@ -253,7 +276,13 @@ function bossPanelModule.openBossPanel()
                 table.insert(formattedEmployees, employeeData)
                 playerIdCounter = playerIdCounter + 1
 
-                if employee.identifier == playerData.identifier then
+                local employeeId = tostring(employee.identifier or "")
+                local isCurrentPlayer = employeeId ~= "" and (
+                    employeeId == tostring(playerData.identifier or "") or
+                    employeeId == tostring(playerData.uuid or "") or
+                    employeeId == tostring(playerData.id or "")
+                )
+                if isCurrentPlayer then
                     currentPlayer = employeeData
                 end
             end
@@ -271,8 +300,49 @@ function bossPanelModule.openBossPanel()
         end
     end
 
+
+    -- Certains schémas utilisent l'UUID du personnage tandis que PlayerData.identifier
+    -- contient la licence FiveM. Dans ce cas l'employé courant n'était jamais trouvé et
+    -- React recevait `player = nil`, ce qui empêchait tout le panneau de se rendre.
+    if not currentPlayer then
+        local currentRole = nil
+        local currentGrade = tonumber(job.grade) or 0
+        for _, role in ipairs(roles) do
+            if role.name == job.grade_name or tonumber(role.grade) == currentGrade then
+                currentRole = role
+                break
+            end
+        end
+        currentRole = currentRole or {
+            name = job.grade_name or "employee",
+            label = job.grade_label or "Employé",
+            salary = tonumber(job.salary) or 0,
+            grade = currentGrade,
+            isBoss = playerCanEditAnnounces(),
+            permissions = playerCanEditAnnounces() and permissions or {}
+        }
+
+        currentPlayer = {
+            id = playerData.uuid or playerData.identifier or playerData.id or "self",
+            firstname = playerData.firstName or playerData.firstname or "",
+            lastname = playerData.lastName or playerData.lastname or "",
+            onDuty = job.onDuty == true,
+            mugshot = playerData.mugshot or "",
+            role = currentRole,
+            serviceStart = 0,
+            serviceStop = 0,
+            totalWeek = 0,
+            totalLastWeek = 0,
+            timeInService = 0,
+            isFavorite = false,
+            startDate = "",
+            phoneNumber = "",
+        }
+    end
+
     -- Create dummy data for invoices
     local invoices = TriggerServerCallback("core:jobs:getBillings")
+    invoices = type(invoices) == "table" and invoices or { billings = {} }
 
     local items = {}
 
@@ -285,7 +355,10 @@ function bossPanelModule.openBossPanel()
             amount = invoice.total or 0,
             baseCost = invoice.base_cost, -- coût pièces côté mécano (nil pour autres factures)
             status = invoice.type == "deposit" and "received" or invoice.type == "withdraw" and "paid" or invoice.statut == 2 and "paid later" or invoice.statut == 1 and "paid" or "unpaid",
-            description = formatDescription(json.decode(invoice.items)),
+            description = formatDescription((function()
+                local ok, decoded = pcall(json.decode, invoice.items or "[]")
+                return ok and type(decoded) == "table" and decoded or {}
+            end)()),
             type = invoice.type
         }
     end
@@ -305,7 +378,7 @@ function bossPanelModule.openBossPanel()
             roles = roles,
             permissions = permissions,
             invoices = items or {},
-            balance = societyData.money,
+            balance = tonumber(societyData.money) or 0,
             revenue = revenue,
             expenses = expenses,
             chests = chests,

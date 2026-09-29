@@ -729,3 +729,70 @@ RegisterNetEvent("vfw:staff:phone:setCertif", function()
     if not Require(source, "wipe") then return end
     PhoneUnavailable(source)
 end)
+
+-- ═══════════════════════════════════════════════════════════════
+-- Densité du monde (Gestion > Serveur > Densité du monde)
+--
+-- Les natifs de densité sont « this frame » et côté client : on garde ici l'état de référence
+-- (variable `world_density`) et on le diffuse. L'application est dans
+-- plugins/015_Features/client/world_density.lua.
+-- ═══════════════════════════════════════════════════════════════
+
+local DENSITY_VAR = "world_density"
+local DENSITY_KEYS = { "peds", "vehicles", "parked", "scenarios" }
+
+-- Jamais réglé : on garde le comportement historique du serveur, donné par le convar
+-- `entity_disable_density` (true = monde vide, comme avant cet outil).
+local function DensityDefault()
+    return GetConvar("entity_disable_density", "true") == "true" and 0.0 or 1.0
+end
+
+local function DensityConfig()
+    local stored = Var(DENSITY_VAR)
+    local fallback = DensityDefault()
+    local cfg = {}
+    for i = 1, #DENSITY_KEYS do
+        local key = DENSITY_KEYS[i]
+        local value = tonumber(stored[key])
+        if not value or value < 0.0 or value > 1.0 then value = fallback end
+        cfg[key] = value + 0.0
+    end
+    return cfg
+end
+
+--- Densité courante du monde, pour les autres scripts serveur.
+---@return table
+function VFW.GetWorldDensity()
+    return DensityConfig()
+end
+
+RegisterServerCallback("vfw:density:get", function(source)
+    return DensityConfig()
+end)
+
+RegisterServerCallback("vfw:density:set", function(source, values)
+    if not Require(source, "server_management", "dev") then return false end
+    if type(values) ~= "table" then return false end
+
+    local cfg = DensityConfig()
+    for i = 1, #DENSITY_KEYS do
+        local key = DENSITY_KEYS[i]
+        local value = tonumber(values[key])
+        if value then
+            if value < 0.0 then value = 0.0 end
+            if value > 1.0 then value = 1.0 end
+            cfg[key] = value + 0.0
+        end
+    end
+
+    SaveVar(DENSITY_VAR, cfg)
+    TriggerClientEvent("vfw:density:apply", -1, cfg)
+    return cfg
+end)
+
+-- Un joueur qui arrive récupère la densité en cours (le client la redemande aussi au chargement).
+AddEventHandler("vfw:onPlayerLoaded", function(source)
+    local src = tonumber(source)
+    if not src then return end
+    TriggerClientEvent("vfw:density:apply", src, DensityConfig())
+end)

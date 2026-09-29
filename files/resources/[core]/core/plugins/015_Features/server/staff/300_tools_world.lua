@@ -889,9 +889,170 @@ RegisterNetEvent("vfw:staff:removeLicense", function(targetId, licenseType)
     logStaff(source, "remove_license", { target = target.source, license = internal })
 end)
 
+-- ══════════════════════════════════════════════════════════════════════════
+-- Moitié serveur manquante pour freeze/unfreeze, spectate et goto/bring/return.
+-- Le menu staff et les listeners client existaient déjà des deux côtés, mais
+-- rien ne les reliait sur le serveur (spectate = écran noir bloqué, freeze =
+-- aucun effet, goto/bring/return = commandes jamais enregistrées).
+-- ══════════════════════════════════════════════════════════════════════════
+
+RegisterNetEvent("core:FreezePlayer", function(targetId, state)
+    local source = source
+    local xPlayer = allow(source, "freeze_player")
+    if not xPlayer then return end
+
+    local target = VFW.GetPlayerFromId(tonumber(targetId))
+    if not target then
+        notify(source, "ERROR", "Freeze", "Ce joueur n'est pas connecté.")
+        return
+    end
+
+    local frozen = state == true
+    TriggerClientEvent("core:FreezePlayer", target.source, frozen)
+
+    logStaff(source, "freeze_player", { target = target.source, frozen = frozen })
+end)
+
+-- Le ped de l'admin ne bouge jamais pendant le spectate (seule la caméra change via
+-- NetworkSetInSpectatorMode) : pas besoin de coordonnées à transmettre, ni au départ
+-- ni au retour, le client gère déjà les deux cas avec coords = nil.
+-- Position de l'admin avant le spectate, pour l'y ramener à la sortie.
+local spectateOrigins = {}
+
+local function xyz(xp)
+    local c = xp and xp.getCoords()
+    if not c then return nil end
+    return { x = c.x, y = c.y, z = c.z }
+end
+
+RegisterNetEvent("core:StaffSpectate", function(targetId, isSpectating)
+    local source = source
+    local xPlayer = allow(source, "spectate")
+    if not xPlayer then return end
+
+    local spectating = isSpectating == true
+
+    if not spectating then
+        local back = spectateOrigins[source]
+        spectateOrigins[source] = nil
+        TriggerClientEvent("core:StaffSpectate", source, back, tonumber(targetId) or 0, false)
+        logStaff(source, "spectate_player", { target = tonumber(targetId), spectating = false })
+        return
+    end
+
+    local target = VFW.GetPlayerFromId(tonumber(targetId))
+    if not target then
+        notify(source, "ERROR", "Spectate", "Ce joueur n'est pas connecté.")
+        return
+    end
+
+    -- Sans coordonnées, le client reste sur place : le ped de la cible n'est pas streamé et
+    -- NetworkSetInSpectatorMode ne montre qu'un écran noir. On envoie donc la position de la
+    -- cible (l'admin s'y téléporte invisible) et on garde la sienne pour le retour.
+    spectateOrigins[source] = xyz(xPlayer)
+
+    TriggerClientEvent("core:StaffSpectate", source, xyz(target), target.source, true)
+    logStaff(source, "spectate_player", { target = target.source, spectating = true })
+end)
+
+VFW.RegisterCommand("unspectate", "spectate", function(source)
+    local back = spectateOrigins[source]
+    spectateOrigins[source] = nil
+    TriggerClientEvent("core:StaffSpectate", source, back, 0, false)
+end, { help = "Quitter le mode spectateur" })
+
+AddEventHandler("playerDropped", function()
+    spectateOrigins[source] = nil
+end)
+
+local function coordsTable(xp)
+    local c = xp.getCoords()
+    if not c then return nil end
+    return { x = c.x, y = c.y, z = c.z }
+end
+
+-- Position d'un joueur avant un /bring, pour pouvoir le /return à sa place d'origine.
+local bringOrigins = {}
+
+-- Enregistrées via VFW.RegisterCommand : elles apparaissent dans les suggestions du chat et
+-- passent par le pont `vfw:command:run` (le chat et le menu staff ne peuvent pas atteindre une
+-- commande serveur avec ExecuteCommand côté client).
+VFW.RegisterCommand("goto", "goto", function(source, xPlayer, args)
+    local target = VFW.GetPlayerFromId(tonumber(args and args[1]))
+    if not target then
+        notify(source, "ERROR", "Goto", "Ce joueur n'est pas connecté.")
+        return
+    end
+
+    local coords = target.getCoords()
+    if not coords then return end
+
+    TriggerClientEvent("vfw:teleportTo", source, coords.x, coords.y, coords.z)
+    notify(source, "SUCCESS", "Goto", ("Téléporté sur %s."):format(target.name or ("#" .. target.source)))
+    logStaff(source, "goto_player", { target = target.source })
+end, {
+    help = "Se téléporter sur un joueur",
+    params = { { name = "id", help = "ID du joueur" } },
+})
+
+VFW.RegisterCommand("bring", "goto", function(source, xPlayer, args)
+    local target = VFW.GetPlayerFromId(tonumber(args and args[1]))
+    if not target then
+        notify(source, "ERROR", "Bring", "Ce joueur n'est pas connecté.")
+        return
+    end
+
+    local adminCoords = xPlayer and xPlayer.getCoords()
+    if not adminCoords then return end
+
+    bringOrigins[target.source] = coordsTable(target)
+
+    TriggerClientEvent("vfw:teleportTo", target.source, adminCoords.x, adminCoords.y, adminCoords.z)
+    notify(source, "SUCCESS", "Bring", ("%s a été téléporté jusqu'à vous."):format(target.name or ("#" .. target.source)))
+    logStaff(source, "bring_player", { target = target.source })
+end, {
+    help = "Téléporter un joueur jusqu'à vous",
+    params = { { name = "id", help = "ID du joueur" } },
+})
+
+VFW.RegisterCommand("return", "goto", function(source, xPlayer, args)
+    local target = VFW.GetPlayerFromId(tonumber(args and args[1]))
+    if not target then
+        notify(source, "ERROR", "Return", "Ce joueur n'est pas connecté.")
+        return
+    end
+
+    local origin = bringOrigins[target.source]
+    if not origin then
+        notify(source, "ERROR", "Return", "Aucune position de retour enregistrée pour ce joueur.")
+        return
+    end
+
+    bringOrigins[target.source] = nil
+    TriggerClientEvent("vfw:teleportTo", target.source, origin.x, origin.y, origin.z)
+    notify(source, "SUCCESS", "Return", ("%s a été renvoyé à sa position."):format(target.name or ("#" .. target.source)))
+    logStaff(source, "return_player", { target = target.source })
+end, {
+    help = "Renvoyer un joueur à sa position d'avant le bring",
+    params = { { name = "id", help = "ID du joueur" } },
+})
+
+-- Même bug que goto/bring/return : le bouton "GPS POSITION" appelait ce callback,
+-- jamais enregistré côté serveur (trouvé en passant, pas dans la liste d'origine).
+RegisterServerCallback("core:CoordsOfPlayer", function(source, targetId)
+    local xPlayer = allow(source, "goto")
+    if not xPlayer then return nil end
+
+    local target = VFW.GetPlayerFromId(tonumber(targetId))
+    if not target then return nil end
+
+    return coordsTable(target)
+end)
+
 AddEventHandler("playerDropped", function()
     local source = source
     entityBudget[source] = nil
+    bringOrigins[source] = nil
 end)
 
 AddEventHandler("onResourceStop", function(resource)

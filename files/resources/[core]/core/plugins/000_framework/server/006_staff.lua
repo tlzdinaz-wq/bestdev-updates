@@ -592,6 +592,204 @@ AddEventHandler("playerDropped", function()
     broadcastAnimatorMode()
 end)
 
+local hiddenGamerTags = {}
+
+local function canUseGamerTags(xPlayer)
+    return xPlayer
+        and (xPlayer.hasPermission("staff_menu")
+            or xPlayer.hasPermission("show_gamertag")
+            or xPlayer.hasPermission("menu_anim"))
+end
+
+local function gamerTagPlaytime(target)
+    local playtime = 0
+    if target.globalData then
+        playtime = tonumber(target.globalData.playtime) or 0
+    end
+    if target.sessionStart then
+        playtime = playtime + math.max(0, os.time() - target.sessionStart)
+    end
+    return playtime
+end
+
+local function gamerTagCrew(target)
+    if target.job2 then
+        return target.job2.label or target.job2.name or "NoCrew"
+    end
+    if type(target.faction) == "table" then
+        return target.faction.label or target.faction.name or "NoCrew"
+    end
+    if type(target.faction) == "string" and target.faction ~= "" then
+        return target.faction
+    end
+    return "NoCrew"
+end
+
+local function gamerTagPayload(target)
+    if not target then return nil end
+
+    local source = tonumber(target.source)
+    local playerName = target.playerName or (source and GetPlayerName(source)) or "unknown"
+    local rpName = target.name
+    if (not rpName or rpName == "") and target.firstName and target.lastName then
+        rpName = ("%s %s"):format(target.firstName, target.lastName)
+    end
+
+    local vipTier = tonumber(target.vipTier or (target.globalData and target.globalData.vip_tier)) or 0
+
+    return {
+        ID = target.uuid or target.charId or source,
+        UUID = target.uuid or target.charId or source,
+        SOURCE_ID = source,
+        NAME = playerName,
+        RP_NAME = rpName or playerName,
+        CREW = gamerTagCrew(target),
+        NEW = gamerTagPlaytime(target) < 3600,
+        PREMIUM = vipTier > 0,
+        STAFF_DUTY = staffMode[source] == true,
+        ANIMATOR_DUTY = animatorMode[source] == true,
+        IS_GAMERTAG = true,
+    }
+end
+
+RegisterNetEvent("Admin:gamerTag", function(enabled)
+    local source = source
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not canUseGamerTags(xPlayer) then return end
+
+    TriggerClientEvent("Admin:gamerTag", source, enabled and true or false)
+end)
+
+RegisterNetEvent("Admin:requestPlayerData", function(targetServerId)
+    local source = source
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not canUseGamerTags(xPlayer) then return end
+
+    local target = tonumber(targetServerId)
+    if not target then return end
+
+    if hiddenGamerTags[target] and target ~= source then
+        TriggerClientEvent("Admin:removeValue", source, target)
+        return
+    end
+
+    local xTarget = VFW.GetPlayerFromId(target)
+    if not xTarget then
+        TriggerClientEvent("Admin:removeValue", source, target)
+        return
+    end
+
+    local payload = gamerTagPayload(xTarget)
+    if payload then
+        TriggerClientEvent("Admin:updateValue", source, target, payload)
+    end
+end)
+
+RegisterNetEvent("Admin:hideMyTag", function(hidden)
+    local source = source
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not xPlayer or not xPlayer.hasPermission("hide_gamertag") then return end
+
+    local hide = hidden and true or false
+    hiddenGamerTags[source] = hide or nil
+
+    if hide then
+        TriggerClientEvent("Admin:removeValue", -1, source)
+        return
+    end
+
+    local payload = gamerTagPayload(xPlayer)
+    if payload then
+        TriggerClientEvent("Admin:updateValue", -1, source, payload)
+    end
+end)
+
+AddEventHandler("playerDropped", function()
+    local source = source
+    hiddenGamerTags[source] = nil
+    TriggerClientEvent("Admin:removeValue", -1, source)
+end)
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- Blips staff : position des joueurs sur la carte.
+--
+-- `Admin:activeBlips` était déclenché par le menu et la touche staff, mais aucun
+-- handler serveur n'existait : aucun blip n'apparaissait jamais. On tient ici la
+-- liste des admins qui les ont activés et on leur envoie les positions.
+-- ══════════════════════════════════════════════════════════════════════════
+
+local blipWatchers = {}
+local BLIP_REFRESH_MS = 2500
+
+local function blipJobLabel(target)
+    local job = target.job
+    if type(job) == "table" and (job.label or job.name) then
+        return job.label or job.name
+    end
+    return nil
+end
+
+local function blipPayload()
+    local players = {}
+    local xPlayers = VFW.GetPlayers and VFW.GetPlayers() or {}
+
+    for i = 1, #xPlayers do
+        local target = VFW.GetPlayerFromId(xPlayers[i])
+        if target and target.source then
+            local coords = target.getCoords()
+            if coords then
+                players[#players + 1] = {
+                    id = target.source,
+                    name = target.name or GetPlayerName(target.source) or ("#" .. target.source),
+                    job = blipJobLabel(target),
+                    staff = staffMode[target.source] == true,
+                    x = coords.x + 0.0,
+                    y = coords.y + 0.0,
+                    z = coords.z + 0.0,
+                }
+            end
+        end
+    end
+
+    return players
+end
+
+RegisterNetEvent("Admin:activeBlips", function(enabled)
+    local source = source
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not canUseGamerTags(xPlayer) then return end
+
+    if enabled ~= true then
+        blipWatchers[source] = nil
+        TriggerClientEvent("Admin:blips", source, false, {})
+        return
+    end
+
+    blipWatchers[source] = true
+    TriggerClientEvent("Admin:blips", source, true, blipPayload())
+end)
+
+CreateThread(function()
+    while true do
+        Wait(BLIP_REFRESH_MS)
+
+        if next(blipWatchers) then
+            local payload = blipPayload()
+            for watcher in pairs(blipWatchers) do
+                if VFW.GetPlayerFromId(watcher) then
+                    TriggerClientEvent("Admin:blips", watcher, true, payload)
+                else
+                    blipWatchers[watcher] = nil
+                end
+            end
+        end
+    end
+end)
+
+AddEventHandler("playerDropped", function()
+    blipWatchers[source] = nil
+end)
+
 RegisterServerCallback("vfw:staff:getJobs", function(source)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer or not xPlayer.hasPermission("staff_menu") then return {} end

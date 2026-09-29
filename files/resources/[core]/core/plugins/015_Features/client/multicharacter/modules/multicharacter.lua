@@ -580,6 +580,13 @@ end)
 -- Forcer le retour au creator après un crash
 RegisterNetEvent("vfw:multicharacter:forceCreator")
 AddEventHandler("vfw:multicharacter:forceCreator", function(charId)
+    DoScreenFadeOut(0)
+    VFW.PlayerLoaded = false
+    VFW.PlayerData = {}
+    Multicharacter.inSelection = false
+    Multicharacter.spawned = false
+    Multicharacter:HideHud(true)
+    VFW.Nui.Multicharacter(false)
     VFW.Cam:Destroy("multichar")
     ClearFocus()
     Multicharacter:Cleanup()

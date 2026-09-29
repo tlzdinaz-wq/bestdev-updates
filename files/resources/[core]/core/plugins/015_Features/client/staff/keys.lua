@@ -2,9 +2,17 @@
 ---@diagnostic disable: duplicate-doc-field
 
 -- Register F2 keybinding for noclip (staff only)
+-- On appelle VFW.ToggleNoclip directement : aucune commande `noclip` n'est enregistrée dans la
+-- base, ExecuteCommand("noclip") ne faisait donc rien. La fonction vérifie elle-même que le mode
+-- staff ou animateur est actif.
 VFW.RegisterInput("staff_noclip", "Activer/Désactiver le noclip", "keyboard", "F2", function()
-    ExecuteCommand("noclip")
+    if VFW.ToggleNoclip then VFW.ToggleNoclip() end
 end)
+
+-- Même bascule depuis le chat.
+RegisterCommand("noclip", function()
+    if VFW.ToggleNoclip then VFW.ToggleNoclip() end
+end, false)
 
 -- Register F10 keybinding for staff menu
 VFW.RegisterInput("openStaffMenu", "Menu Staff", "keyboard", "F10", function()

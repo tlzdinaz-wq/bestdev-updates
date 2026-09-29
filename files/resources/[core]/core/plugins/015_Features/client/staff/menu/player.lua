@@ -116,19 +116,21 @@ function StaffMenu.BuildPlayerMenu()
     end
 
     if isAnimatorCtx or perms["goto"] then
+        -- `goto` / `bring` / `return` sont des commandes serveur : ExecuteCommand côté client ne
+        -- les atteint pas, on passe par le pont de commandes.
         P_Button(":arrow: GOTO", "Se téléporter directement sur le joueur", nil, "chevron", false, function()
-            ExecuteCommand(("goto %s"):format(selectedPlayer))
+            TriggerServerEvent("vfw:command:run", "goto", { tostring(selectedPlayer) })
         end)
 
         P_Button(":back: BRING", "Téléporter le joueur jusqu'à vous", nil, "chevron", false, function()
-            ExecuteCommand(("bring %s"):format(selectedPlayer))
+            TriggerServerEvent("vfw:command:run", "bring", { tostring(selectedPlayer) })
             player.Return = true
             StaffMenu.player.refresh()
         end)
 
         if player.Return then
             P_Button(":back: RETURN", "Renvoyer le joueur à sa position d'origine avant le bring", nil, "chevron", false, function()
-                ExecuteCommand(("return %s"):format(selectedPlayer))
+                TriggerServerEvent("vfw:command:run", "return", { tostring(selectedPlayer) })
                 player.Return = false
                 StaffMenu.player.refresh()
             end)

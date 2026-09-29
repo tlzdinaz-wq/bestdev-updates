@@ -108,6 +108,75 @@ local function firstFreeSlot(account)
     return nil
 end
 
+local function notifyRegister(source, variant, message)
+    if not source or source == 0 then return end
+    TriggerClientEvent("vfw:showNotification", source, {
+        type = "STAFF",
+        variant = variant,
+        subtitle = "Register",
+        message = message,
+        content = message,
+    })
+end
+
+-- Renvoie un joueur dans le createur de personnage. La commande doit aussi
+-- fonctionner lorsqu'il est bloque avant le chargement de son premier personnage.
+VFW.RegisterCommand("register", "register", function(source, xPlayer, args)
+    local targetId = tonumber(args and args[1])
+    if not targetId or targetId < 1 or targetId % 1 ~= 0 then
+        notifyRegister(source, "ERROR", "Utilisation : /register [ID]")
+        return
+    end
+
+    targetId = math.floor(targetId)
+    if not GetPlayerName(targetId) then
+        notifyRegister(source, "ERROR", "Ce joueur n'est pas connecte.")
+        return
+    end
+
+    local account = VFW.GetPendingAccount(targetId)
+    if not account then
+        notifyRegister(source, "ERROR", "Le compte de ce joueur n'est pas encore charge.")
+        return
+    end
+
+    local target = VFW.GetPlayerFromId(targetId)
+    local slot = target and tonumber(target.charNum) or pendingSlot[targetId]
+    if not slot then
+        slot = firstFreeSlot(account)
+    end
+
+    if not slot then
+        notifyRegister(source, "ERROR", "Ce joueur n'a aucun slot disponible.")
+        return
+    end
+
+    local targetName = target and target.name or GetPlayerName(targetId) or ("#" .. targetId)
+    local targetCharId = target and target.charId or nil
+
+    -- Sauvegarde et retire le personnage actif des index serveur avant sa recreation.
+    -- keepConnected=false evite d'ouvrir la selection multichar en concurrence.
+    pendingSlot[targetId] = slot
+    if target then
+        VFW.LogoutPlayer(targetId, false)
+    end
+
+    TriggerClientEvent("vfw:multicharacter:forceCreator", targetId, slot)
+    TriggerEvent("vfw:logs:staff", source, "register", {
+        target = targetId,
+        targetName = targetName,
+        charId = targetCharId,
+        slot = slot,
+    })
+
+    notifyRegister(source, "SUCCESS", ("%s a ete renvoye dans le createur de personnage."):format(targetName))
+end, {
+    help = "Renvoyer un joueur dans le createur de personnage.",
+    params = {
+        { name = "id", help = "ID serveur du joueur" },
+    },
+})
+
 function VFW.LoadCharacterForSource(source, row, account, isNew)
     local xPlayer = VFW.CreateExtendedPlayer(source, row, account)
 

@@ -311,6 +311,25 @@ local function activeSanctionOf(accountId, kind)
     return nil
 end
 
+--- Message affiché au joueur banni quand il tente de se connecter (motif + échéance).
+--- Renvoie nil si aucun bannissement actif n'est trouvé dans le registre.
+---@param accountId any
+---@return string|nil
+function VFW.GetActiveBanMessage(accountId)
+    local id, payload = activeSanctionOf(accountId, "ban")
+    if not id or type(payload) ~= "table" then return nil end
+
+    local reason = payload.reason
+    if type(reason) ~= "string" or reason == "" then reason = "non précisé" end
+
+    local expires = humanDate(payload.expiresAt)
+    if expires then
+        return ("Vous êtes banni de ce serveur jusqu'au %s. Motif : %s"):format(expires, reason)
+    end
+
+    return ("Vous êtes banni définitivement de ce serveur. Motif : %s"):format(reason)
+end
+
 local function hasAnticheatBan(accountId)
     if accountId == nil or tostring(accountId) == "" then return false end
     local identifier = Staff29.Scalar("SELECT identifier FROM users WHERE id = ?", { tostring(accountId) })
@@ -1615,6 +1634,7 @@ end
 local function removeReport(index)
     local entry = reports[index]
     if not entry then return end
+    Staff29.ResetRateLimit(entry.player.source, "report")
     table.remove(reports, index)
     broadcastReport("vfw:staff:deleteReport", entry.id)
     -- Toujours renvoyer la liste (y compris vide) : le HUD staff ne doit pas rester à 1.
@@ -1631,10 +1651,6 @@ end)
 --- Ouvre un signalement pour un joueur (commande /report et formulaire Support du pause menu).
 --- Retourne true, ou false + message d'erreur destiné au joueur.
 local function submitReport(source, xPlayer, rawMessage)
-    if not Staff29.RateLimit(source, "report", 30000) then
-        return false, "Vous venez déjà d'envoyer un signalement."
-    end
-
     local message = trim(Staff29.Clean(rawMessage, REPORT_MAX_LEN))
     if not message or #message < REPORT_MIN_LEN then
         return false, "Décrivez votre problème en quelques mots."
@@ -1648,6 +1664,10 @@ local function submitReport(source, xPlayer, rawMessage)
 
     if #reports >= REPORT_MAX then
         return false, "Le staff est saturé, réessayez dans un moment."
+    end
+
+    if not Staff29.RateLimit(source, "report", 30000) then
+        return false, "Vous venez déjà d'envoyer un signalement."
     end
 
     reportSeq = reportSeq + 1

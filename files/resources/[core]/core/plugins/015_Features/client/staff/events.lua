@@ -71,6 +71,62 @@ end)
 ---@param coords vector3|table target coords (start) or pre-spectate coords (stop)
 ---@param id any
 ---@param isSpectating any
+-- ══════════════════════════════════════════════════════════════════════════
+-- Spectate. Le serveur envoie la position de la cible au démarrage (sinon son ped
+-- n'est jamais streamé chez l'admin : écran noir), et la position d'origine de
+-- l'admin à la sortie. `RETOUR ARRIÈRE` quitte le spectate à tout moment.
+-- ══════════════════════════════════════════════════════════════════════════
+
+StaffMenu = StaffMenu or {}
+local spectateTargetId = nil
+local spectateWatcher = false
+
+local function restorePed(playerPed, playerId)
+    FreezeEntityPosition(playerPed, false)
+    SetEntityInvincible(playerPed, false)
+    SetEntityCollision(playerPed, true, true)
+    SetEntityVisible(playerPed, true, false)
+    SetEveryoneIgnorePlayer(playerId, false)
+end
+
+function StaffMenu.IsSpectating()
+    return spectateTargetId ~= nil
+end
+
+--- Demande au serveur d'arrêter le spectate (il renvoie la position d'origine).
+function StaffMenu.StopSpectate()
+    if not spectateTargetId then return end
+    TriggerServerEvent("core:StaffSpectate", spectateTargetId, false)
+end
+
+-- Surveillance pendant le spectate : aide à l'écran, touche de sortie, et arrêt
+-- automatique si la cible se déconnecte.
+local function startSpectateWatcher()
+    if spectateWatcher then return end
+    spectateWatcher = true
+
+    CreateThread(function()
+        while spectateTargetId do
+            VFW.ShowHelpNotification("Spectate en cours~n~~INPUT_FRONTEND_RRIGHT~ pour quitter")
+
+            if IsControlJustReleased(0, 194) or IsControlJustReleased(0, 202) then
+                StaffMenu.StopSpectate()
+                break
+            end
+
+            if GetPlayerFromServerId(spectateTargetId) == -1 then
+                VFW.ShowNotification({ type = 'STAFF', variant = 'INFO', subtitle = 'Spectate', message = "Le joueur observé s'est déconnecté." })
+                StaffMenu.StopSpectate()
+                break
+            end
+
+            Wait(0)
+        end
+
+        spectateWatcher = false
+    end)
+end
+
 RegisterNetEvent("core:StaffSpectate", function(coords, id, isSpectating)
     local playerPed = PlayerPedId()
     local playerId = PlayerId()
@@ -87,26 +143,27 @@ RegisterNetEvent("core:StaffSpectate", function(coords, id, isSpectating)
             Wait(0)
         end
 
+        playerPed = PlayerPedId()
         FreezeEntityPosition(playerPed, true)
         SetEntityInvincible(playerPed, true)
         SetEntityCollision(playerPed, false, false)
         SetEntityVisible(playerPed, false, false)
         SetEveryoneIgnorePlayer(playerId, true)
 
-        if coords then
+        -- On se place sur la cible (invisible) pour que son ped soit streamé.
+        if coords and coords.x then
             SetEntityCoordsNoOffset(playerPed, coords.x, coords.y, coords.z, false, false, false)
+            SetEntityVelocity(playerPed, 0.0, 0.0, 0.0)
         end
 
-        local targetPlayerIndex = GetPlayerFromServerId(id)
         local targetPed = 0
         local timeout = 80
         while timeout > 0 do
-            targetPlayerIndex = GetPlayerFromServerId(id)
+            local targetPlayerIndex = GetPlayerFromServerId(id)
             if targetPlayerIndex ~= -1 then
                 targetPed = GetPlayerPed(targetPlayerIndex)
-                -- Inclut un check NetworkGetNetworkIdFromEntity: sans ça
-                -- NetworkSetInSpectatorMode crash réseau sur un ped fraichement
-                -- streamé (GTA5+1691021).
+                -- NetworkGetNetworkIdFromEntity : sans ce contrôle, NetworkSetInSpectatorMode
+                -- crash réseau sur un ped fraîchement streamé (GTA5+1691021).
                 if targetPed and targetPed ~= 0
                     and DoesEntityExist(targetPed)
                     and targetPed ~= playerPed
@@ -122,57 +179,48 @@ RegisterNetEvent("core:StaffSpectate", function(coords, id, isSpectating)
         if not targetPed or targetPed == 0 or not DoesEntityExist(targetPed)
             or NetworkGetNetworkIdFromEntity(targetPed) == 0 then
             VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Gestion Events', message = "Joueur non trouvé ou hors de portée." })
-            -- Route through StopSpectate so the noclip restore + state cleanup
-            -- runs and we never appear at the target's last coords.
-            if StaffMenu and StaffMenu.StopSpectate then
-                StaffMenu.StopSpectate()
-            else
-                FreezeEntityPosition(playerPed, false)
-                SetEntityInvincible(playerPed, false)
-                SetEntityCollision(playerPed, true, true)
-                SetEntityVisible(playerPed, true, false)
-                SetEveryoneIgnorePlayer(playerId, false)
-                DoScreenFadeIn(250)
-            end
+            spectateTargetId = tonumber(id)
+            StaffMenu.StopSpectate()
             return
         end
 
         Wait(100)
 
         NetworkSetInSpectatorMode(true, targetPed)
+        spectateTargetId = tonumber(id)
+        startSpectateWatcher()
 
         DoScreenFadeIn(250)
-    else
-        -- Fade out pour cacher la transition
-        DoScreenFadeOut(250)
-        while not IsScreenFadedOut() do
-            Wait(0)
-        end
-
-        -- Désactiver le mode spectateur
-        NetworkSetInSpectatorMode(false, playerPed)
-        SetEveryoneIgnorePlayer(playerId, false)
-
-        -- Teleport back to the pre-spectate position so the ped no longer
-        -- overlaps the target ped. Re-entering noclip while stacked on another
-        -- player triggers the GTA5+8EC6A8 crash.
-        if coords and coords.x then
-            SetEntityCoordsNoOffset(playerPed, coords.x, coords.y, coords.z, false, false, false)
-            SetEntityVelocity(playerPed, 0.0, 0.0, 0.0)
-        end
-
-        if StaffMenu and StaffMenu._restoreNoclipAfterSpectate then
-            StaffMenu._restoreNoclipAfterSpectate = false
-            VFW.ToggleNoclip()
-        else
-            FreezeEntityPosition(playerPed, false)
-            SetEntityInvincible(playerPed, false)
-            SetEntityCollision(playerPed, true, true)
-            SetEntityVisible(playerPed, true, false)
-        end
-
-        DoScreenFadeIn(250)
+        return
     end
+
+    -- ── Sortie ──
+    DoScreenFadeOut(250)
+    while not IsScreenFadedOut() do
+        Wait(0)
+    end
+
+    playerPed = PlayerPedId()
+    NetworkSetInSpectatorMode(false, playerPed)
+    SetEveryoneIgnorePlayer(playerId, false)
+    spectateTargetId = nil
+
+    -- Retour à la position d'avant le spectate : réactiver le noclip au-dessus d'un autre
+    -- joueur déclenche le crash GTA5+8EC6A8.
+    if coords and coords.x then
+        SetEntityCoordsNoOffset(playerPed, coords.x, coords.y, coords.z, false, false, false)
+        SetEntityVelocity(playerPed, 0.0, 0.0, 0.0)
+    end
+
+    if StaffMenu and StaffMenu._restoreNoclipAfterSpectate then
+        StaffMenu._restoreNoclipAfterSpectate = false
+        restorePed(playerPed, playerId)
+        VFW.ToggleNoclip()
+    else
+        restorePed(playerPed, playerId)
+    end
+
+    DoScreenFadeIn(250)
 end)
 
 -- Watch distance after /goto with bucket change, return to original bucket when far enough
@@ -204,8 +252,31 @@ RegisterNetEvent("vfw:staff:goto:watchBucket", function(targetServerId, original
 end)
 
 ---@param staut any
+local frozenByStaff = false
+
 RegisterNetEvent("core:FreezePlayer", function(staut)
-    FreezeEntityPosition(VFW.PlayerData.ped, staut)
+    local frozen = staut == true
+    frozenByStaff = frozen
+
+    -- VFW.PlayerData.ped est un handle mis en cache : il devient invalide après un
+    -- changement de modèle et le gel ne s'appliquait alors à rien.
+    FreezeEntityPosition(PlayerPedId(), frozen)
+
+    if not frozen then return end
+
+    VFW.ShowNotification({ type = 'ROUGE', content = "Vous avez été immobilisé par le staff." })
+
+    CreateThread(function()
+        while frozenByStaff do
+            local ped = PlayerPedId()
+            if not IsEntityPositionFrozen(ped) then
+                FreezeEntityPosition(ped, true)
+            end
+            Wait(500)
+        end
+        FreezeEntityPosition(PlayerPedId(), false)
+        VFW.ShowNotification({ type = 'VERT', content = "Vous pouvez de nouveau bouger." })
+    end)
 end)
 
 ---@param ped any
@@ -650,8 +721,9 @@ RegisterCommand("staff", function()
 
     local newState = not StaffMenu.adminChecked
 
-    if not newState and VFW.IsNoclipActive() then
-        VFW.ToggleNoclip()
+    if not newState then
+        if StaffMenu.IsSpectating and StaffMenu.IsSpectating() then StaffMenu.StopSpectate() end
+        if VFW.IsNoclipActive() then VFW.ToggleNoclip() end
     end
 
     StaffMenu.adminChecked = newState

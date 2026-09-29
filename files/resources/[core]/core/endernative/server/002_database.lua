@@ -210,12 +210,37 @@ function VFW.DB.LoadJobs()
 end
 
 function VFW.DB.BuildJob(name, grade)
-    local job = VFW.Jobs[name] or VFW.Jobs.unemployed
+    local jobs = type(VFW.Jobs) == "table" and VFW.Jobs or {}
+    local job = jobs[name] or jobs.unemployed
+
+    -- BuildJob peut etre appele par un joueur deja connecte pendant que le
+    -- callback MySQL.ready recharge encore les metiers. Ne jamais laisser ce
+    -- court delai faire planter le chargement du personnage.
+    if not job then
+        job = {
+            name = "unemployed",
+            label = "Sans emploi",
+            type = "job",
+            whitelisted = false,
+            grades = {
+                ["0"] = {
+                    grade = 0,
+                    name = "unemployed",
+                    label = "Sans emploi",
+                    salary = 200,
+                    isBoss = false,
+                    permissions = {},
+                },
+            },
+        }
+    end
+
     grade = tonumber(grade) or 0
 
-    local gradeData = job.grades[tostring(grade)]
+    local grades = type(job.grades) == "table" and job.grades or {}
+    local gradeData = grades[tostring(grade)]
     if not gradeData then
-        local _, first = next(job.grades)
+        local _, first = next(grades)
         gradeData = first or { grade = 0, name = "unknown", label = "Inconnu", salary = 0, isBoss = false, permissions = {} }
         grade = gradeData.grade
     end
@@ -302,28 +327,166 @@ function VFW.DB.ApplyOwnerAccount(account)
     return account
 end
 
+local usersIdAutoIncrement = nil
+
+local function playerUuidFromAccountId(accountId)
+    local numericId = tonumber(accountId)
+    if not numericId or numericId < 1 or numericId % 1 ~= 0 then
+        error(("Identifiant de compte invalide pour générer l'UUID : %s"):format(tostring(accountId)))
+    end
+
+    return tostring(math.floor(numericId))
+end
+
+local function ensureSequentialPlayerUuid(account)
+    if account then
+        local uuid = playerUuidFromAccountId(account.id)
+        if tostring(account.uuid or "") ~= uuid then
+            MySQL.update.await("UPDATE users SET uuid = ? WHERE id = ?", { uuid, account.id })
+            account.uuid = uuid
+        end
+    end
+    return account
+end
+
+local function nextLegacyAccountId(identifier)
+    local existing = MySQL.scalar.await(
+        "SELECT id FROM player_uuid_sequence WHERE identifier = ? LIMIT 1",
+        { identifier }
+    )
+    if existing then return playerUuidFromAccountId(existing) end
+
+    local id = MySQL.insert.await([[
+        INSERT INTO player_uuid_sequence (identifier)
+        VALUES (?)
+        ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)
+    ]], { identifier })
+
+    if not id or tonumber(id) == 0 then
+        id = MySQL.scalar.await(
+            "SELECT id FROM player_uuid_sequence WHERE identifier = ? LIMIT 1",
+            { identifier }
+        )
+    end
+
+    return playerUuidFromAccountId(id)
+end
+
+function VFW.DB.EnsureSequentialPlayerUuids()
+    local autoIncrementColumn = MySQL.scalar.await([[
+        SELECT COUNT(*)
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'users'
+          AND COLUMN_NAME = 'id'
+          AND EXTRA LIKE '%auto_increment%'
+    ]])
+    usersIdAutoIncrement = (tonumber(autoIncrementColumn) or 0) > 0
+
+    if not usersIdAutoIncrement then
+        local invalidLegacyId = MySQL.scalar.await([[
+            SELECT 1
+            FROM users
+            WHERE id NOT REGEXP '^[1-9][0-9]*$'
+            LIMIT 1
+        ]])
+        if invalidLegacyId then
+            error("Les anciens identifiants de compte ne sont pas numériques : migration UUID automatique impossible")
+        end
+
+        MySQL.query.await([[
+            CREATE TABLE IF NOT EXISTS player_uuid_sequence (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                identifier VARCHAR(64) NOT NULL,
+                PRIMARY KEY (id),
+                UNIQUE KEY uk_player_uuid_sequence_identifier (identifier)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ]])
+
+        MySQL.query.await([[
+            INSERT IGNORE INTO player_uuid_sequence (id, identifier)
+            SELECT CAST(u.id AS UNSIGNED), u.identifier
+            FROM users u
+            LEFT JOIN player_uuid_sequence sequence_row ON sequence_row.identifier = u.identifier
+            WHERE sequence_row.identifier IS NULL
+            ORDER BY CAST(u.id AS UNSIGNED)
+        ]])
+
+        local invalidSequence = MySQL.scalar.await([[
+            SELECT 1
+            FROM users u
+            LEFT JOIN player_uuid_sequence sequence_row ON sequence_row.identifier = u.identifier
+            WHERE sequence_row.id IS NULL
+               OR sequence_row.id <> CAST(u.id AS UNSIGNED)
+            LIMIT 1
+        ]])
+        if invalidSequence then
+            error("La séquence des identifiants joueurs ne correspond pas aux comptes existants")
+        end
+    end
+
+    local needsMigration = MySQL.scalar.await([[
+        SELECT 1
+        FROM users
+        WHERE uuid IS NULL OR CAST(uuid AS BINARY) <> CAST(id AS BINARY)
+        LIMIT 1
+    ]])
+    if not needsMigration then return end
+
+    local migrated = MySQL.transaction.await({
+        {
+            query = "UPDATE users SET uuid = NULL WHERE uuid IS NULL OR CAST(uuid AS BINARY) <> CAST(id AS BINARY)",
+            values = {},
+        },
+        {
+            query = "UPDATE users SET uuid = CAST(id AS CHAR) WHERE uuid IS NULL",
+            values = {},
+        },
+    })
+
+    if not migrated then
+        error("Impossible de convertir les UUID joueurs en identifiants séquentiels")
+    end
+end
+
 function VFW.DB.LoadAccount(identifier)
     local row = MySQL.single.await("SELECT * FROM users WHERE identifier = ?", { identifier })
     if row then
+        row = ensureSequentialPlayerUuid(row)
         row.permissions = decode(row.permissions, {})
         return VFW.DB.EnsureNiveau6Account(VFW.DB.ApplyOwnerAccount(row))
     end
 
-    local id = VFW.GenerateUUID and VFW.GenerateUUID() or tostring(math.random(1, 2 ^ 31))
     local isOwner = VFW.IsOwnerIdentifier(identifier)
     local perms = isOwner and VFW.BuildFullPermissions() or {}
     local role = isOwner and "niveau_6" or "user"
     local vip = isOwner and 3 or 0
 
-    MySQL.insert.await(
-        "INSERT INTO users (id, identifier, uuid, slots, role, permissions, vip_tier) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        { id, identifier, id, Config.Multicharacter.Slots, role, json.encode(perms), vip }
-    )
+    if usersIdAutoIncrement == nil then
+        error("Le mode d'identifiant des comptes n'a pas été initialisé")
+    end
+
+    local id, uuid
+    if usersIdAutoIncrement then
+        id = MySQL.insert.await(
+            "INSERT INTO users (identifier, slots, role, permissions, vip_tier) VALUES (?, ?, ?, ?, ?)",
+            { identifier, Config.Multicharacter.Slots, role, json.encode(perms), vip }
+        )
+        uuid = playerUuidFromAccountId(id)
+        MySQL.update.await("UPDATE users SET uuid = ? WHERE id = ?", { uuid, id })
+    else
+        id = nextLegacyAccountId(identifier)
+        uuid = id
+        MySQL.insert.await(
+            "INSERT INTO users (id, identifier, uuid, slots, role, permissions, vip_tier) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            { id, identifier, uuid, Config.Multicharacter.Slots, role, json.encode(perms), vip }
+        )
+    end
 
     return VFW.DB.EnsureNiveau6Account(VFW.DB.ApplyOwnerAccount({
         id = id,
         identifier = identifier,
-        uuid = id,
+        uuid = uuid,
         permissions = perms,
         role = role,
         role_id = 0,
@@ -476,6 +639,7 @@ function VFW.DB.SaveAll()
 end
 
 MySQL.ready(function()
+    VFW.DB.EnsureSequentialPlayerUuids()
     VFW.DB.LoadJobs()
     VFW.DB.LoadItems()
 

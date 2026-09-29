@@ -193,6 +193,16 @@ function Staff29.RateLimit(source, key, intervalMs)
     return true
 end
 
+function Staff29.ResetRateLimit(source, key)
+    local bucket = rateBuckets[source]
+    if not bucket then return end
+
+    bucket[key] = nil
+    if not next(bucket) then
+        rateBuckets[source] = nil
+    end
+end
+
 AddEventHandler("vfw:playerDropped", function(source)
     rateBuckets[source] = nil
 end)

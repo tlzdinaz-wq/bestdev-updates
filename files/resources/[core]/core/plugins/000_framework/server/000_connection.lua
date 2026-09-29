@@ -57,8 +57,18 @@ AddEventHandler("playerConnecting", function(name, setKickReason, deferrals)
         return
     end
 
-    if account.banned == 1 then
-        deferrals.done("Vous êtes banni de ce serveur.")
+    -- `users.banned` est un TINYINT(1) : suivant la version d'oxmysql il revient en booléen
+    -- (true), en nombre (1) ou en texte ("1"). Le test `== 1` laissait donc entrer un compte
+    -- banni — le bannissement semblait levé tout seul à la reconnexion.
+    local banned = account.banned
+    if banned == true or banned == 1 or banned == "1" then
+        local message = "Vous êtes banni de ce serveur."
+        if VFW.GetActiveBanMessage then
+            local ok, detailed = pcall(VFW.GetActiveBanMessage, account.id)
+            if ok and type(detailed) == "string" and detailed ~= "" then message = detailed end
+        end
+        console.warn(("[connexion] compte banni refusé : %s (compte %s)"):format(identifier, tostring(account.id)))
+        deferrals.done(message)
         return
     end
 

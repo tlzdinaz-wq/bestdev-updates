@@ -190,7 +190,8 @@ local function spawnGhost(ghost)
     SetEntityAlpha(ped, GHOST_ALPHA, false)
 
     -- Create gamer tag showing player info
-    local tagText = ("UUID : %s %s (%s)"):format(ghost.permId, ghost.name, ghost.timeStr)
+    local tagText = ("UUID : %s %s | %s | Déco: %s (%s)"):format(
+        ghost.permId, ghost.name, ghost.reason or "Raison inconnue", ghost.timeStr, ghostAgeLabel(ghost))
     local gamerTag = CreateFakeMpGamerTag(ped, tagText, false, false, "", false)
     SetMpGamerTagAlpha(gamerTag, 0, GHOST_ALPHA)
     SetMpGamerTagColour(gamerTag, 0, 4) -- Color 4 (orangish)
@@ -201,6 +202,24 @@ local function spawnGhost(ghost)
 
     SetModelAsNoLongerNeeded(model)
 
+end
+
+--- Temps écoulé depuis la déconnexion, affiché sur l'étiquette du fantôme.
+--- Le serveur envoie l'ancienneté au moment de l'envoi (ageSeconds) : on la fait avancer
+--- localement, faute d'avoir son horloge.
+---@param ghost table
+---@return string
+function ghostAgeLabel(ghost)
+    local base = tonumber(ghost.ageSeconds) or 0
+    local since = ghost.receivedAt and ((GetGameTimer() - ghost.receivedAt) / 1000) or 0
+    local elapsed = math.floor(base + since)
+
+    if elapsed < 60 then return "à l'instant" end
+
+    local minutes = math.floor(elapsed / 60)
+    if minutes < 60 then return ("il y a %d min"):format(minutes) end
+
+    return ("il y a %dh%02d"):format(math.floor(minutes / 60), minutes % 60)
 end
 
 ---Remove a ghost ped
@@ -236,7 +255,8 @@ end
 ---Add a new ghost to the registry
 ---@param ghostData table Ghost data from server
 local function addGhost(ghostData)
-    -- Store ghost data
+    -- Repère local de réception : sert à faire avancer l'ancienneté envoyée par le serveur.
+    ghostData.receivedAt = GetGameTimer()
     ghosts[ghostData.playerServerId] = ghostData
 end
 

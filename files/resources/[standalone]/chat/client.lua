@@ -28,11 +28,49 @@ RegisterCommand("chatopen", function()
 end, false)
 RegisterKeyMapping("chatopen", "Ouvrir le chat", "keyboard", "T")
 
+-- Opacité du fond du chat, réglable par chaque joueur : /chatopacity 0 (transparent) à 100 (plein).
+RegisterCommand("chatopacity", function(_, args)
+    local value = tonumber(args[1])
+    if not value then return end
+    value = math.max(0, math.min(100, value))
+    nui("chat:setOpacity", { value = value })
+end, false)
+
 RegisterNUICallback("chat:close", function(_, cb)
     cb({ ok = true })
     open = false
     SetNuiFocus(false, false)
 end)
+
+-- Les commandes de la base sont enregistrées côté serveur : ExecuteCommand, côté client, ne
+-- les atteint pas. On exécute donc localement uniquement ce qui existe côté client, et tout
+-- le reste part au serveur (VFW.RegisterCommand) via le pont `vfw:command:run`.
+local function localCommandExists(name)
+    local ok, list = pcall(GetRegisteredCommands)
+    if not ok or type(list) ~= "table" then return false end
+    for i = 1, #list do
+        local entry = list[i]
+        local entryName = type(entry) == "table" and entry.name or entry
+        if type(entryName) == "string" and entryName:lower() == name then return true end
+    end
+    return false
+end
+
+local function runCommand(raw)
+    local parts = {}
+    for word in raw:gmatch("%S+") do parts[#parts + 1] = word end
+
+    local name = table.remove(parts, 1)
+    if not name then return end
+    name = name:lower()
+
+    if localCommandExists(name) then
+        ExecuteCommand(raw)
+        return
+    end
+
+    TriggerServerEvent("vfw:command:run", name, parts)
+end
 
 RegisterNUICallback("chat:send", function(data, cb)
     cb({ ok = true })
@@ -42,7 +80,7 @@ RegisterNUICallback("chat:send", function(data, cb)
     if message == "" then return end
     if message:sub(1, 1) == "/" then
         local cmd = message:sub(2)
-        if cmd ~= "" then ExecuteCommand(cmd) end
+        if cmd ~= "" then runCommand(cmd) end
         return
     end
     TriggerServerEvent("_chat:messageEntered", GetPlayerName(PlayerId()), { 255, 255, 255 }, message)
