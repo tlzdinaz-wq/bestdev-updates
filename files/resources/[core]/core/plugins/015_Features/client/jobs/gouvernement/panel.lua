@@ -36,43 +36,69 @@ AddEventHandler("onResourceStop", function(resource)
     ClearPedTasks(PlayerPedId())
 end)
 
-local function toPermissionList(map)
-    local list = {}
-    if type(map) ~= "table" then return list end
-    for name, enabled in pairs(map) do
-        list[#list + 1] = { name = name, enabled = enabled == true }
-    end
-    return list
+-- Les permissions de la tablette et leur mise en forme vivent dans
+-- plugins/015_Features/shared/mdt_permissions.lua, partagées avec le serveur.
+---@param map table|nil
+---@param forceAll boolean|nil accès complet (staff)
+---@return table
+local function toPermissionList(map, forceAll)
+    local granted = type(map) == "table" and map or {}
+    local isBoss = forceAll == true or granted.isBoss == true or granted.isBoss == 1
+    return VFW.BuildMdtPermissions("gouvernement", granted, isBoss)
 end
 
---- Open Gouvernement Panel (Tablette Taxes)
+--- Message de données de la tablette, à partir de ce qu'on a sous la main.
+---@param societies table|nil liste des entreprises (nil tant que le serveur n'a pas répondu)
+---@param permissions table|nil permissions serveur
+---@param isStaff boolean|nil ouverture en mode staff (accès complet)
+---@return table
+local function buildPanelData(societies, permissions, isStaff)
+    local job = VFW.PlayerData.job
+
+    return {
+        job = job.name,
+        societies = societies or {},
+        playerGrade = isStaff and "Staff" or (job.grade_label or job.grade),
+        playerName = (VFW.PlayerData.firstName or "") .. " " .. (VFW.PlayerData.lastName or ""),
+        playerMugshot = VFW.PlayerData.mugshot or "",
+        permissions = toPermissionList(permissions, isStaff),
+        logo = GOUV_IMG,
+    }
+end
+
 VFW.Nui.gouvernementPanel = function(visible, isStaff)
     if visible then
-        local societies = TriggerServerCallback("gouvernement:getSocieties")
-        local playerPermissions = TriggerServerCallback("gouvernement:getPlayerPermissions")
+        if not VFW.PlayerData or not VFW.PlayerData.job then return end
 
-        local gouvLogo = GOUV_IMG
+        -- La tablette s'affiche tout de suite, avec ce que le client connaît déjà.
+        -- Avant, on attendait deux réponses du serveur AVANT d'envoyer quoi que ce soit à
+        -- l'interface : un callback qui ne répond pas bloque 15 secondes chacun (délai de
+        -- Citizen.Await), et la tablette ne s'ouvrait pas du tout pendant ce temps.
+        -- Les entreprises et les permissions arrivent ensuite et remplacent ces données.
+        SendNUIMessage({ action = "nui:GouvernementPanel:data", data = buildPanelData(nil, nil, isStaff) })
 
-        local playerName = (VFW.PlayerData.firstName or "") .. " " .. (VFW.PlayerData.lastName or "")
-        local playerGrade
-        if isStaff then
-            playerGrade = "Staff"
-        else
-            playerGrade = VFW.PlayerData.job.grade_label or VFW.PlayerData.job.grade
-        end
+        CreateThread(function()
+            local started = GetGameTimer()
+            local societies = TriggerServerCallback("gouvernement:getSocieties")
+            local playerPermissions = TriggerServerCallback("gouvernement:getPlayerPermissions")
+            local elapsed = GetGameTimer() - started
 
-        SendNUIMessage({
-            action = "nui:GouvernementPanel:data",
-            data = {
-                job = VFW.PlayerData.job.name,
-                societies = societies or {},
-                playerGrade = playerGrade,
-                playerName = playerName,
-                playerMugshot = VFW.PlayerData.mugshot or "",
-                permissions = toPermissionList(playerPermissions),
-                logo = gouvLogo,
-            }
-        })
+            if elapsed > 3000 then
+                console.warn(("[Gouvernement] le serveur a mis %d ms à répondre (entreprises/permissions)"):format(elapsed))
+                VFW.ShowNotification({
+                    type = 'ROUGE',
+                    title = "Gouvernement",
+                    content = ("Le serveur a mis %.1f s à répondre (entreprises/permissions)."):format(elapsed / 1000),
+                })
+            end
+
+            if not isPanelOpen then return end
+
+            SendNUIMessage({
+                action = "nui:GouvernementPanel:data",
+                data = buildPanelData(societies, playerPermissions, isStaff),
+            })
+        end)
     end
 
     SendNUIMessage({

@@ -37,6 +37,16 @@ local function StartTabletAnim()
     tabletAnimActive = true
 end
 
+-- Les permissions du MDT et leur mise en forme vivent dans
+-- plugins/015_Features/shared/mdt_permissions.lua : le serveur s'appuie sur la même liste
+-- pour la page « Permissions MDT », il ne doit pas y en avoir deux versions.
+---@param map table|nil permissions renvoyées par le serveur (nom -> booléen)
+---@param isBoss boolean
+---@return table
+local function buildPermissionList(map, isBoss)
+    return VFW.BuildMdtPermissions("police", map, isBoss)
+end
+
 local function StopTabletAnim()
     tabletAnimActive = false
     local ped = PlayerPedId()
@@ -53,36 +63,62 @@ AddEventHandler("onResourceStop", function(resource)
     StopTabletAnim()
 end)
 
+--- Construit le message de données du MDT à partir de ce qu'on a sous la main.
+---@param permissions table|nil permissions serveur (nil tant qu'elles n'ont pas répondu)
+---@param mugshot string|nil
+---@return table
+local function buildPanelData(permissions, mugshot)
+    local job = VFW.PlayerData.job
+    local bossFlag = job.grade_is_boss
+    local isBoss = bossFlag == true or bossFlag == 1 or bossFlag == "1"
+        or (tonumber(job.grade) or 0) >= 98
+
+    return {
+        job = job.name,
+        jobLabel = job.label or job.name,
+        playerGrade = job.grade_label or job.grade,
+        playerName = (VFW.PlayerData.firstName or "") .. " " .. (VFW.PlayerData.lastName or ""),
+        playerMugshot = (mugshot ~= nil and mugshot ~= "") and mugshot or (VFW.PlayerData.mugshot or ""),
+        permissions = buildPermissionList(permissions, isBoss),
+        isBoss = isBoss,
+        logo = POLICE_IMG:format(job.name),
+    }
+end
+
 --- Open Police Panel (MDT)
 VFW.Nui.policePanel = function(visible)
     if visible then
-        local playerPermissions = TriggerServerCallback("police:getPlayerPermissions")
-
         if not VFW.PlayerData or not VFW.PlayerData.job then return end
 
-        local playerName = (VFW.PlayerData.firstName or "") .. " " .. (VFW.PlayerData.lastName or "")
-        local playerGrade = VFW.PlayerData.job.grade_label or VFW.PlayerData.job.grade
+        -- La tablette s'affiche tout de suite, avec ce que le client connaît déjà.
+        -- Avant, on attendait deux réponses du serveur AVANT d'envoyer quoi que ce soit à
+        -- l'interface : un callback qui ne répond pas bloque 15 secondes chacun (délai de
+        -- Citizen.Await), et pendant ce temps la tablette ne s'ouvrait pas du tout.
+        -- Les permissions et le mugshot arrivent ensuite et remplacent ces données.
+        SendNUIMessage({ action = "nui:PolicePanel:data", data = buildPanelData(nil, nil) })
 
-        local isBoss = VFW.PlayerData.job.grade_is_boss or (tonumber(VFW.PlayerData.job.grade) or 0) >= 98
+        CreateThread(function()
+            local started = GetGameTimer()
+            local permissions = TriggerServerCallback("police:getPlayerPermissions")
+            local mugshot = TriggerServerCallback("vfw:server:getMugshot")
+            local elapsed = GetGameTimer() - started
 
-        local mugshot = TriggerServerCallback("vfw:server:getMugshot")
-        if not mugshot or mugshot == "" then
-            mugshot = VFW.PlayerData.mugshot or ""
-        end
+            if elapsed > 3000 then
+                console.warn(("[MDT] le serveur a mis %d ms à répondre (permissions/mugshot)"):format(elapsed))
+                VFW.ShowNotification({
+                    type = 'ROUGE',
+                    title = "MDT",
+                    content = ("Permissions : le serveur a mis %.1f s à répondre."):format(elapsed / 1000),
+                })
+            end
 
-        SendNUIMessage({
-            action = "nui:PolicePanel:data",
-            data = {
-                job = VFW.PlayerData.job.name,
-                jobLabel = VFW.PlayerData.job.label or VFW.PlayerData.job.name,
-                playerGrade = playerGrade,
-                playerName = playerName,
-                playerMugshot = mugshot,
-                permissions = playerPermissions or {},
-                isBoss = isBoss,
-                logo = POLICE_IMG:format(VFW.PlayerData.job.name),
-            }
-        })
+            if not isPanelOpen then return end
+
+            SendNUIMessage({
+                action = "nui:PolicePanel:data",
+                data = buildPanelData(permissions, mugshot),
+            })
+        end)
     end
 
     SendNUIMessage({
@@ -142,17 +178,46 @@ VFW.Nui.policePanel = function(visible)
 end
 
 function OpenPolicePanel()
+    local jobName = VFW.PlayerData.job.name or "sasp"
+
     if not VFW.PlayerData.job.onDuty then
-        VFW.ShowNotification({ type = "JOB", title = VFW.PlayerData.job.name or "sasp", subtitle = "Accès", image = VFW.CDN.Get("entreprise/" .. (VFW.PlayerData.job.name or "sasp") .. ".png"), content = "Vous devez être en service" })
+        VFW.ShowNotification({ type = "JOB", title = jobName, subtitle = "Accès", image = VFW.CDN.Get("entreprise/" .. jobName .. ".png"), content = "Vous devez être en service (menu métier > Prise de service)" })
+        console.warn(("[MDT] ouverture refusée : %s n'est pas en service"):format(jobName))
         return
     end
 
-    if not IsLawEnforcementJob(VFW.PlayerData.job.name) then
+    -- Refus silencieux à l'origine : le joueur cliquait sur le bouton et il ne se passait
+    -- rien, sans le moindre message. La liste des métiers police est construite à partir
+    -- de la table `societies` : si le métier n'y figure pas, il n'est reconnu nulle part.
+    if not IsLawEnforcementJob(jobName) then
+        VFW.ShowNotification({ type = "JOB", title = jobName, subtitle = "Accès", content = "Ce métier n'est pas reconnu comme métier de police (type de la société)." })
+        console.warn(("[MDT] ouverture refusée : '%s' n'est pas un métier police/milice (type de société)"):format(jobName))
         return
     end
 
     VFW.Nui.policePanel(true)
 end
+
+-- Filet de sécurité : referme toutes les tablettes, rend la souris et surtout remet le HUD.
+-- Quand une tablette se bloquait en cours d'ouverture, le HUD restait masqué (minimap et
+-- barres disparues) et il fallait se reconnecter.
+RegisterCommand("mdtclose", function()
+    SendNUIMessage({ action = "nui:PolicePanel:visible", data = false })
+    SendNUIMessage({ action = "nui:GouvernementPanel:visible", data = false })
+    SendNUIMessage({ action = "bossPanel:close" })
+
+    if VFW.BossPanel and VFW.BossPanel.closeBossPanel then
+        pcall(VFW.BossPanel.closeBossPanel)
+    end
+
+    VFW.Nui.Focus(false)
+    VFW.Nui.HudVisible(true)
+    isPanelOpen = false
+    isPanelMinimized = false
+    StopTabletAnim()
+
+    print("[Tablettes] fermeture forcée : souris rendue, HUD réaffiché")
+end, false)
 
 RegisterNuiCallback("nui:closePolicePanel", function(_, cb)
     VFW.Nui.policePanel(false)

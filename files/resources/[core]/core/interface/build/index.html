@@ -97,7 +97,88 @@
     <link rel="modulepreload" crossorigin href="./assets/vendor-dnd-BcC72jcB.js">
     <link rel="stylesheet" crossorigin href="./assets/index-yMOrF4qJ.css?v=8">
     <link rel="stylesheet" href="./tablet3d/tablet3d.css?v=3">
-    <link rel="stylesheet" href="./skin/boss-panel.css?v=1">
+    <link rel="stylesheet" href="./skin/boss-panel.css?v=2">
+    <style>
+      /* Points de repère des cartes (zones de circulation, territoires) : étiquettes
+         discrètes, elles ne doivent jamais passer devant les zones ni gêner le clic. */
+      .leaflet-tooltip.bd-landmark {
+        background: rgba(10, 13, 20, .72);
+        border: 1px solid rgba(255, 255, 255, .08);
+        color: rgba(226, 231, 240, .68);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: .02em;
+        padding: 2px 6px;
+        box-shadow: none;
+        pointer-events: none;
+      }
+      .leaflet-tooltip.bd-landmark::before { display: none; }
+    </style>
+    <script>
+      /* Repères affichés sur les cartes Leaflet quand le fond de carte est absent
+         (le jeu de tuiles GTA vit dans interface/brand/map/satelite et n'est pas livré
+         avec la base). Coordonnées du jeu : x = est/ouest, y = nord/sud.
+         Liste librement modifiable — ajouter une ligne suffit. */
+      window.__BD_LANDMARKS = [
+        { n: 'Legion Square',            x:   195, y:  -935 },
+        { n: 'Commissariat Mission Row', x:   425, y:  -979 },
+        { n: 'Hopital Pillbox',          x:   298, y:  -584 },
+        { n: 'Alta',                     x:   100, y:  -200 },
+        { n: 'Downtown Vinewood',        x:   300, y:   200 },
+        { n: 'Little Seoul',             x:  -600, y: -1000 },
+        { n: 'Textile City',             x:   400, y: -1300 },
+        { n: 'La Mesa',                  x:   900, y: -1600 },
+        { n: 'Mirror Park',              x:  1100, y:  -650 },
+        { n: 'East Vinewood',            x:   800, y:  -200 },
+        { n: 'Rockford Hills',           x:  -800, y:  -180 },
+        { n: 'Morningwood',              x: -1400, y:  -500 },
+        { n: 'Richman',                  x: -1700, y:   100 },
+        { n: 'Del Perro',                x: -1600, y:  -800 },
+        { n: 'Del Perro Pier',           x: -1850, y: -1240 },
+        { n: 'Vespucci Beach',           x: -1230, y: -1490 },
+        { n: 'La Puerta',                x: -1000, y: -1650 },
+        { n: 'Pacific Bluffs',           x: -2300, y:  -350 },
+        { n: 'Strawberry',               x:   200, y: -1450 },
+        { n: 'Chamberlain Hills',        x:  -100, y: -1600 },
+        { n: 'Davis',                    x:   100, y: -1900 },
+        { n: 'Rancho',                   x:   400, y: -1900 },
+        { n: 'Cypress Flats',            x:   800, y: -1900 },
+        { n: 'El Burro Heights',         x:  1400, y: -1600 },
+        { n: 'Murrieta Heights',         x:  1000, y: -1200 },
+        { n: 'Maze Bank Arena',          x:  -250, y: -2050 },
+        { n: 'Elysian Island',           x:   200, y: -2650 },
+        { n: 'Port de Los Santos',       x:   900, y: -2950 },
+        { n: 'Aeroport LSIA',            x: -1037, y: -2737 },
+        { n: 'Vinewood Hills',           x:   200, y:   550 },
+        { n: 'Panneau Vinewood',         x:   720, y:  1200 },
+        { n: 'Observatoire Galileo',     x:  -430, y:  1150 },
+        { n: 'Casino Diamond',           x:   935, y:    45 },
+        { n: 'Hippodrome',               x:  1100, y:   200 },
+        { n: 'Barrage Land Act',         x:  1600, y:   300 },
+        { n: 'Tongva Hills',             x: -1700, y:  1400 },
+        { n: 'Banham Canyon',            x: -2900, y:   300 },
+        { n: 'Chumash',                  x: -3200, y:  1000 },
+        { n: 'Great Chaparral',          x:   100, y:  2000 },
+        { n: 'Harmony',                  x:   250, y:  2900 },
+        { n: 'Prison Bolingbroke',       x:  1845, y:  2585 },
+        { n: 'Centrale Palmer-Taylor',   x:  2700, y:  1600 },
+        { n: 'Raffinerie Ron',           x:  2700, y:  2700 },
+        { n: 'Grand Senora',             x:  1400, y:  3000 },
+        { n: 'Aerodrome Sandy',          x:  1700, y:  3250 },
+        { n: 'Sandy Shores',             x:  1700, y:  3700 },
+        { n: 'Alamo Sea',                x:   900, y:  3800 },
+        { n: 'Fort Zancudo',             x: -2200, y:  3200 },
+        { n: 'Lac Zancudo',              x: -1700, y:  2500 },
+        { n: 'Grapeseed',                x:  1680, y:  4800 },
+        { n: 'Raton Canyon',             x: -1500, y:  4400 },
+        { n: 'Cassidy Creek',            x:  -600, y:  4400 },
+        { n: 'Mont Chiliad',             x:   425, y:  5615 },
+        { n: 'Braddock Pass',            x:  1500, y:  5400 },
+        { n: 'Mont Gordo',               x:  2800, y:  5500 },
+        { n: 'Paleto Bay',               x:   130, y:  6360 },
+        { n: 'Baie de Procopio',         x:  -300, y:  6900 }
+      ];
+    </script>
     <link rel="stylesheet" href="./skin/notifications.css?v=8">
     <link rel="stylesheet" href="./skin/status-hud.css?v=5">
     <link rel="stylesheet" href="./skin/char-creator.css?v=4">
@@ -148,6 +229,14 @@
           if (t.dataset.nuiFallback) return;
           var src = t.currentSrc || t.src || '';
           if (!src) return;
+          // Les tuiles des cartes Leaflet ne doivent pas hériter du visuel « image
+          // manquante » : sans jeu de tuiles installé, on obtiendrait une grille
+          // d'icônes à la place de la carte. On les efface simplement.
+          if (t.classList && t.classList.contains('leaflet-tile')) {
+            t.dataset.nuiFallback = '1';
+            t.style.visibility = 'hidden';
+            return;
+          }
           if (src.indexOf('placeholder.svg') !== -1 || src.indexOf('aucun.svg') !== -1) return;
           t.dataset.nuiFallback = '1';
           t.src = src.indexOf('outfits_greenscreener') !== -1 ? OUTFIT_PH : ITEM_PH;

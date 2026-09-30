@@ -30,6 +30,72 @@ local function citizenIdentifier(data)
     return id
 end
 
+-- ══════════════════════════════════════════════════════════════════════════
+-- Journal du MDT (onglet « Logs MDT »)
+--
+-- La table `police_mdt_logs` et sa lecture (`police:getMdtLogs`) existaient, mais rien
+-- n'y écrivait : l'onglet affichait « Aucun log enregistré » quoi qu'il arrive. On trace
+-- ici toutes les actions qui modifient quelque chose, avec leur auteur.
+-- ══════════════════════════════════════════════════════════════════════════
+
+local LOG_KEEP = 2000
+local logCount = 0
+
+--- Écrit une ligne de journal.
+---@param xPlayer table|nil
+---@param action string libellé court affiché dans l'onglet
+---@param payload any données de l'action (résumées en JSON)
+local function logMdt(xPlayer, action, payload)
+    if not xPlayer then return end
+
+    local details = ""
+    if payload ~= nil then
+        local ok, encoded = pcall(json.encode, payload)
+        if ok and type(encoded) == "string" then
+            details = #encoded > 900 and (encoded:sub(1, 900) .. "…") or encoded
+        end
+    end
+
+    MiscB.Update([[
+        INSERT INTO police_mdt_logs (identifier, player_name, job_name, action, details)
+        VALUES (?, ?, ?, ?, ?)
+    ]], { xPlayer.identifier, xPlayer.name or "", MiscB.JobName(xPlayer), action, details })
+
+    -- Purge périodique : le journal ne doit pas grossir indéfiniment.
+    logCount = logCount + 1
+    if logCount >= 200 then
+        logCount = 0
+        MiscB.Update([[
+            DELETE FROM police_mdt_logs WHERE id <= (
+                SELECT id FROM (
+                    SELECT id FROM police_mdt_logs ORDER BY id DESC LIMIT 1 OFFSET ?
+                ) AS cutoff
+            )
+        ]], { LOG_KEEP })
+    end
+end
+
+--- Enregistre un callback dont le succès est journalisé.
+--- Le handler garde sa signature et ses valeurs de retour ; on n'écrit au journal que si
+--- l'action a réellement abouti (pas de ligne pour un refus de permission).
+---@param name string
+---@param label string
+---@param handler function
+local function CbLogged(name, label, handler)
+    MiscB.Cb(name, function(source, ...)
+        local result = table.pack(handler(source, ...))
+        local first = result[1]
+        local failed = type(first) == "table" and first.success == false
+
+        if not failed then
+            local args = table.pack(...)
+            logMdt(VFW.GetPlayerFromId(source), label, args[1])
+        end
+
+        return table.unpack(result, 1, result.n)
+    end)
+end
+
 local function jobPermissions(jobName, grade)
     local row = MiscB.Single(
         "SELECT permissions FROM police_grade_permissions WHERE job_name = ? AND grade = ? LIMIT 1",
@@ -47,21 +113,61 @@ MiscB.Cb("police:getPlayerPermissions", function(source)
     return jobPermissions(MiscB.JobName(xPlayer), MiscB.GradeLevel(xPlayer))
 end)
 
+-- La page « Permissions MDT » affiche une carte par grade du métier et attend, pour chacun,
+-- { grade, name, label, isBoss, permissions = [{ name, enabled }] }.
+-- On ne renvoyait que les lignes déjà présentes en base, au format brut (une table
+-- nom -> booléen, sans nom ni libellé de grade) : sur un serveur où personne n'a encore
+-- rien coché, la réponse était vide et la page restait blanche — impossible d'attribuer
+-- la moindre permission, donc impossible d'en attribuer une première.
+---@param jobName string
+---@return table
+local function gradePermissionCards(jobName)
+    local job = VFW.Jobs and VFW.Jobs[jobName]
+    if not job or type(job.grades) ~= "table" then return {} end
+
+    -- permissions enregistrées, indexées par numéro de grade
+    local saved = {}
+    local rows = MiscB.Query(
+        "SELECT grade, permissions FROM police_grade_permissions WHERE job_name = ?",
+        { jobName }
+    )
+    for i = 1, #rows do
+        local decoded = VFW.DB.Decode(rows[i].permissions, {})
+        saved[tonumber(rows[i].grade) or 0] = type(decoded) == "table" and decoded or {}
+    end
+
+    local grades = {}
+    for _, grade in pairs(job.grades) do
+        grades[#grades + 1] = grade
+    end
+    table.sort(grades, function(a, b) return (tonumber(a.grade) or 0) < (tonumber(b.grade) or 0) end)
+
+    local cards = {}
+    for i = 1, #grades do
+        local grade = grades[i]
+        local level = tonumber(grade.grade) or 0
+        local isBoss = grade.isBoss == true or grade.is_boss == true or grade.is_boss == 1
+
+        cards[i] = {
+            grade = level,
+            name = grade.name,
+            label = grade.label or grade.name,
+            isBoss = isBoss,
+            permissions = VFW.BuildMdtPermissions("police", saved[level], isBoss),
+        }
+    end
+
+    return cards
+end
+
 MiscB.Cb("police:getGradesPermissions", function(source)
     local xPlayer = officer(source)
     if not xPlayer or not MiscB.IsBoss(xPlayer) then return {} end
 
-    local rows = MiscB.Query(
-        "SELECT grade, permissions FROM police_grade_permissions WHERE job_name = ? ORDER BY grade ASC",
-        { MiscB.JobName(xPlayer) }
-    )
-    for i = 1, #rows do
-        rows[i].permissions = VFW.DB.Decode(rows[i].permissions, {})
-    end
-    return rows
+    return gradePermissionCards(MiscB.JobName(xPlayer))
 end)
 
-MiscB.Cb("police:updateGradePermissions", function(source, data)
+CbLogged("police:updateGradePermissions", "Permissions de grade modifiées", function(source, data)
     local xPlayer = officer(source)
     if not xPlayer or not MiscB.IsBoss(xPlayer) then return { success = false } end
     if type(data) ~= "table" then return { success = false } end
@@ -325,7 +431,7 @@ for _, entry in ipairs(RECORD_CALLBACKS) do
     end)
 end
 
-MiscB.Cb("police:createCriminalRecordBatch", function(source, data)
+CbLogged("police:createCriminalRecordBatch", "Dossier créé", function(source, data)
     local xPlayer = officerOrJustice(source)
     if not xPlayer then return { success = false } end
     if type(data) ~= "table" then return { success = false } end
@@ -380,7 +486,7 @@ MiscB.Cb("police:getAuthoredRecords", function(source, data)
     return rows
 end)
 
-MiscB.Cb("police:deleteRecord", function(source, data)
+CbLogged("police:deleteRecord", "Dossier supprimé", function(source, data)
     local xPlayer = officerOrJustice(source)
     if not xPlayer then return { success = false } end
 
@@ -397,7 +503,7 @@ MiscB.Cb("police:deleteRecord", function(source, data)
     return { success = true }
 end)
 
-MiscB.Cb("police:editRecord", function(source, data)
+CbLogged("police:editRecord", "Dossier modifié", function(source, data)
     local xPlayer = officerOrJustice(source)
     if not xPlayer then return { success = false } end
     if type(data) ~= "table" then return { success = false } end
@@ -502,7 +608,7 @@ MiscB.Cb("police:getDashboard", function(source)
     }
 end)
 
-MiscB.Cb("police:addAnnouncement", function(source, data)
+CbLogged("police:addAnnouncement", "Annonce publiée", function(source, data)
     local xPlayer = officer(source)
     if not xPlayer then return { success = false } end
     if type(data) ~= "table" then return { success = false } end
@@ -519,7 +625,7 @@ MiscB.Cb("police:addAnnouncement", function(source, data)
     return { success = id ~= nil, id = id }
 end)
 
-MiscB.Cb("police:removeAnnouncement", function(source, data)
+CbLogged("police:removeAnnouncement", "Annonce supprimée", function(source, data)
     local xPlayer = officer(source)
     if not xPlayer then return { success = false } end
 
@@ -530,7 +636,7 @@ MiscB.Cb("police:removeAnnouncement", function(source, data)
     return { success = true }
 end)
 
-MiscB.Cb("police:addWantedNotice", function(source, data)
+CbLogged("police:addWantedNotice", "Avis de recherche émis", function(source, data)
     local xPlayer = officerOrJustice(source)
     if not xPlayer then return { success = false } end
 
@@ -551,7 +657,7 @@ MiscB.Cb("police:addWantedNotice", function(source, data)
     return { success = id ~= nil, id = id }
 end)
 
-MiscB.Cb("police:removeWantedNotice", function(source, data)
+CbLogged("police:removeWantedNotice", "Avis de recherche levé", function(source, data)
     local xPlayer = officerOrJustice(source)
     if not xPlayer then return { success = false } end
 
@@ -562,7 +668,7 @@ MiscB.Cb("police:removeWantedNotice", function(source, data)
     return { success = true }
 end)
 
-MiscB.Cb("police:addWantedVehicle", function(source, data)
+CbLogged("police:addWantedVehicle", "Véhicule recherché ajouté", function(source, data)
     local xPlayer = officerOrJustice(source)
     if not xPlayer then return { success = false } end
     if type(data) ~= "table" then return { success = false } end
@@ -578,7 +684,7 @@ MiscB.Cb("police:addWantedVehicle", function(source, data)
     return { success = id ~= nil, id = id }
 end)
 
-MiscB.Cb("police:removeWantedVehicle", function(source, data)
+CbLogged("police:removeWantedVehicle", "Véhicule recherché retiré", function(source, data)
     local xPlayer = officerOrJustice(source)
     if not xPlayer then return { success = false } end
 
@@ -609,7 +715,7 @@ MiscB.Cb("police:getAllWarrants", function(source)
     return MiscB.Query("SELECT * FROM police_warrants ORDER BY id DESC LIMIT 300", {})
 end)
 
-MiscB.Cb("police:createWarrant", function(source, data)
+CbLogged("police:createWarrant", "Mandat créé", function(source, data)
     local xPlayer = officerOrJustice(source)
     if not xPlayer then return { success = false } end
 
@@ -631,7 +737,7 @@ MiscB.Cb("police:createWarrant", function(source, data)
     return { success = id ~= nil, id = id }
 end)
 
-MiscB.Cb("police:updateWarrantStatus", function(source, data)
+CbLogged("police:updateWarrantStatus", "Mandat mis à jour", function(source, data)
     local xPlayer = officerOrJustice(source)
     if not xPlayer then return { success = false } end
     if type(data) ~= "table" then return { success = false } end
@@ -687,7 +793,7 @@ local function createFine(xPlayer, targetIdentifier, fine, amountOverride)
     })
 end
 
-MiscB.Cb("police:createFine", function(source, data)
+CbLogged("police:createFine", "Amende émise", function(source, data)
     local xPlayer = officer(source)
     if not xPlayer then return { success = false } end
 
@@ -739,7 +845,7 @@ MiscB.Cb("police:getCitizenFines", function(source, data)
     ]], { identifier })
 end)
 
-MiscB.Cb("police:cancelFine", function(source, data)
+CbLogged("police:cancelFine", "Amende annulée", function(source, data)
     local xPlayer = officerOrJustice(source)
     if not xPlayer then return { success = false } end
 
@@ -750,7 +856,7 @@ MiscB.Cb("police:cancelFine", function(source, data)
     return { success = true }
 end)
 
-MiscB.Cb("police:togglePPA", function(source, data)
+CbLogged("police:togglePPA", "PPA modifié", function(source, data)
     local xPlayer = officer(source)
     if not xPlayer then return { success = false } end
 

@@ -68,16 +68,54 @@ MiscB.Cb("gouvernement:checkPerm", function(source, permission)
     return hasPerm(xPlayer, perm)
 end)
 
+-- Même contrat que le MDT police : une carte par grade du métier, permissions en liste.
+-- Sans ça, la page reste vide tant qu'aucune permission n'a été enregistrée — et comme
+-- c'est justement l'écran qui sert à les enregistrer, on ne pouvait jamais commencer.
+---@param jobName string
+---@return table
+local function gouvGradeCards(jobName)
+    local job = VFW.Jobs and VFW.Jobs[jobName]
+    if not job or type(job.grades) ~= "table" then return {} end
+
+    local saved = {}
+    local rows = MiscB.Query(
+        "SELECT grade, permissions FROM gouv_grade_permissions WHERE job_name = ?",
+        { jobName }
+    )
+    for i = 1, #rows do
+        local decoded = VFW.DB.Decode(rows[i].permissions, {})
+        saved[tonumber(rows[i].grade) or 0] = type(decoded) == "table" and decoded or {}
+    end
+
+    local grades = {}
+    for _, grade in pairs(job.grades) do
+        grades[#grades + 1] = grade
+    end
+    table.sort(grades, function(a, b) return (tonumber(a.grade) or 0) < (tonumber(b.grade) or 0) end)
+
+    local cards = {}
+    for i = 1, #grades do
+        local grade = grades[i]
+        local level = tonumber(grade.grade) or 0
+        local isBoss = grade.isBoss == true or grade.is_boss == true or grade.is_boss == 1
+
+        cards[i] = {
+            grade = level,
+            name = grade.name,
+            label = grade.label or grade.name,
+            isBoss = isBoss,
+            permissions = VFW.BuildMdtPermissions("gouvernement", saved[level], isBoss),
+        }
+    end
+
+    return cards
+end
+
 MiscB.Cb("gouvernement:getGradesPermissions", function(source)
     local xPlayer = gouv(source)
     if not xPlayer or not MiscB.IsBoss(xPlayer) then return {} end
 
-    local rows = MiscB.Query(
-        "SELECT grade, permissions FROM gouv_grade_permissions WHERE job_name = ? ORDER BY grade ASC",
-        { MiscB.JobName(xPlayer) }
-    )
-    for i = 1, #rows do rows[i].permissions = VFW.DB.Decode(rows[i].permissions, {}) end
-    return rows
+    return gouvGradeCards(MiscB.JobName(xPlayer))
 end)
 
 MiscB.Cb("gouvernement:updateGradePermissions", function(source, data)

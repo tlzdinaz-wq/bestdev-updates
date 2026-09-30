@@ -1429,8 +1429,13 @@ end)
 local function renderJobMenu()
     local jobName = VFW.PlayerData.job.name
 
-    main.Checkbox("Prise de service", "", false, Society.data.service or false, function(checked)
-        Society.data.service = checked
+    -- Society.data peut être remplacé par ce que renvoie le serveur : si la société du métier
+    -- n'existe pas encore, une lecture directe fait planter tout le rendu et le menu s'ouvre
+    -- vide (fond assombri, aucune ligne).
+    local onService = (Society.data and Society.data.service) or VFW.PlayerData.job.onDuty or false
+
+    main.Checkbox("Prise de service", "", false, onService, function(checked)
+        if Society.data then Society.data.service = checked end
         VFW.ChangeDuty(checked)
         main.refresh()
     end)

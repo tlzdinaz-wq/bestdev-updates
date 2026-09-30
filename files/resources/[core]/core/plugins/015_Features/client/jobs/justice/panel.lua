@@ -193,12 +193,34 @@ end
 
 -- NUI Callbacks for DOJ data
 
+--- L'interface parcourt la réponse (`permissions.forEach`) : le serveur renvoie une table
+--- « nom -> booléen », qui arrive côté page sous la forme d'un objet et fait échouer la
+--- lecture des permissions en silence. On convertit, et on ne renvoie rien plutôt qu'une
+--- table vide (que la page prendrait pour une liste).
+---@param map table|nil
+---@return table|nil
+local function toPermissionList(map)
+    if type(map) ~= "table" then return nil end
+
+    local isBoss = map.isBoss == true or map.isBoss == 1
+    local list = {}
+
+    for name, enabled in pairs(map) do
+        if type(name) == "string" then
+            list[#list + 1] = { name = name, enabled = name == "isBoss" and isBoss or (isBoss or enabled == true) }
+        end
+    end
+
+    if #list == 0 then return nil end
+    return list
+end
+
 RegisterNuiCallback("doj:getPlayerPermissions", function(_, cb)
-    local ok, err = pcall(function()
+    local ok = pcall(function()
         local response = TriggerServerCallback("doj:getPlayerPermissions")
-        cb(response or {})
+        cb(toPermissionList(response))
     end)
-    if not ok then cb({}) end
+    if not ok then cb(nil) end
 end)
 
 RegisterNuiCallback("doj:getGradesPermissions", function(_, cb)

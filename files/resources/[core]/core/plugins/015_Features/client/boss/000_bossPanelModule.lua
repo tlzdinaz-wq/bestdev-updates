@@ -100,6 +100,29 @@ local formatDescription = function(items)
     return desc
 end
 
+-- La tablette a besoin de sept réponses du serveur avant de pouvoir s'afficher. Un callback
+-- qui ne répond pas coûte 15 secondes (délai de Citizen.Await) et, pendant tout ce temps, il
+-- ne se passe strictement rien à l'écran : impossible de savoir si ça charge ou si c'est
+-- cassé. On mesure donc chaque appel, on prévient quand ça traîne, et on nomme le coupable.
+local SLOW_CALL_MS = 3000
+local slowestCall, slowestMs = nil, 0
+
+local function timedCallback(name, ...)
+    local started = GetGameTimer()
+    local a, b, c, d = TriggerServerCallback(name, ...)
+    local elapsed = GetGameTimer() - started
+
+    if elapsed > slowestMs then
+        slowestCall, slowestMs = name, elapsed
+    end
+
+    if elapsed > SLOW_CALL_MS then
+        console.warn(("[Tablette] '%s' a mis %d ms à répondre"):format(name, elapsed))
+    end
+
+    return a, b, c, d
+end
+
 function bossPanelModule.openBossPanel()
 
     local playerData = VFW.PlayerData
@@ -112,29 +135,52 @@ function bossPanelModule.openBossPanel()
         return
     end
 
+    slowestCall, slowestMs = nil, 0
+    local openStarted = GetGameTimer()
+
+    -- Le chargement peut prendre un instant : on le dit, sinon le clic a l'air ignoré.
+    local stillLoading = true
+    CreateThread(function()
+        Wait(1200)
+        if not stillLoading then return end
+        VFW.ShowNotification({ type = 'JOB', title = "Tablette", content = "Chargement de l'entreprise…" })
+    end)
 
     -- Get employees from server
 
-    local employees = TriggerServerCallback("core:jobs:getMembers", job.name)
+    local employees = timedCallback("core:jobs:getMembers", job.name)
 
 
-    local employeesServices = TriggerServerCallback("core:jobs:getMembersServices", job.name)
+    local employeesServices = timedCallback("core:jobs:getMembersServices", job.name)
 
-    local jobData, societyData, membersFavoris, customData = TriggerServerCallback("core:jobs:getJob", job.name)
+    local jobData, societyData, membersFavoris, customData = timedCallback("core:jobs:getJob", job.name)
 
-    local chests = TriggerServerCallback("vfw:chest:getByGroup", job.name) or {}
+    local chests = timedCallback("vfw:chest:getByGroup", job.name) or {}
 
-    local lockers = TriggerServerCallback("core:societyLockers:getByJob", job.name)
+    local lockers = timedCallback("core:societyLockers:getByJob", job.name)
 
-    local isFarmingJob, farmingLogs, isTaxiJob = TriggerServerCallback("core:farm:getLogs", job.name)
+    local isFarmingJob, farmingLogs, isTaxiJob = timedCallback("core:farm:getLogs", job.name)
 
-    local isLTDJob, ltdLogs = TriggerServerCallback("fl_ltd:getLogs", job.name)
+    local isLTDJob, ltdLogs = timedCallback("fl_ltd:getLogs", job.name)
 
     local restaurantConfig = getRestaurantConfig(job.name)
     local restaurantLogs = nil
     if restaurantConfig then
-        local _, logs = TriggerServerCallback(restaurantConfig.getLogsCallback, job.name)
+        local _, logs = timedCallback(restaurantConfig.getLogsCallback, job.name)
         restaurantLogs = logs
+    end
+
+    stillLoading = false
+
+    local totalMs = GetGameTimer() - openStarted
+    if totalMs > SLOW_CALL_MS then
+        local detail = slowestCall and ("%s : %d ms"):format(slowestCall, slowestMs) or "inconnu"
+        console.warn(("[Tablette] ouverture en %d ms — le plus lent : %s"):format(totalMs, detail))
+        VFW.ShowNotification({
+            type = 'ROUGE',
+            title = "Tablette",
+            content = ("Le serveur a mis %.1f s à répondre (%s)."):format(totalMs / 1000, detail),
+        })
     end
 
     if employees == nil then
@@ -394,6 +440,26 @@ function bossPanelModule.openBossPanel()
     }
     VFW.Nui.HudVisible(false)
 
+    -- SendNUIMessage encode la table en JSON. Si un champ n'était pas encodable (fonction,
+    -- valeur infinie, table cyclique), le message ne partirait pas du tout et l'écran
+    -- resterait vide alors que le reste de l'ouverture continue. On encode donc nous-mêmes
+    -- pour pouvoir le dire, au lieu d'échouer en silence.
+    local encodeOk, encoded = pcall(json.encode, data)
+
+    if not encodeOk then
+        console.error(("[Tablette] données non encodables : %s"):format(tostring(encoded)))
+        VFW.ShowNotification({
+            type = 'ROUGE',
+            title = "Tablette",
+            content = "Données de l'entreprise illisibles — voir F8.",
+        })
+        VFW.Nui.HudVisible(true)
+        return
+    end
+
+    console.info(("[Tablette] envoi à l'interface : %d octets, %d employé(s), %d grade(s)"):format(
+        #encoded, #formattedEmployees, #roles))
+
     SendNUIMessage({
         action = "bossPanel:open",
         data = data
@@ -401,28 +467,40 @@ function bossPanelModule.openBossPanel()
 
     bossPanelModule.isOpen = true
 
-    local announces = TriggerServerCallback("core:jobs:getAnnounces", job.name)
-    if type(announces) ~= "table" then
-        announces = {
-            company = job.label or "",
-            image = (jobData and jobData.image) or "",
-            banner = (jobData and jobData.banner) or "",
-            announceTitleColor = "#FFFFFF",
-            announceSubtitle = "",
-            openMessage = "",
-            closeMessage = "",
-            allowCustomAnnouncement = false,
-            customTitleColor = "#FFFFFF",
-            customSubtitle = "",
-        }
-    end
-    announces.company = announces.company or job.label or ""
-    announces.image = announces.image or (jobData and jobData.image) or ""
-    announces.banner = announces.banner or (jobData and jobData.banner) or ""
-    bossPanelModule.announceContext = announces
-    attachAnnounceTab()
-
+    -- La souris et l'animation d'abord : le HUD vient d'être masqué et la page a reçu ses
+    -- données, il ne faut plus rien attendre avant de rendre la tablette utilisable.
     VFW.Nui.Focus(true, false)
+
+    -- L'onglet Annonces demande une huitième réponse au serveur. Elle se faisait ici, en
+    -- bloquant : tant qu'elle n'arrivait pas (jusqu'à 15 s), le joueur restait sans souris,
+    -- sans animation et sans HUD — écran figé et assombri, comme si le clic n'avait rien
+    -- fait. Elle se charge maintenant en arrière-plan et l'onglet s'ajoute à son arrivée.
+    CreateThread(function()
+        local announces = timedCallback("core:jobs:getAnnounces", job.name)
+
+        if not bossPanelModule.isOpen then return end
+
+        if type(announces) ~= "table" then
+            announces = {
+                company = job.label or "",
+                image = (jobData and jobData.image) or "",
+                banner = (jobData and jobData.banner) or "",
+                announceTitleColor = "#FFFFFF",
+                announceSubtitle = "",
+                openMessage = "",
+                closeMessage = "",
+                allowCustomAnnouncement = false,
+                customTitleColor = "#FFFFFF",
+                customSubtitle = "",
+            }
+        end
+
+        announces.company = announces.company or job.label or ""
+        announces.image = announces.image or (jobData and jobData.image) or ""
+        announces.banner = announces.banner or (jobData and jobData.banner) or ""
+        bossPanelModule.announceContext = announces
+        attachAnnounceTab()
+    end)
 
     CreateThread(function()
         if not bossPanelModule.isOpen then
