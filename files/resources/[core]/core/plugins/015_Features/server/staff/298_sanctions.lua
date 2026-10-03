@@ -368,8 +368,11 @@ local function applyWarn(target, payload)
     if not target.source then return end
 
     if payload.displayMode == "chat" then
+        -- Mode « message » : une notification passait, mais rien dans le chat et aucun son —
+        -- un joueur qui regardait ailleurs ne voyait jamais son avertissement.
         notifyTarget(target, "ERROR", "Avertissement",
             ("Vous avez reçu un avertissement du staff. Motif : %s"):format(payload.reason))
+        TriggerClientEvent("vfw:warn:chat", target.source, payload.reason, payload.by)
         return
     end
 
@@ -440,6 +443,31 @@ local function commitSanction(staffSource, xStaff, target, payload)
         applyTigWeapon(target, payload)
     elseif payload.type == "tig" then
         applyTig(target, payload)
+    end
+
+    -- Tout le staff connecté est informé, dans son chat : qui a sanctionné qui, et pourquoi.
+    if VFW.StaffBroadcast then
+        local labels = {
+            warn = "a averti", kick = "a kick", ban = "a banni",
+            tig = "a mis en TIG", tigweapon = "a retiré les armes de",
+        }
+        local label = labels[payload.type] or ("a sanctionné (" .. payload.type .. ")")
+        local duration = ""
+
+        if payload.type == "ban" then
+            duration = payload.expiresAt
+                and (" (%d %s)"):format(payload.durationAmount or 0, payload.durationUnit or "")
+                or " (définitif)"
+        elseif payload.type == "tig" then
+            duration = (" (%d tâches)"):format(payload.tasks or 0)
+        end
+
+        local tone = (payload.type == "ban" and "red")
+            or (payload.type == "kick" and "orange")
+            or "yellow"
+
+        VFW.StaffBroadcast(("%s %s %s%s — %s"):format(
+            payload.by or "Staff", label, payload.targetName or "?", duration, payload.reason or ""), tone)
     end
 
     auditLog(staffSource, "staff_sanction_" .. payload.type, {
@@ -1309,10 +1337,17 @@ local function wipeCharacter(staffSource, xStaff, accountId, charId)
         DropPlayer(owner.source, "Ce personnage a été réinitialisé par le staff. Reconnectez-vous pour continuer.")
     end
 
+    local wipedName = trim(("%s %s"):format(row.firstname or "", row.lastname or ""))
+
+    if VFW.StaffBroadcast then
+        VFW.StaffBroadcast(("%s a wipe le personnage %s"):format(
+            displayName(xStaff), wipedName ~= "" and wipedName or ("#" .. tostring(id))), "red")
+    end
+
     auditLog(staffSource, "staff_wipe", {
         charId = id,
         target = accountId,
-        targetName = trim(("%s %s"):format(row.firstname or "", row.lastname or "")),
+        targetName = wipedName,
         by = displayName(xStaff),
     })
 
@@ -1814,3 +1849,120 @@ CreateThread(function()
     while not VFW.Ready do Wait(250) end
     console.init("Sanctions", "sanctions, reports et wipes branchés sur logs_staff")
 end)
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- Commandes de modération
+--
+-- /kick et /ban n'existaient nulle part : seules leurs permissions étaient déclarées
+-- dans la configuration. Tout passait par le menu staff. Elles rejouent exactement le
+-- même chemin que le menu (ledger, antiban, annonce au staff, journal).
+-- ══════════════════════════════════════════════════════════════════════════
+
+--- Durée de bannissement écrite à la main : « perm », « 12h », « 7j ».
+---@param text string|nil
+---@return table|nil {unit, amount} ou nil si invalide
+local function parseBanDuration(text)
+    if type(text) ~= "string" then return nil end
+    text = text:lower()
+
+    if text == "perm" or text == "permanent" or text == "def" or text == "definitif" then
+        return { unit = "permanent" }
+    end
+
+    local amount, unit = text:match("^(%d+)%s*([hjd]?)$")
+    amount = tonumber(amount)
+    if not amount or amount < 1 then return nil end
+
+    if unit == "h" then
+        if amount > BAN_MAX_HOURS then return nil end
+        return { unit = "hours", amount = amount }
+    end
+
+    -- j (jours) ou rien : par défaut en jours
+    if amount > BAN_MAX_DAYS then return nil end
+    return { unit = "days", amount = amount }
+end
+
+VFW.RegisterCommand("kick", "kick", function(source, xPlayer, args)
+    local target = resolveBySession(args and args[1])
+    if not target then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Joueur introuvable.")
+        return
+    end
+
+    if not target.source then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Ce joueur n'est pas connecté.")
+        return
+    end
+
+    if VFW.IsAntiban and VFW.IsAntiban(target.accountId) then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Ce joueur est protégé (antiban).")
+        return
+    end
+
+    local reason = cleanReason(table.concat(args or {}, " ", math.min(2, #(args or {}) + 1)))
+    if not reason then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Motif manquant ou trop court.")
+        return
+    end
+
+    commitSanction(source, xPlayer, target, { type = "kick", reason = reason, active = false })
+end, {
+    help = "Expulser un joueur du serveur",
+    params = {
+        { name = "id", help = "ID du joueur" },
+        { name = "raison", help = "Motif communiqué au joueur" },
+    },
+})
+
+VFW.RegisterCommand("ban", "ban", function(source, xPlayer, args)
+    args = args or {}
+
+    local target = resolveBySession(args[1])
+    if not target then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Joueur introuvable.")
+        return
+    end
+
+    if VFW.IsAntiban and VFW.IsAntiban(target.accountId) then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Ce joueur est protégé (antiban).")
+        return
+    end
+
+    local duration = parseBanDuration(args[2])
+    if not duration then
+        Staff29.Notify(source, "ERROR", "Sanctions",
+            "Durée invalide. Exemples : perm, 12h, 7j.")
+        return
+    end
+
+    local reason = cleanReason(table.concat(args, " ", math.min(3, #args + 1)))
+    if not reason then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Motif manquant ou trop court.")
+        return
+    end
+
+    local payload = { type = "ban", reason = reason, active = true }
+
+    if duration.unit == "hours" then
+        payload.durationUnit = "heures"
+        payload.durationAmount = duration.amount
+        payload.durationSeconds = duration.amount * 3600
+        payload.expiresAt = unixNow() + payload.durationSeconds
+    elseif duration.unit == "days" then
+        payload.durationUnit = "jours"
+        payload.durationAmount = duration.amount
+        payload.durationSeconds = duration.amount * 86400
+        payload.expiresAt = unixNow() + payload.durationSeconds
+    end
+
+    commitSanction(source, xPlayer, target, payload)
+end, {
+    help = "Bannir un joueur",
+    params = {
+        { name = "id", help = "ID du joueur" },
+        { name = "duree", help = "perm, 12h ou 7j" },
+        { name = "raison", help = "Motif du bannissement" },
+    },
+})

@@ -169,6 +169,11 @@ VFW.RegisterCommand("register", "register", function(source, xPlayer, args)
         slot = slot,
     })
 
+    if VFW.StaffBroadcast then
+        VFW.StaffBroadcast(("%s a renvoye %s dans la creation de personnage"):format(
+            (xPlayer and xPlayer.name) or "Staff", GetPlayerName(targetId) or ("#" .. targetId)), "cyan")
+    end
+
     notifyRegister(source, "SUCCESS", ("%s a ete renvoye dans le createur de personnage."):format(targetName))
 end, {
     help = "Renvoyer un joueur dans le createur de personnage.",

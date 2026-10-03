@@ -662,6 +662,11 @@ local function assignRole(source, xPlayer, playerId, roleId, replace)
     end
     pushGlobalData(target)
 
+    if VFW.StaffBroadcast then
+        VFW.StaffBroadcast(("%s a donné le rôle %s à %s"):format(
+            xPlayer.name or "Staff", role.name or roleId, target.name or "?"), "cyan")
+    end
+
     logStaff(source, replace and "role_assign" or "role_preset", {
         target = target.identifier,
         targetName = target.name,
@@ -730,6 +735,11 @@ RegisterNetEvent("vfw:staff:removeAllPlayerPermissions", function(playerId)
 
     setTargetRole(target, DEFAULT_ROLE)
     pushGlobalData(target)
+
+    if VFW.StaffBroadcast then
+        VFW.StaffBroadcast(("%s a retiré toutes les permissions de %s"):format(
+            xPlayer.name or "Staff", target.name or "?"), "red")
+    end
 
     logStaff(source, "perm_wipe", {
         target = target.identifier,

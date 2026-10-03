@@ -1,26 +1,27 @@
 {
- "version": "1.12.48",
- "date": "2026-09-30T17:59:51.306Z",
- "notes": "**Métiers enfin configurés** — un métier vit dans `jobs` ET `societies`, mais seule la première était remplie au démarrage : vingt métiers en base et un serveur qui paraissait vide (liste du builder, reconnaissance police/milice, blip, Panneau Patron, coffre, compte). Les sociétés manquantes sont créées automatiquement, même sur un serveur déjà en service.\r\n\r\n**Sept métiers institutionnels livrés** — SAMS Pillbox et Paleto, Gouvernement, USSS, Department of Justice, LifeInvader, Weazel News. Leurs modules étaient là depuis toujours, mais aucun métier ne portait leur nom : leurs boutons ne pouvaient jamais apparaître.\r\n\r\n**Tablette patron** — elle ne s'affichait pas : son conteneur n'avait pas d'ancrage haut et se dessinait sous le bas de l'écran. Elle s'ouvrait vraiment (animation, flou, souris), simplement hors champ.\r\n\r\n**MDT police** — la page plantait à chaque ouverture (permissions envoyées en table, attendues en liste) et emportait toute l'interface, HUD compris. Corrigé, et un patron a désormais toutes les permissions.\r\n\r\n**Ouverture immédiate des tablettes** — MDT, gouvernement et patron attendaient les réponses du serveur avant d'afficher quoi que ce soit ; un appel sans réponse coûte 15 secondes, écran vide et sans message. Elles s'affichent maintenant tout de suite, les données arrivent derrière, et une notification nomme l'appel fautif s'il traîne.\r\n\r\n**Permissions par grade** — la page restait vide tant que rien n'était enregistré, alors que c'est l'écran qui sert à enregistrer. Elle affiche maintenant une carte par grade avec toutes les permissions.\r\n\r\n**Logs MDT** — l'onglet ne pouvait jamais rien afficher : rien n'écrivait dans la table. 15 actions sont désormais tracées (dossiers, amendes, avis de recherche, mandats, annonces, permissions).\r\n\r\n**Cartes** — plus de grille d'images cassées quand le jeu de tuiles GTA est absent, et 57 lieux nommés couvrant toute l'île pour se repérer. Liste éditable dans `interface/build/index.html`.\r\n\r\n**Logo du dock staff** — il ne suivait pas le changement de logo du serveur avant un redémarrage.\r\n\r\n**Divers** — refus d'ouverture du MDT désormais expliqués à l'écran, menu métier qui ne plante plus si les données de société tardent, et `/mdtclose` pour refermer toutes les tablettes et récupérer souris et HUD.\r\n\r\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L'archive des fichiers modifiés est jointe.",
+ "version": "1.12.49",
+ "date": "2026-10-03T14:06:40.223Z",
+ "notes": "**`/dv`, `/kick` et `/ban` n'existaient pas** — seules leurs permissions étaient déclarées, la commande n'avait jamais été écrite (et `/dv` était même masquée des suggestions). Les trois sont là, avec le même registre et les mêmes protections que le menu staff :\r\n`/kick <id> <raison>` · `/ban <id> <perm|12h|7j> <raison>` · `/dv [rayon]`\r\n\r\n**`/item`** — ouvre l'inventaire de tous les items et armes du serveur. **`/mstaff`** — chat staff, qui n'existait qu'en `/sc` côté client.\r\n\r\n**Suggestions du chat** — la liste était coupée aux 8 premières par ordre alphabétique : `/car` arrive 14ᵉ et ne pouvait jamais s'afficher. Elle propose maintenant d'abord ce qui correspond à ce que vous tapez, et elle défile.\r\n\r\n**Actions staff dans le chat** — avertissement, kick, ban, TIG, wipe, `/register`, changement de rôle et retrait de permissions sont annoncés à tout le staff connecté : « Marco a banni X (7 jours) — raison ».\r\n\r\n**Avertissement par message** — il n'envoyait qu'une notification, sans rien dans le chat ni aucun son. Désormais message rouge dans le chat et signal sonore.\r\n\r\n**TIG** — la zone était en plein centre de Los Santos alors que les sorties sont à la prison, et le joueur n'était jamais téléporté au début de sa peine. Zone et points de tâches déplacés dans l'enceinte, entrée en TIG avec téléport.\r\n\r\n**Menu contextuel (ALT)** — « Mes informations » et les infos d'un joueur affichaient « N/A » partout : le fournisseur de données côté serveur n'avait jamais été écrit. Identité, métier, argent et temps de jeu s'affichent enfin.\r\n\r\n**Attribuer un rôle** — le menu affichait une liste écrite en dur : les rôles créés dans Gestion étaient introuvables et impossibles à attribuer. Il lit maintenant la vraie liste.\r\n\r\n**Cercle de portée vocale** — réécrit (il avait été désactivé au profit d'un cercle jamais livré) : il apparaît à chaque changement, son rayon s'anime et sa couleur suit le mode.\r\n\r\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L'archive des fichiers modifiés est jointe.",
  "added": [
-  "resources/[core]/core/jobs/institutions/server/320_institutions.lua",
-  "resources/[core]/core/plugins/015_Features/shared/mdt_permissions.lua"
+  "resources/[core]/core/plugins/015_Features/client/voice_range_circle.lua"
  ],
  "changed": [
-  "resources/[core]/core/interface/build/assets/index-CgLoM61l.js",
-  "resources/[core]/core/interface/build/index.html",
-  "resources/[core]/core/interface/build/skin/boss-panel.css",
-  "resources/[core]/core/interface/hud/assets/index.js",
-  "resources/[core]/core/jobs/ambulance/server/320_jobs_common.lua",
-  "resources/[core]/core/modules/society/client/menu.lua",
-  "resources/[core]/core/plugins/015_Features/client/boss/000_bossPanelModule.lua",
-  "resources/[core]/core/plugins/015_Features/client/jobs/gouvernement/panel.lua",
-  "resources/[core]/core/plugins/015_Features/client/jobs/justice/panel.lua",
-  "resources/[core]/core/plugins/015_Features/client/jobs/police/panel.lua",
-  "resources/[core]/core/plugins/015_Features/server/misc_b/34_13_police.lua",
-  "resources/[core]/core/plugins/015_Features/server/misc_b/34_14_gouvernement.lua"
+  "resources/[core]/core/config/tig/config.lua",
+  "resources/[core]/core/plugins/000_framework/client/000_command_suggestions.lua",
+  "resources/[core]/core/plugins/000_framework/server/006_staff.lua",
+  "resources/[core]/core/plugins/000_framework/server/025_contextmenu.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/permission_player.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/warn_display.lua",
+  "resources/[core]/core/plugins/015_Features/client/tig/main.lua",
+  "resources/[core]/core/plugins/015_Features/server/inventory/25_05_search.lua",
+  "resources/[core]/core/plugins/015_Features/server/multicharacter.lua",
+  "resources/[core]/core/plugins/015_Features/server/staff/298_sanctions.lua",
+  "resources/[core]/core/plugins/015_Features/server/staff/299_permissions_ranks.lua",
+  "resources/[core]/core/plugins/015_Features/server/staff/301_vehicles.lua",
+  "resources/[standalone]/chat/html/assets/index.js",
+  "resources/[standalone]/chat/html/assets/style.css"
  ],
  "removed": [],
- "total": 292615531,
- "fileCount": 3382
+ "total": 292635789,
+ "fileCount": 3383
 }

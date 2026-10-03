@@ -504,6 +504,33 @@ RegisterNetEvent("vfw:staff:sendStaffMessage", function(message)
     staffChatBroadcast(source, message)
 end)
 
+--- Message de service visible uniquement du staff (sanctions, actions de modération).
+--- Utilisé par les sanctions pour que tout le staff connecté voie qui a sanctionné qui.
+---@param message string
+---@param tone string|nil couleur : red, orange, yellow, green, cyan, purple
+function VFW.StaffBroadcast(message, tone)
+    if type(message) ~= "string" or message == "" then return end
+
+    for target, other in pairs(VFW.Players) do
+        if other.hasPermission("staff_chat") or other.hasPermission("staff_menu") then
+            TriggerClientEvent("vfw:staff:receiveStaffMessage", target,
+                "Modération", message:sub(1, 400), "Staff", tone or "orange")
+        end
+    end
+end
+
+-- Le chat staff n'était accessible que par /sc (commande client) et par le menu : on
+-- l'enregistre aussi côté serveur pour qu'il passe par le pont du chat, apparaisse dans
+-- les suggestions et respecte la même vérification de permission que le reste.
+VFW.RegisterCommand("mstaff", "staff_chat", function(source, _xPlayer, args)
+    local message = table.concat(args or {}, " ")
+    if message:gsub("%s", "") == "" then return end
+    staffChatBroadcast(source, message)
+end, {
+    help = "Parler dans le chat staff",
+    params = { { name = "message", help = "Message visible uniquement par le staff" } },
+})
+
 RegisterNetEvent("vfw:staff:sendChatMessage", function(message)
     local source = source
     staffChatBroadcast(source, message)
