@@ -1,16 +1,14 @@
 {
- "version": "1.12.50",
- "date": "2026-10-03T14:21:20.967Z",
- "notes": "**Message staff** — le logo était remplacé par un carré « image manquante ». Le serveur envoyait une image vide, l'interface construisait une URL incomplète, et le filet de sécurité des images prenait le relais.\r\n\r\nLe bandeau affiche maintenant le **logo du serveur configuré dans Gestion** (il suivra automatiquement tout changement), et son apparence est revue : panneau sombre arrondi, filet vertical aux couleurs du serveur, logo encadré, message plus lisible, barre de progression dans la couleur de marque.\r\n\r\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L'archive des fichiers modifiés est jointe.",
+ "version": "1.12.51",
+ "date": "2026-10-03T14:35:47.925Z",
+ "notes": "**Zones safe et armureries job : la saisie du nom ne marchait pas.** Le clavier s'ouvrait mais ne rendait jamais ce qui était tapé — impossible donc de créer quoi que ce soit.\r\n\r\nLa saisie doit attendre la validation du joueur, or ces boutons appartiennent à un menu VUI : le code vit dans `core` mais c'est VUI qui le déclenche, et FiveM n'autorise pas de mise en attente dans ce contexte.\r\n\r\nUn helper partagé (`VFW.Nui.AskText` / `AskNumber`) fait désormais tourner la saisie dans un thread et renvoie le résultat par rappel. Les 4 saisies des zones safe et les 7 des armureries job sont converties.\r\n\r\nÀ savoir : la création d'une zone safe passe par le menu staff (Builders → ZONE SAFE → Création), la tablette NUI n'ayant que les vues Vue d'ensemble, Carte et Liste. Et pour une entreprise, c'est bien l'entrée « ARMURERIES JOB » (permission `builder_job_armory`), pas « ARMURERIES ».\r\n\r\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L'archive des fichiers modifiés est jointe.",
  "added": [],
  "changed": [
-  "resources/[core]/core/interface/build/assets/index-CgLoM61l.js",
-  "resources/[core]/core/interface/build/index.html",
-  "resources/[core]/core/interface/build/skin/notifications.css",
-  "resources/[core]/core/plugins/000_framework/client/002_functions.lua",
-  "resources/[core]/core/plugins/000_framework/client/branding_nui.lua"
+  "resources/[core]/core/plugins/000_framework/client/010_nui.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderJobArmory.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/safeZone.lua"
  ],
  "removed": [],
- "total": 292638545,
+ "total": 292640404,
  "fileCount": 3383
 }

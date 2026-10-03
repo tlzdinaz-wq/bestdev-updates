@@ -719,6 +719,51 @@ function VFW.Nui.KeyboardInput(visible, text, defaultValue, keepInput, options)
     return kbd_input
 end
 
+--- Demande une saisie au clavier NUI depuis un menu VUI, puis rappelle `onDone`.
+---
+--- `VFW.Nui.KeyboardInput` attend la réponse du joueur : elle doit donc rendre la main
+--- pendant l'attente. Appelée directement dans le callback d'un bouton VUI, elle ne le peut
+--- pas — le callback appartient à `core` mais il est déclenché par la ressource VUI, et
+--- FiveM n'autorise pas une pause dans ce contexte : la fenêtre s'ouvre sans jamais rendre
+--- ce qui a été tapé. On passe donc par un thread de `core`, comme le builder concession.
+---
+---@param title string texte affiché au-dessus du champ
+---@param defaultValue string|nil valeur pré-remplie
+---@param onDone fun(value: string) appelé uniquement si la saisie n'est pas vide
+---@param options table|nil { numberOnly?: boolean, maxValue?: number }
+function VFW.Nui.AskText(title, defaultValue, onDone, options)
+    if type(onDone) ~= "function" then return end
+
+    CreateThread(function()
+        local input = VFW.Nui.KeyboardInput(true, title, defaultValue or "", nil, options)
+
+        if type(input) == "string" then
+            input = input:match("^%s*(.-)%s*$") or ""
+        end
+
+        if input == nil or input == "" then return end
+
+        onDone(input)
+    end)
+end
+
+--- Variante numérique : `onDone` ne reçoit que des nombres valides.
+---@param title string
+---@param defaultValue any
+---@param onDone fun(value: number)
+function VFW.Nui.AskNumber(title, defaultValue, onDone)
+    if type(onDone) ~= "function" then return end
+
+    VFW.Nui.AskText(title, defaultValue and tostring(defaultValue) or "", function(value)
+        local number = tonumber(value)
+        if not number then
+            VFW.ShowNotification({ type = 'ROUGE', content = "Cette valeur n'est pas un nombre." })
+            return
+        end
+        onDone(number)
+    end)
+end
+
 RegisterNUICallback('nui:keyboardinput:response', function(data, cb)
     -- Accepter aussi une chaîne vide explicite comme annulation.
     local value = data and data.value
