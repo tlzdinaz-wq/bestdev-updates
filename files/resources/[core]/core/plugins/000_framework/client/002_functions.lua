@@ -361,6 +361,14 @@ end
 ---@param alert table
 ---@return nil
 function VFW.CreateAlert(content, image)
+    -- Sans image, le serveur envoyait une chaîne vide : l'interface construisait alors une
+    -- URL incomplète, l'image échouait, et le filet de sécurité affichait le visuel
+    -- « image manquante » à la place du logo. On met le logo du serveur (celui configuré
+    -- dans Gestion) dès qu'aucune image précise n'est demandée.
+    if type(image) ~= "string" or image == "" then
+        image = VFW.BrandLogoUrl and VFW.BrandLogoUrl() or nil
+    end
+
     SendNUIMessage({
         action = "nui:hud:create-alert",
         data = {

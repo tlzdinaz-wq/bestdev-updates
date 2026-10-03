@@ -1,27 +1,16 @@
 {
- "version": "1.12.49",
- "date": "2026-10-03T14:06:40.223Z",
- "notes": "**`/dv`, `/kick` et `/ban` n'existaient pas** — seules leurs permissions étaient déclarées, la commande n'avait jamais été écrite (et `/dv` était même masquée des suggestions). Les trois sont là, avec le même registre et les mêmes protections que le menu staff :\r\n`/kick <id> <raison>` · `/ban <id> <perm|12h|7j> <raison>` · `/dv [rayon]`\r\n\r\n**`/item`** — ouvre l'inventaire de tous les items et armes du serveur. **`/mstaff`** — chat staff, qui n'existait qu'en `/sc` côté client.\r\n\r\n**Suggestions du chat** — la liste était coupée aux 8 premières par ordre alphabétique : `/car` arrive 14ᵉ et ne pouvait jamais s'afficher. Elle propose maintenant d'abord ce qui correspond à ce que vous tapez, et elle défile.\r\n\r\n**Actions staff dans le chat** — avertissement, kick, ban, TIG, wipe, `/register`, changement de rôle et retrait de permissions sont annoncés à tout le staff connecté : « Marco a banni X (7 jours) — raison ».\r\n\r\n**Avertissement par message** — il n'envoyait qu'une notification, sans rien dans le chat ni aucun son. Désormais message rouge dans le chat et signal sonore.\r\n\r\n**TIG** — la zone était en plein centre de Los Santos alors que les sorties sont à la prison, et le joueur n'était jamais téléporté au début de sa peine. Zone et points de tâches déplacés dans l'enceinte, entrée en TIG avec téléport.\r\n\r\n**Menu contextuel (ALT)** — « Mes informations » et les infos d'un joueur affichaient « N/A » partout : le fournisseur de données côté serveur n'avait jamais été écrit. Identité, métier, argent et temps de jeu s'affichent enfin.\r\n\r\n**Attribuer un rôle** — le menu affichait une liste écrite en dur : les rôles créés dans Gestion étaient introuvables et impossibles à attribuer. Il lit maintenant la vraie liste.\r\n\r\n**Cercle de portée vocale** — réécrit (il avait été désactivé au profit d'un cercle jamais livré) : il apparaît à chaque changement, son rayon s'anime et sa couleur suit le mode.\r\n\r\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L'archive des fichiers modifiés est jointe.",
- "added": [
-  "resources/[core]/core/plugins/015_Features/client/voice_range_circle.lua"
- ],
+ "version": "1.12.50",
+ "date": "2026-10-03T14:21:20.967Z",
+ "notes": "**Message staff** — le logo était remplacé par un carré « image manquante ». Le serveur envoyait une image vide, l'interface construisait une URL incomplète, et le filet de sécurité des images prenait le relais.\r\n\r\nLe bandeau affiche maintenant le **logo du serveur configuré dans Gestion** (il suivra automatiquement tout changement), et son apparence est revue : panneau sombre arrondi, filet vertical aux couleurs du serveur, logo encadré, message plus lisible, barre de progression dans la couleur de marque.\r\n\r\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L'archive des fichiers modifiés est jointe.",
+ "added": [],
  "changed": [
-  "resources/[core]/core/config/tig/config.lua",
-  "resources/[core]/core/plugins/000_framework/client/000_command_suggestions.lua",
-  "resources/[core]/core/plugins/000_framework/server/006_staff.lua",
-  "resources/[core]/core/plugins/000_framework/server/025_contextmenu.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/permission_player.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/warn_display.lua",
-  "resources/[core]/core/plugins/015_Features/client/tig/main.lua",
-  "resources/[core]/core/plugins/015_Features/server/inventory/25_05_search.lua",
-  "resources/[core]/core/plugins/015_Features/server/multicharacter.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/298_sanctions.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/299_permissions_ranks.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/301_vehicles.lua",
-  "resources/[standalone]/chat/html/assets/index.js",
-  "resources/[standalone]/chat/html/assets/style.css"
+  "resources/[core]/core/interface/build/assets/index-CgLoM61l.js",
+  "resources/[core]/core/interface/build/index.html",
+  "resources/[core]/core/interface/build/skin/notifications.css",
+  "resources/[core]/core/plugins/000_framework/client/002_functions.lua",
+  "resources/[core]/core/plugins/000_framework/client/branding_nui.lua"
  ],
  "removed": [],
- "total": 292635789,
+ "total": 292638545,
  "fileCount": 3383
 }
