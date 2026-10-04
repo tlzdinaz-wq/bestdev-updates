@@ -1,14 +1,26 @@
 {
- "version": "1.12.51",
- "date": "2026-10-03T14:35:47.925Z",
- "notes": "**Zones safe et armureries job : la saisie du nom ne marchait pas.** Le clavier s'ouvrait mais ne rendait jamais ce qui était tapé — impossible donc de créer quoi que ce soit.\r\n\r\nLa saisie doit attendre la validation du joueur, or ces boutons appartiennent à un menu VUI : le code vit dans `core` mais c'est VUI qui le déclenche, et FiveM n'autorise pas de mise en attente dans ce contexte.\r\n\r\nUn helper partagé (`VFW.Nui.AskText` / `AskNumber`) fait désormais tourner la saisie dans un thread et renvoie le résultat par rappel. Les 4 saisies des zones safe et les 7 des armureries job sont converties.\r\n\r\nÀ savoir : la création d'une zone safe passe par le menu staff (Builders → ZONE SAFE → Création), la tablette NUI n'ayant que les vues Vue d'ensemble, Carte et Liste. Et pour une entreprise, c'est bien l'entrée « ARMURERIES JOB » (permission `builder_job_armory`), pas « ARMURERIES ».\r\n\r\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L'archive des fichiers modifiés est jointe.",
- "added": [],
+ "version": "1.12.52",
+ "date": "2026-10-04T11:17:41.233Z",
+ "notes": "**Démarrage du serveur** — « Le serveur n'a pas fini de démarrer » refusait TOUS les joueurs, sans explication. Le drapeau « prêt » est posé après cinq opérations enchaînées sans protection : la moindre erreur (table absente, schéma incomplet) interrompait la suite et fermait le serveur en silence. Chaque étape est maintenant isolée et nommée, l'échec est écrit en clair dans la console, et le serveur ouvre quand même.\r\n\r\n**Banque** — aucune transaction n'était enregistrée : le code écrivait la version colorée d'affichage (`~g~+950`) dans une colonne entière, et MySQL refusait l'insertion à chaque opération. Corrigé, l'historique existe enfin.\r\n\r\n**Coffres** — impossible d'en créer ou d'en modifier : les six points d'entrée serveur du menu n'avaient jamais été écrits. Tout est branché.\r\n\r\n**Doorlock** — les boutons d'ouverture de l'éditeur déclenchaient un événement qui n'existe nulle part, et l'éditeur d'ox_doorlock est protégé par un ace FiveM que le staff n'a pas. Pont écrit : la permission `doorlock_builder` suffit désormais.\r\n\r\n**Blips** — le blip d'une entreprise n'était visible que par ses employés ; modifier ou supprimer un blip ne faisait rien (sept points d'entrée manquants) ; et les blips de ville, écrits en dur, ne pouvaient pas être retirés. Les trois sont réglés : les blips de ville sont repris en base et se gèrent comme les autres.\r\n\r\n**Fourrière et location de véhicules** — le label et l'emplacement étaient effacés à chaque rafraîchissement du menu, rendant toute création impossible.\r\n\r\n**Boutique** — un achat pour soi-même est maintenant livré directement au garage ou à l'inventaire, au lieu d'attendre d'être réclamé.\r\n\r\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L'archive des fichiers modifiés est jointe.",
+ "added": [
+  "resources/[core]/core/modules/blips/server/241_blips_manager.lua",
+  "resources/[core]/core/modules/society/server/223_society_blips.lua",
+  "resources/[core]/core/plugins/015_Features/server/inventory/25_10_chestbuilder_menu.lua",
+  "resources/[core]/core/plugins/015_Features/server/staff/315_doorlock_editor.lua"
+ ],
  "changed": [
-  "resources/[core]/core/plugins/000_framework/client/010_nui.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderJobArmory.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/safeZone.lua"
+  "resources/[core]/core/endernative/server/002_database.lua",
+  "resources/[core]/core/modules/society/client/blip.lua",
+  "resources/[core]/core/modules/society/client/builder.lua",
+  "resources/[core]/core/modules/society/server/220_society_store.lua",
+  "resources/[core]/core/plugins/000_framework/server/000_connection.lua",
+  "resources/[core]/core/plugins/015_Banking/server/310_bank_core.lua",
+  "resources/[core]/core/plugins/015_Features/client/point_interaction.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/pound.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/vehicleRental.lua",
+  "resources/[core]/core/plugins/015_Features/server/paidshop/271_purchase.lua"
  ],
  "removed": [],
- "total": 292640404,
- "fileCount": 3383
+ "total": 292674052,
+ "fileCount": 3387
 }

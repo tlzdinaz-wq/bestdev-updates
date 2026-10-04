@@ -196,7 +196,11 @@ function Bank.AddTransaction(iban, accountType, label, status, value, positive, 
 
     if not VALID_STATUS[status] then status = "purchase" end
 
-    local amount = (positive and "~g~+" or "~r~-") .. tostring(value)
+    -- `amount` est une colonne BIGINT : on y écrit le montant signé. Le code y plaçait la
+    -- version colorée destinée à l'affichage (« ~g~+950 »), que MySQL refusait — l'insertion
+    -- échouait donc à CHAQUE opération bancaire, et aucun historique n'était enregistré.
+    -- La chaîne colorée est reconstruite à la lecture (Bank.GetTransactions).
+    local amount = positive and value or -value
     local query = [[
         INSERT INTO bank_transactions (iban, account_type, label, `status`, amount, `value`, positive, `date`)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -233,12 +237,16 @@ function Bank.GetTransactions(iban, limit)
     local out = {}
     for i = 1, #rows do
         local row = rows[i]
+        local isPositive = tonumber(row.positive) == 1
+        local stored = math.abs(math.floor(tonumber(row.amount) or 0))
+
         out[i] = {
             label = tostring(row.label or ""),
             status = VALID_STATUS[row.status] and row.status or "purchase",
-            amount = tostring(row.amount or "0"),
+            -- l'interface attend le montant déjà coloré, elle le rend en vert ou en rouge
+            amount = (isPositive and "~g~+" or "~r~-") .. tostring(stored),
             date = tostring(row.date or Bank.Now()),
-            positive = tonumber(row.positive) == 1,
+            positive = isPositive,
         }
     end
 

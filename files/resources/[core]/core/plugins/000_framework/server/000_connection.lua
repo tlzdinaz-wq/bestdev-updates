@@ -27,7 +27,15 @@ AddEventHandler("playerConnecting", function(name, setKickReason, deferrals)
         Wait(100)
         waited = waited + 100
         if waited > 30000 then
-            deferrals.done("Le serveur n'a pas fini de démarrer. Réessayez dans quelques secondes.")
+            -- Sans trace, ce refus ne disait rien : on indique en console si la base de
+            -- données n'a jamais répondu, ou si c'est le démarrage qui est resté bloqué.
+            if VFW.DbCallbackFired then
+                console.error("[connexion] refus : le démarrage n'a jamais abouti alors que la base a répondu.")
+                deferrals.done("Le serveur n'a pas fini de démarrer. Prévenez le staff si cela persiste.")
+            else
+                console.error("[connexion] refus : la base de données n'a jamais répondu (vérifiez mysql_connection_string).")
+                deferrals.done("Le serveur n'arrive pas à joindre sa base de données. Prévenez le staff.")
+            end
             return
         end
     end

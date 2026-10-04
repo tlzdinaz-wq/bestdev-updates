@@ -1,30 +1,11 @@
 ---@meta _
 ---@diagnostic disable: duplicate-doc-field
 
--- Blips statiques de la ville (LSPD, LSFD, SAMS, USSS, LSSD, Gouvernement, DOJ, Garage
--- Bateaux, HeliWave, Pawnshop). Ils existaient déjà plus bas dans ce fichier mais étaient
--- pris dans un bloc entièrement commenté qui dépendait de fonctions (LoadMask, etc.) migrées
--- ailleurs depuis — on ne réactive que la liste de blips, pas tout le bloc legacy.
-CreateThread(function()
-    while not VFW.PlayerLoaded do
-        Wait(100)
-    end
-
-    VFW.CreateBlipInternal(vector3(-805.83, -1354.64, 4.18), 404, 47, 0.8, "HeliWave")
-    VFW.CreateBlipInternal(vector3(-296.41, -106.34, 46.05), 267, 1, 0.8, "Pawnshop")
-    VFW.CreateBlipInternal(vector3(-1096.03, -837.89, 18.33), 60, 0, 0.8, "LSPD VP")
-    VFW.CreateBlipInternal(vector3(440.13, -982.43, 29.69), 60, 0, 0.8, "LSPD MR")
-    VFW.CreateBlipInternal(vector3(1816.87, 3672.44, 33.71), 137, 0, 0.8, "LSSD")
-    VFW.CreateBlipInternal(vector3(-466.32, 7086.44, 21.38), 137, 0, 0.8, "LSSD")
-    VFW.CreateBlipInternal(vector3(344.26, -587.68, 27.78), 61, 0, 0.8, "SAMS")
-    VFW.CreateBlipInternal(vector3(-509.52, 7364.57, 11.84), 61, 0, 0.8, "SAMS")
-    VFW.CreateBlipInternal(vector3(2542.17, -381.82, 91.99), 419, 0, 0.8, "USSS")
-    VFW.CreateBlipInternal(vector3(-1039.92, -1400.68, 4.08), 436, 1, 0.8, "LSFD")
-    VFW.CreateBlipInternal(vector3(-429.58, 7071.68, 20.68), 436, 1, 0.8, "LSFD")
-    VFW.CreateBlipInternal(vector3(-552.28, -191.53, 37.22), 419, 0, 0.8, "Gouvernement")
-    VFW.CreateBlipInternal(vector3(232.75, -418.38, 47.1), 419, 0, 0.8, "DOJ")
-    VFW.CreateBlipInternal(vector3(-719.4, -1325.9, 0.6), 356, 3, 0.8, "Garage Bateaux")
-end)
+-- Les blips de ville (LSPD, LSFD, SAMS, USSS, LSSD, Gouvernement, DOJ, Garage Bateaux,
+-- HeliWave, Pawnshop) étaient créés ici, en dur : le staff ne pouvait ni les déplacer, ni les
+-- renommer, ni les retirer. Ils sont désormais repris une fois en base de données au premier
+-- démarrage (modules/blips/server/241_blips_manager.lua) et se gèrent comme n'importe quel
+-- autre blip, depuis Builders > BLIPS.
 
 --local interactionZones = {}
 --

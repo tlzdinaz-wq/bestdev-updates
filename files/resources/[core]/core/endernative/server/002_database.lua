@@ -638,24 +638,65 @@ function VFW.DB.SaveAll()
     end
 end
 
-MySQL.ready(function()
-    VFW.DB.EnsureSequentialPlayerUuids()
-    VFW.DB.LoadJobs()
-    VFW.DB.LoadItems()
+-- Démarrage de la base de données.
+--
+-- Ces étapes s'enchaînaient sans protection : la moindre erreur de l'une d'elles (table
+-- absente, colonne manquante, requête refusée) interrompait la suite, `VFW.Ready` n'était
+-- jamais posé, et TOUS les joueurs étaient alors refusés au bout de 30 secondes avec
+-- « Le serveur n'a pas fini de démarrer » — sans rien dans la console pour dire laquelle
+-- avait lâché.
+--
+-- Chaque étape est désormais isolée et nommée : une étape qui échoue est signalée en clair,
+-- les autres se poursuivent, et le serveur devient utilisable au lieu de rester fermé.
+local function bootStep(label, fn)
+    local ok, err = pcall(fn)
+    if ok then return true end
 
-    local all = VFW.BuildFullPermissions()
-    local encoded = json.encode(all)
-    for i = 1, #(Config.OwnerIdentifiers or {}) do
-        local owner = Config.OwnerIdentifiers[i]
-        if type(owner) == "string" and owner ~= "" then
-            MySQL.update.await(
-                "UPDATE users SET role = ?, permissions = ?, vip_tier = GREATEST(IFNULL(vip_tier, 0), 3) WHERE identifier = ? OR identifier LIKE ?",
-                { "niveau_6", encoded, owner, "%" .. owner .. "%" }
-            )
+    console.error(("[Démarrage] étape « %s » en échec : %s"):format(label, tostring(err)))
+    return false
+end
+
+MySQL.ready(function()
+    -- Permet de distinguer « la base n'a jamais répondu » d'une étape de démarrage ratée
+    -- quand un joueur se fait refuser la connexion.
+    VFW.DbCallbackFired = true
+
+    local failed = {}
+
+    local steps = {
+        { "UUID des comptes", VFW.DB.EnsureSequentialPlayerUuids },
+        { "chargement des métiers", VFW.DB.LoadJobs },
+        { "chargement des items", VFW.DB.LoadItems },
+        { "permissions des propriétaires", function()
+            local all = VFW.BuildFullPermissions()
+            local encoded = json.encode(all)
+
+            for i = 1, #(Config.OwnerIdentifiers or {}) do
+                local owner = Config.OwnerIdentifiers[i]
+                if type(owner) == "string" and owner ~= "" then
+                    MySQL.update.await(
+                        "UPDATE users SET role = ?, permissions = ?, vip_tier = GREATEST(IFNULL(vip_tier, 0), 3) WHERE identifier = ? OR identifier LIKE ?",
+                        { "niveau_6", encoded, owner, "%" .. owner .. "%" }
+                    )
+                end
+            end
+        end },
+    }
+
+    for i = 1, #steps do
+        if not bootStep(steps[i][1], steps[i][2]) then
+            failed[#failed + 1] = steps[i][1]
         end
     end
 
     VFW.Ready = true
+
+    if #failed > 0 then
+        console.error(("[Démarrage] serveur ouvert malgré %d étape(s) en échec : %s"):format(
+            #failed, table.concat(failed, ", ")))
+        console.error("[Démarrage] vérifiez la base de données (tables manquantes ou schéma incomplet).")
+    end
+
     console.init("Core", "Base de données prête")
 end)
 

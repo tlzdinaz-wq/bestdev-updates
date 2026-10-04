@@ -38,6 +38,9 @@ local function resolveQuantity(categoryConfig, quantity)
     return value
 end
 
+-- Défini plus bas : déclaré ici pour que l'achat puisse livrer directement.
+local deliverItem
+
 local function doPurchase(source, spawnName, quantity, category, targetIdentifier, targetXPlayer)
     if type(spawnName) ~= "string" or type(category) ~= "string" then
         return false, "Cette demande n'a pas pu être traitée", nil
@@ -76,8 +79,35 @@ local function doPurchase(source, spawnName, quantity, category, targetIdentifie
     end
 
     local receiverIdentifier = targetIdentifier or xPlayer.identifier
-    addPending(receiverIdentifier, category, item, amount, price)
+    local pendingId = addPending(receiverIdentifier, category, item, amount, price)
     logPurchase(xPlayer.identifier, category, spawnName, amount, price, targetIdentifier and 1 or nil)
+
+    -- Livraison immédiate : un achat pour soi-même atterrit directement dans le garage ou
+    -- l'inventaire. L'article n'allait jusqu'ici que dans les « objets en attente », qu'il
+    -- fallait réclamer ensuite — d'où l'impression de ne rien recevoir après un achat.
+    -- Un cadeau reste en attente chez son destinataire, de même que tout échec de livraison
+    -- (garage indisponible, inventaire plein) : rien n'est perdu.
+    local delivered, deliveryMessage = false, nil
+
+    if pendingId and not targetIdentifier then
+        local ok, success, message = pcall(deliverItem, xPlayer, {
+            id = pendingId,
+            category = category,
+            spawn_name = item.spawnName,
+            name = item.name or item.spawnName,
+            image = item.image or "",
+            quantity = amount,
+            price = price,
+        })
+
+        if ok and success == true then
+            delivered = true
+            deliveryMessage = message
+            MySQL.update.await(
+                "UPDATE paidshop_pending_items SET `status` = 'claimed', `claimed_at` = NOW() WHERE `id` = ?",
+                { pendingId })
+        end
+    end
 
     pushPendingCount(xPlayer)
     if targetXPlayer then
@@ -91,6 +121,10 @@ local function doPurchase(source, spawnName, quantity, category, targetIdentifie
         category = category,
         rarity = item.rarity,
     })
+
+    if delivered then
+        return true, deliveryMessage or "Achat effectué et livré.", newBalance
+    end
 
     return true, "Achat effectué, retrouvez l'article dans vos objets en attente", newBalance
 end
@@ -151,7 +185,7 @@ RegisterServerCallback("paidshop:getPendingItems", function(source)
     return out
 end)
 
-local function deliverItem(xPlayer, row)
+function deliverItem(xPlayer, row)
     local category = row.category
     local categoryConfig = PaidShop.CategoryConfig(category)
     local itemType = categoryConfig and categoryConfig.itemType or "consumable"

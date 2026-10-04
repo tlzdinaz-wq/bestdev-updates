@@ -147,6 +147,14 @@ local function rebuildMinified()
     if BuildPoliceJobsList then
         pcall(BuildPoliceJobsList)
     end
+
+    -- Point de passage unique de toute modification de société (chargement, création,
+    -- édition, suppression) : on en profite pour renvoyer les blips d'entreprise à tous
+    -- les joueurs. Les events `vfw:society:updated` / `loaded` existaient mais n'étaient
+    -- déclenchés nulle part.
+    if VFW.Society.SendBlips then
+        pcall(VFW.Society.SendBlips)
+    end
 end
 
 function VFW.Society.LoadRecipes()
