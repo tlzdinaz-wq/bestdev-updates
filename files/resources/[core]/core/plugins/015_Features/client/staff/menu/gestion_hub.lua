@@ -217,6 +217,17 @@ local function BuildHubData()
     return categories
 end
 
+--- Dit à VUI si le hub est à l'écran (voir VUI_HubVisible dans VUI/vui.lua).
+---@param visible boolean
+local function SetVuiHubVisible(visible)
+    -- Pas de pcall muet : si l'export manque (VUI pas à jour), le menu VUI se remettrait à
+    -- s'afficher derrière le hub sans qu'on sache pourquoi. On veut le voir.
+    local ok, err = pcall(function() exports["VUI"]:SetHubVisible(visible) end)
+    if not ok then
+        console.error("[GestionHub] VUI:SetHubVisible indisponible : " .. tostring(err))
+    end
+end
+
 --- Ouvre le hub. `state.category` = catégorie à rouvrir (retour depuis un outil).
 ---@param state? table
 function StaffMenu.OpenGestionHub(state)
@@ -231,6 +242,9 @@ function StaffMenu.OpenGestionHub(state)
     hubData = BuildHubData()
     hubOpen = true
     hubMinimized = false
+    -- Tant que le hub est affiché, VUI ne doit plus rendre ses menus dans son propre
+    -- overlay : ils apparaîtraient par-dessus la page du hub (l'ancien menu qui revient).
+    SetVuiHubVisible(true)
 
     SendNUIMessage({
         action = "gestion:open",
@@ -247,6 +261,7 @@ function StaffMenu.CloseGestionHub()
     if not hubOpen then return end
     hubOpen = false
     hubMinimized = false
+    SetVuiHubVisible(false)
     if hubTextInput == nil then
         hubTextInput = false
     end
@@ -274,6 +289,9 @@ end
 function StaffMenu.MinimizeGestionHub()
     if not hubOpen or hubMinimized then return end
     hubMinimized = true
+    -- Hub réduit : le joueur marche et peut ouvrir n'importe quel menu VUI (commerce,
+    -- métier…). Ceux-là doivent retrouver l'overlay VUI, pas la page du hub.
+    SetVuiHubVisible(false)
     SendNUIMessage({ action = "gestion:minimize" })
     ApplyWalkFocus()
 end
@@ -281,6 +299,7 @@ end
 function StaffMenu.RestoreGestionHub()
     if not hubOpen then return end
     hubMinimized = false
+    SetVuiHubVisible(true)
     SendNUIMessage({ action = "gestion:restore" })
     VFW.Nui.Focus(true)
 end
@@ -604,6 +623,7 @@ AddEventHandler('onResourceStop', function(resourceName)
     if hubOpen then
         hubOpen = false
         hubMinimized = false
+        SetVuiHubVisible(false)
         SetNuiFocus(false, false)
     end
 end)

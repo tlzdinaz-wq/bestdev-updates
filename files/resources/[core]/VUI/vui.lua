@@ -133,6 +133,12 @@ local VUI_ALWAYS_SHOW_TYPES <const> = {
 -- (https://VUI/vui:menu:click, ...). Activé par OpenInHub(), désactivé quand la
 -- chaîne de menus se ferme (event "vui:hub:ended") ou au retour vers le hub.
 VUI_HubMode = false
+-- Le hub de gestion est-il affiché ? Tant qu'il l'est, l'overlay VUI ne doit JAMAIS rendre
+-- un menu : il apparaîtrait par-dessus la page du hub — c'est l'ancien menu qu'on voyait
+-- revenir en ouvrant un outil. VUI_HubMode seul ne suffit pas : plusieurs chemins le
+-- remettent à false (close() hors transition, retour hub, fin de chaîne) alors que le hub
+-- est toujours à l'écran. `core` nous dit donc directement quand il est visible.
+VUI_HubVisible = false
 -- Fermeture interne (open() d'un autre menu, refresh) : ne termine pas le mode hub.
 VUI_Switching = false
 -- Proxy « retour au hub » : ne pas remonter vers le menu F5 (MENU ADMINISTRATION).
@@ -145,8 +151,39 @@ local HUB_BLOCKED_PARENTS <const> = {
 }
 
 local _SendNUIMessageNative = SendNUIMessage
+
+--- Efface ce que l'overlay VUI affiche encore (sans toucher à l'état Lua des menus).
+---
+--- Un rendu laissé en place reste à l'écran indéfiniment : c'est le menu figé qu'on voyait
+--- en haut à gauche, derrière la page du hub. On le nettoie à chaque fois que le rendu part
+--- vers le hub, pas seulement à l'ouverture.
+local function ClearOverlay()
+    _SendNUIMessageNative({ action = "vui:menu:close" })
+end
+
+-- Trace de routage (/vuitrace) : dit, pour chaque rendu de menu, s'il part vers l'overlay
+-- VUI ou vers le hub de gestion, et dans quel état sont les deux drapeaux. Sans elle, un
+-- menu qui s'affiche au mauvais endroit ne laisse aucune trace.
+local VUI_Trace = false
+
+RegisterCommand("vuitrace", function()
+    VUI_Trace = not VUI_Trace
+    print(("^5[vui]^7 trace de routage %s"):format(VUI_Trace and "activée" or "désactivée"))
+end, false)
+
 SendNUIMessage = function(msg)
-    if VUI_HubMode and type(msg) == "table" and type(msg.action) == "string" and msg.action:sub(1, 8) == "vui:menu" then
+    if VUI_Trace and type(msg) == "table" and msg.action == "vui:menu" then
+        local title = type(msg.data) == "table" and msg.data.title or "?"
+        print(("^5[vui]^7 rendu « %s » → %s (hubMode=%s hubVisible=%s)"):format(
+            tostring(title),
+            (VUI_HubMode or VUI_HubVisible) and "HUB" or "OVERLAY",
+            tostring(VUI_HubMode), tostring(VUI_HubVisible)))
+    end
+
+    if (VUI_HubMode or VUI_HubVisible) and type(msg) == "table" and type(msg.action) == "string" and msg.action:sub(1, 8) == "vui:menu" then
+        -- Seul le rendu complet peut laisser une trace à l'écran : inutile de renvoyer une
+        -- fermeture à chaque mise à jour d'index ou de ligne.
+        if msg.action == "vui:menu" then ClearOverlay() end
         -- Event local : reçu par tous les handlers client, dont celui de `core`
         TriggerEvent("vui:hub:message", msg)
         return
@@ -1627,6 +1664,16 @@ function IsHubMode()
     return VUI_HubMode == true
 end
 
+--- `core` signale l'affichage du hub de gestion : voir VUI_HubVisible.
+---@param visible boolean
+local function SetHubVisible(visible)
+    VUI_HubVisible = visible and true or false
+    if VUI_HubVisible then
+        ClearOverlay()
+    end
+end
+
+exports("SetHubVisible", SetHubVisible)
 exports("HandleBack", VUI_HandleBack)
 exports("OpenWithReturn", OpenWithReturn)
 exports("OpenInHub", OpenInHub)

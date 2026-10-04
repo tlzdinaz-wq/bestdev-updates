@@ -9,8 +9,26 @@ local zoneData = {
 
 local markerThread = nil
 local isMarkersActive = false
-local isRefreshing = false
-local isNavigating = false
+-- Rafraîchissement et navigation : horodatés, pas de simples drapeaux.
+--
+-- `menu.refresh()` ferme et rouvre le menu côté VUI, mais le gestionnaire de fermeture
+-- appartient à `core` : il arrive après que le drapeau ait été remis à false juste après
+-- l'appel. Il prenait donc chaque rafraîchissement pour une vraie fermeture et appelait
+-- `resetZoneData()` — tout ce qui venait d'être saisi ou ajouté était effacé aussitôt, et
+-- aucun bouton ne semblait avoir d'effet.
+local lastRefreshAt = 0
+local lastNavigationAt = 0
+local GUARD_MS = 750
+
+---@return boolean
+local function isRefreshing()
+    return (GetGameTimer() - lastRefreshAt) < GUARD_MS
+end
+
+---@return boolean
+local function isNavigating()
+    return (GetGameTimer() - lastNavigationAt) < GUARD_MS
+end
 
 local controlDisabled <const> = {
     { label = "Sauter", control = 22},
@@ -97,9 +115,8 @@ local function stopMarkerThread()
 end
 
 local function safeRefresh(menu)
-    isRefreshing = true
+    lastRefreshAt = GetGameTimer()
     menu.refresh()
-    isRefreshing = false
 end
 
 local function startMarkerThread()
@@ -307,11 +324,11 @@ function StaffMenu.BuildCreateZoneSafeMenu()
     end)
 
     StaffMenu.CreateZoneSafe.Button("DÉSACTIVER DES ACTIONS", "Choisir les actions interdites dans cette zone (saut, sprint, bagarre...)", nil, zoneData.actionDisabled and #zoneData.actionDisabled > 0 and "check" or "chevron", false, function()
-        isNavigating = true
+        lastNavigationAt = GetGameTimer()
     end, StaffMenu.DisableActionsZoneSafe)
 
     StaffMenu.CreateZoneSafe.Button("JOBS BYPASS", "Définir les jobs autorisés à effectuer des actions malgré la zone safe", nil, zoneData.bypassJob and #zoneData.bypassJob > 0 and "check" or "chevron", false, function()
-        isNavigating = true
+        lastNavigationAt = GetGameTimer()
     end, StaffMenu.ByPassJobZoneSafe)
 
     StaffMenu.CreateZoneSafe.Separator(nil)
@@ -339,7 +356,7 @@ function StaffMenu.BuildCreateZoneSafeMenu()
                 type = 'STAFF', variant = 'SUCCESS', subtitle = 'Zones Sécurisées',
                 message = "Zone safe créée"
           })
-            isNavigating = true
+            lastNavigationAt = GetGameTimer()
             StaffMenu.CreateZoneSafe.close()
             StaffMenu.CreateZoneSafe.parent.open()
         end)
@@ -396,7 +413,7 @@ function StaffMenu.BuildListZoneSafeMenu()
         local pointsCount = safeZone.points and #safeZone.points or 0
 
         StaffMenu.ListZoneSafe.Button(safeZone.label, safeZone.name .. " | " .. pointsCount .. " points", nil, "chevron", false, function()
-            isNavigating = true
+            lastNavigationAt = GetGameTimer()
             zoneData = {
                 name = safeZone.name,
                 label = safeZone.label,
@@ -431,7 +448,7 @@ function StaffMenu.BuildManageZoneSafeMenu()
     end)
 
     StaffMenu.ManageZoneSafe.Button(":monitor: MODIFIER LA ZONE", "Éditer les paramètres, les points et les accès de cette zone safe", nil, "chevron", false, function()
-        isNavigating = true
+        lastNavigationAt = GetGameTimer()
         zoneData.oldName = zoneData.name
         zoneData.isUpdate = true
         startMarkerThread()
@@ -447,7 +464,7 @@ function StaffMenu.BuildManageZoneSafeMenu()
             message = "Zone safe supprimée"
       })
 
-        isNavigating = true
+        lastNavigationAt = GetGameTimer()
         StaffMenu.ManageZoneSafe.close()
         StaffMenu.ManageZoneSafe.parent.open()
     end)
@@ -497,32 +514,27 @@ local function autoSaveZone()
 end
 
 StaffMenu.CreateZoneSafe.OnClose(function()
-    if not isRefreshing and not isNavigating then
+    if not isRefreshing() and not isNavigating() then
         stopMarkerThread()
         resetZoneData()
     elseif zoneData.isUpdate then
         autoSaveZone()
     end
-    isNavigating = false
 end)
 
 StaffMenu.ManageZoneSafe.OnClose(function()
-    if not isRefreshing and not isNavigating then
+    if not isRefreshing() and not isNavigating() then
         autoSaveZone()
         stopMarkerThread()
         resetZoneData()
     end
-    isNavigating = false
 end)
 
 StaffMenu.DisableActionsZoneSafe.OnClose(function()
-    isNavigating = false
 end)
 
 StaffMenu.ByPassJobZoneSafe.OnClose(function()
-    isNavigating = false
 end)
 
 StaffMenu.ListZoneSafe.OnClose(function()
-    isNavigating = false
 end)

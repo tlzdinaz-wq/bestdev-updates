@@ -1,26 +1,24 @@
 {
- "version": "1.12.52",
- "date": "2026-10-04T11:17:41.233Z",
- "notes": "**Démarrage du serveur** — « Le serveur n'a pas fini de démarrer » refusait TOUS les joueurs, sans explication. Le drapeau « prêt » est posé après cinq opérations enchaînées sans protection : la moindre erreur (table absente, schéma incomplet) interrompait la suite et fermait le serveur en silence. Chaque étape est maintenant isolée et nommée, l'échec est écrit en clair dans la console, et le serveur ouvre quand même.\r\n\r\n**Banque** — aucune transaction n'était enregistrée : le code écrivait la version colorée d'affichage (`~g~+950`) dans une colonne entière, et MySQL refusait l'insertion à chaque opération. Corrigé, l'historique existe enfin.\r\n\r\n**Coffres** — impossible d'en créer ou d'en modifier : les six points d'entrée serveur du menu n'avaient jamais été écrits. Tout est branché.\r\n\r\n**Doorlock** — les boutons d'ouverture de l'éditeur déclenchaient un événement qui n'existe nulle part, et l'éditeur d'ox_doorlock est protégé par un ace FiveM que le staff n'a pas. Pont écrit : la permission `doorlock_builder` suffit désormais.\r\n\r\n**Blips** — le blip d'une entreprise n'était visible que par ses employés ; modifier ou supprimer un blip ne faisait rien (sept points d'entrée manquants) ; et les blips de ville, écrits en dur, ne pouvaient pas être retirés. Les trois sont réglés : les blips de ville sont repris en base et se gèrent comme les autres.\r\n\r\n**Fourrière et location de véhicules** — le label et l'emplacement étaient effacés à chaque rafraîchissement du menu, rendant toute création impossible.\r\n\r\n**Boutique** — un achat pour soi-même est maintenant livré directement au garage ou à l'inventaire, au lieu d'attendre d'être réclamé.\r\n\r\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L'archive des fichiers modifiés est jointe.",
+ "version": "1.12.53",
+ "date": "2026-10-04T12:24:36.937Z",
+ "notes": "**Fenêtres de saisie** — appuyer sur « Nom de la zone », « Nom du blip », « Nom de l'armurerie » ou n'importe quel champ d'un builder ne faisait rien : aucune fenêtre, aucune erreur. Cause trouvée : un fichier de `core` remplaçait l'objet partagé de la ressource par une copie passée à travers la frontière des exports. Chaque fonction y devenait une table appelable, et une fonction passée en argument arrivait en table — les gardes `type(x) ~= \"function\"` sortaient alors en silence, à chaque appel. La ligne est retirée et les gardes muettes supprimées. Toutes les saisies des builders fonctionnent : zones safe, armureries, blips d'entreprise, concessionnaire (16 champs), fourrière, location, sons d'ambiance, restrictions vocales.\n\n**Zones safe** — la fonctionnalité était entièrement cliente : le menu et la tablette envoyaient création, modification et suppression dans le vide, et la liste lisait un cache qui ne pouvait qu'être vide. « Zone safe créée » s'affichait sans qu'aucune zone n'existe. Le serveur est écrit : table créée au démarrage, contrôle de la permission `zonesafe_builder`, refus des doublons et des polygones de moins de trois points, diffusion à tous les joueurs. L'interdiction du port d'arme, qui n'avait pas non plus de serveur, rengaine désormais le joueur.\n\n**Blips d'entreprise** — les quatre champs du blip (nom, sprite, couleur, taille) passaient par la saisie cassée : impossible d'ajouter un blip à une entreprise. Réparé.\n\n**Menu staff et hub de gestion** — l'ancien menu VUI restait affiché en haut à gauche, derrière la page du hub. Tant que le hub occupe l'écran, VUI ne rend plus rien dans son propre affichage, et le rendu laissé en place est effacé à chaque ouverture d'outil.\n\nPour appliquer : `update.bat` / `./update.sh` (hébergeur : zip par FTP), puis `ensure core` (ou restart). L'archive des fichiers modifiés est jointe.",
  "added": [
-  "resources/[core]/core/modules/blips/server/241_blips_manager.lua",
-  "resources/[core]/core/modules/society/server/223_society_blips.lua",
-  "resources/[core]/core/plugins/015_Features/server/inventory/25_10_chestbuilder_menu.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/315_doorlock_editor.lua"
+  "resources/[core]/core/plugins/015_Features/server/staff/316_safe_zones.lua"
  ],
  "changed": [
-  "resources/[core]/core/endernative/server/002_database.lua",
-  "resources/[core]/core/modules/society/client/blip.lua",
-  "resources/[core]/core/modules/society/client/builder.lua",
-  "resources/[core]/core/modules/society/server/220_society_store.lua",
-  "resources/[core]/core/plugins/000_framework/server/000_connection.lua",
-  "resources/[core]/core/plugins/015_Banking/server/310_bank_core.lua",
-  "resources/[core]/core/plugins/015_Features/client/point_interaction.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/pound.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/vehicleRental.lua",
-  "resources/[core]/core/plugins/015_Features/server/paidshop/271_purchase.lua"
+  "resources/[core]/core/plugins/000_framework/client/010_nui.lua",
+  "resources/[core]/core/plugins/015_Features/client/safeZone/event.lua",
+  "resources/[core]/core/plugins/015_Features/client/spacemarket_shop/client.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderAmbientSound.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderConcess.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderGouv.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderVehicleSell.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderVoiceRestriction.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_hub.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/safeZone.lua",
+  "resources/[core]/VUI/vui.lua"
  ],
  "removed": [],
- "total": 292674052,
- "fileCount": 3387
+ "total": 292689529,
+ "fileCount": 3388
 }

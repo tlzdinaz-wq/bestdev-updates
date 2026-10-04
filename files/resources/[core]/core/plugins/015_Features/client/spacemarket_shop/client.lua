@@ -1,4 +1,11 @@
-VFW = exports["core"]:getSharedObject()
+-- Pas de `VFW = exports["core"]:getSharedObject()` ici : ce fichier est chargé PAR `core`
+-- (glob `plugins/**/client/**`), `VFW` y existe déjà. Cette ligne, qui vient du modèle des
+-- ressources externes, remplaçait le VFW réel de la ressource par une copie passée à travers
+-- la frontière des exports : chaque fonction de VFW devenait une table appelable, chaque
+-- appel sérialisait ses arguments, et une fonction passée en argument arrivait en table.
+-- Toutes les gardes `if type(x) ~= "function" then return end` sortaient alors en silence —
+-- c'est ce qui empêchait les fenêtres de saisie de s'ouvrir (VFW.Nui.AskText), partout.
+
 
 local RES = GetCurrentResourceName() -- cache resource name for reuse
 

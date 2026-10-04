@@ -106,17 +106,16 @@ local function fcCoords(offsetZ)
     return { x = pos.x, y = pos.y, z = pos.z - (offsetZ or 0.0), h = h }
 end
 
---- Ancien clavier NUI : le hub se masque le temps de la saisie (cover/uncover).
+--- Saisie au clavier NUI.
+---
+--- La saisie se faisait dans un thread séparé, et la fenêtre ne s'ouvrait alors jamais
+--- depuis un bouton VUI : le thread créé au fond d'un appel venu d'une autre ressource
+--- n'est pas exécuté. On passe par le helper commun, qui appelle le clavier directement.
+---@param title string
+---@param defaultValue string|nil
+---@param onDone fun(value: string)
 local function fcAskText(title, defaultValue, onDone)
-    CreateThread(function()
-        local sInput = VFW.Nui.KeyboardInput(true, title, defaultValue or "")
-        if type(sInput) == "string" then
-            sInput = sInput:match("^%s*(.-)%s*$") or ""
-        end
-        if sInput and sInput ~= "" then
-            onDone(sInput)
-        end
-    end)
+    VFW.Nui.AskText(title, defaultValue, onDone)
 end
 
 local function fcResetNewConcess()
