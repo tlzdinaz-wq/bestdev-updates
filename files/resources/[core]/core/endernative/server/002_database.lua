@@ -140,7 +140,9 @@ function VFW.DB.LoadItems()
         if type(data) == "table" and type(data.image) == "string" and data.image ~= "" then
             image = data.image
         elseif type(image) ~= "string" or image == "" then
-            image = ("items/%s.webp"):format(row.name)
+            -- Le fichier réellement présent, quelle que soit son extension : un pack
+            -- d'icônes en PNG est ainsi pris en compte sans rien changer en base.
+            image = VFW.ItemImageRelPath(row.name) or ("items/%s.webp"):format(row.name)
         end
 
         items[row.name] = {

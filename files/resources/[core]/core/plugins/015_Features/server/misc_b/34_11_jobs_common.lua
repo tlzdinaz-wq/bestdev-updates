@@ -831,6 +831,17 @@ RegisterNetEvent("core:jobEquipment:requestSync", function()
     TriggerClientEvent("core:jobEquipment:sync", source, equipments)
 end)
 
+--- Le builder staff vient de modifier une armurerie ou un équipement
+--- (plugins/015_Features/server/staff/317_job_armory_builder.lua) : on relit la base et on
+--- renvoie la liste à tout le monde, sinon le changement n'existe qu'en base jusqu'au
+--- prochain redémarrage.
+AddEventHandler("core:jobArmory:reload", function()
+    loadArmories()
+    loadEquipments()
+    TriggerClientEvent("core:jobArmory:sync", -1, armories)
+    TriggerClientEvent("core:jobEquipment:sync", -1, equipments)
+end)
+
 local function playerInArmory(xPlayer, armory)
     if not armory or type(armory.jobs) ~= "table" then return false end
     local job = MiscB.JobName(xPlayer)

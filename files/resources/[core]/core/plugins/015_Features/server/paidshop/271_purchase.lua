@@ -192,10 +192,19 @@ function deliverItem(xPlayer, row)
     local definition = PaidShop.FindItem(category, row.spawn_name)
 
     if itemType == "vehicle" then
-        local ok, result = Feat27.Vehicles.Store(xPlayer.identifier, row.spawn_name, {}, nil, { kind = "car" })
+        -- Le nom du produit sert d'étiquette dans le garage : sans lui, le joueur ne voit
+        -- que le nom technique du modèle.
+        local ok, result = Feat27.Vehicles.Store(xPlayer.identifier, row.spawn_name, {}, nil, {
+            kind = "car",
+            label = row.name ~= "" and row.name or row.spawn_name,
+        })
+
         if not ok then
-            return false, "Livraison du véhicule impossible (garage indisponible)"
+            -- La raison exacte est écrite dans la console serveur par Vehicles.Store ; on la
+            -- reprend ici pour que le staff sache quoi regarder.
+            return false, ("Livraison du véhicule impossible (%s)"):format(tostring(result))
         end
+
         return true, ("Véhicule livré au garage (plaque %s)"):format(tostring(result))
     end
 

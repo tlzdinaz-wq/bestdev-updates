@@ -422,16 +422,32 @@ function Feat27.Vehicles.Store(identifier, model, properties, plate, extra)
     extra = extra or {}
 
     local encoded = json.encode(properties)
+
+    -- Les colonnes de `owned_vehicles` varient d'un framework à l'autre : on propose tout,
+    -- et seules celles qui existent vraiment sont écrites (voir loadOwnedVehicleColumns).
+    --
+    -- Les six premières lignes sont celles de CETTE base (modules/garage) : sans `vehName`
+    -- ni `label`, l'insertion était refusée et la boutique répondait « garage indisponible »
+    -- à chaque récupération de véhicule. `garage_id` reste nul : le véhicule est alors
+    -- rattaché au premier garage public ouvert par le joueur, comme les véhicules VIP.
     local values = {
         owner = identifier,
+        plate = plate,
+        vehName = model,
+        label = extra.label or model,
+        props = encoded,
+        model = model,
+        stored = 1,
+        pounded = 0,
+        engineHealth = 1000.0,
+        bodyHealth = 1000.0,
+        fuelLevel = 100.0,
+        -- Autres schémas (ESX, QBCore) : ignorées ici, utiles ailleurs.
         identifier = identifier,
         citizenid = identifier,
-        plate = plate,
         vehicle = encoded,
-        props = encoded,
         mods = encoded,
         vehicle_props = encoded,
-        model = model,
         spawn_name = model,
         hash = joaat(model),
         type = extra.kind or "car",
@@ -439,7 +455,6 @@ function Feat27.Vehicles.Store(identifier, model, properties, plate, extra)
         garage = extra.garage or "airport",
         parking = extra.garage or "airport",
         state = 1,
-        stored = 1,
         fuel = 100,
         engine = 1000.0,
         body = 1000.0,
@@ -456,11 +471,19 @@ function Feat27.Vehicles.Store(identifier, model, properties, plate, extra)
 
     if #names == 0 then return false, "columns_missing" end
 
-    local ok = pcall(MySQL.insert.await,
+    local ok, err = pcall(MySQL.insert.await,
         ("INSERT INTO owned_vehicles (%s) VALUES (%s)"):format(table.concat(names, ", "), table.concat(marks, ", ")),
         params
     )
-    if not ok then return false, "insert_failed" end
+
+    if not ok then
+        -- L'erreur SQL était jetée : la boutique affichait « garage indisponible » quelle
+        -- que soit la cause réelle, et personne ne pouvait savoir ce qui bloquait.
+        console.error(("[véhicules] insertion refusée pour %s (%s) : %s")
+            :format(tostring(model), tostring(identifier), tostring(err)))
+        return false, "insert_failed"
+    end
+
     return true, plate
 end
 
