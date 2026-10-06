@@ -1,3 +1,11 @@
+-- Chaque joueur en multicompte a sa propre instance : MULTICHAR_BUCKET + son ID serveur.
+--
+-- La plage doit rester libre : la zone AFK occupe 10000 a 10999 (config/afk/config.lua),
+-- les labos 20000 et les cambriolages 30000. L'ancienne valeur, 10000, tombait en plein
+-- dans la zone AFK — un joueur au multicompte pouvait se retrouver dans le meme bucket
+-- qu'un joueur AFK.
+local MULTICHAR_BUCKET <const> = 50000
+
 local pendingSlot = {}
 
 local function getSlots(account)
@@ -183,6 +191,12 @@ end, {
 })
 
 function VFW.LoadCharacterForSource(source, row, account, isNew)
+    -- Le personnage entre en jeu : on quitte l'instance de selection pour rejoindre le
+    -- monde commun. C'est le seul moment ou l'isolement doit tomber.
+    if GetPlayerRoutingBucket(source) == MULTICHAR_BUCKET + source then
+        SetPlayerRoutingBucket(source, 0)
+    end
+
     local xPlayer = VFW.CreateExtendedPlayer(source, row, account)
 
     VFW.Players[source] = xPlayer
@@ -209,6 +223,12 @@ RegisterNetEvent("vfw:multicharacter:SetupCharacters", function()
     if VFW.GetPlayerFromId(source) then
         VFW.LogoutPlayer(source, false)
     end
+
+    -- Ecran de selection : les personnages sont presentes au meme endroit pour tout le
+    -- monde. Sans instance, les joueurs qui choisissent en meme temps se voient les uns les
+    -- autres, empiles au parking. On isole chacun jusqu'a son arrivee en jeu.
+    SetPlayerRoutingBucket(source, MULTICHAR_BUCKET + source)
+
     sendSelection(source)
 end)
 
@@ -551,11 +571,15 @@ RegisterNetEvent("core:server:instanceCreator", function(state)
             if not xPlayer then return end
             if not (xPlayer.hasPermission("staff_menu") or canManageMugshots(xPlayer)) then return end
         end
-        SetPlayerRoutingBucket(source, 10000 + source)
+        SetPlayerRoutingBucket(source, MULTICHAR_BUCKET + source)
         return
     end
 
-    if GetPlayerRoutingBucket(source) ~= 10000 + source then return end
+    if GetPlayerRoutingBucket(source) ~= MULTICHAR_BUCKET + source then return end
+
+    -- Sortie du createur sans personnage charge : le joueur revient a l'ecran de selection,
+    -- pas en jeu. Le sortir de son instance ici le reafficherait au milieu des autres.
+    if not VFW.GetPlayerFromId(source) then return end
 
     SetPlayerRoutingBucket(source, 0)
 end)

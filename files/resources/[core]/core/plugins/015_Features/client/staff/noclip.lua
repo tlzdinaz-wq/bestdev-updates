@@ -1199,3 +1199,69 @@ end
 function VFW.IsNoclipCrosshairActive()
     return toggleCrosshair
 end
+
+-- ── Teleportation aleatoire sur un joueur (touche J) ────────────────────────────────────
+--
+-- Reservee au noclip : hors noclip, la touche ne fait rien. On arrive en vol au-dessus de
+-- la cible, sans ragdoll — le ped reste fige comme le reste du temps en noclip, et le
+-- ragdoll est coupe une seconde de plus au cas ou une chute s'amorcerait pendant le
+-- chargement du decor.
+
+local RANDOM_TP_COOLDOWN <const> = 1500
+local lastRandomTeleport = 0
+local randomTeleportBusy = false
+
+local function teleportToRandomPlayer()
+    if randomTeleportBusy then return end
+
+    if not (VFW.IsNoclipActive and VFW.IsNoclipActive()) then
+        VFW.ShowNotification({
+            type = "STAFF", variant = "ERROR", subtitle = "Teleportation",
+            message = "Il faut etre en noclip pour la teleportation aleatoire.",
+        })
+        return
+    end
+
+    local now = GetGameTimer()
+    if (now - lastRandomTeleport) < RANDOM_TP_COOLDOWN then return end
+    lastRandomTeleport = now
+    randomTeleportBusy = true
+
+    CreateThread(function()
+        local result, err = TriggerServerCallback("vfw:staff:randomPlayerCoords")
+
+        if type(result) ~= "table" or type(result.coords) ~= "table" then
+            VFW.ShowNotification({
+                type = "STAFF", variant = "ERROR", subtitle = "Teleportation",
+                message = err or "Aucun autre joueur connecte.",
+            })
+            randomTeleportBusy = false
+            return
+        end
+
+        local ped = PlayerPedId()
+        local coords = result.coords
+
+        SetPedCanRagdoll(ped, false)
+        SetEntityCoords(ped, coords.x, coords.y, coords.z + 1.5, false, false, false, false)
+        SetEntityVelocity(ped, 0.0, 0.0, 0.0)
+        FreezeEntityPosition(ped, true)
+
+        VFW.ShowNotification({
+            type = "STAFF", variant = "SUCCESS", subtitle = "Teleportation",
+            message = ("Teleporte sur %s."):format(result.name or "un joueur"),
+        })
+
+        -- Le decor met un instant a charger sous les pieds : on garde le ragdoll coupe
+        -- jusque-la, puis on rend la main au noclip qui gere le gel du ped.
+        Wait(1000)
+        if DoesEntityExist(ped) then
+            SetPedCanRagdoll(ped, true)
+        end
+
+        randomTeleportBusy = false
+    end)
+end
+
+RegisterCommand("noclip_random_teleport", teleportToRandomPlayer, false)
+RegisterKeyMapping("noclip_random_teleport", "Noclip : teleportation aleatoire sur un joueur", "keyboard", "J")

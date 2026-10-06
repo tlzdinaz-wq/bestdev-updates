@@ -1066,3 +1066,225 @@ AddEventHandler("onResourceStop", function(resource)
     end
     staffPropCount = 0
 end)
+
+-- ── Actions staff sur un joueur (menu ALT) ──────────────────────────────────────────────
+--
+-- Les boutons du menu contextuel « ped » envoient une action au serveur, qui doit la relayer
+-- au joueur vise. Le client sait les traiter depuis toujours (`vfw:ped:apply`), mais aucune
+-- de ces actions n'etait enregistree cote serveur : le callback repondait « Action inconnue »
+-- et rien ne se passait. Animations, plaquage, arret d'animation, teleportations : neuf
+-- actions mortes.
+
+--- Destinations fixes des teleportations staff. A ajuster si votre serveur place ces lieux
+--- ailleurs : ce sont les positions GTA d'origine.
+local STAFF_DESTINATIONS <const> = {
+    police = { x = 441.0, y = -982.0, z = 30.7 },   -- commissariat de Mission Row
+    cubes  = { x = 195.0, y = -934.0, z = 30.7 },   -- Legion Square, dite « place des cubes »
+}
+
+local PED_RANGE <const> = 30.0
+
+--- Resout le joueur vise par le menu contextuel.
+---@return table|nil target, string|nil erreur
+local function contextTarget(source, ent)
+    if type(ent) ~= "table" then return nil, "Cible introuvable." end
+
+    local targetId = tonumber(ent.targetSource)
+    if not targetId then return nil, "Cette action ne vaut que sur un joueur." end
+
+    local target = VFW.GetPlayerFromId(targetId)
+    if not target then return nil, "Ce joueur n'est plus connecte." end
+
+    local me = VFW.GetPlayerFromId(source)
+    local here = me and me.getCoords()
+    local there = target.getCoords()
+
+    if here and there then
+        local dx, dy, dz = here.x - there.x, here.y - there.y, here.z - there.z
+        if (dx * dx + dy * dy + dz * dz) > (PED_RANGE * PED_RANGE) then
+            return nil, "Ce joueur est trop loin."
+        end
+    end
+
+    return target, nil
+end
+
+--- Relaie l'action au client du joueur vise, avec le netId de son propre ped : c'est ce que
+--- son gestionnaire verifie avant d'appliquer quoi que ce soit.
+local function pedRelay(action, message)
+    return function(source, ent, _, extra)
+        local target, err = contextTarget(source, ent)
+        if not target then return { ok = false, err = err } end
+
+        local netId = tonumber(ent.netId) or 0
+        if netId == 0 then return { ok = false, err = "Ce joueur n'est pas synchronise." } end
+
+        TriggerClientEvent("vfw:ped:apply", target.source, action, netId, extra)
+        return { ok = true, msg = message }
+    end
+end
+
+--- Teleporte le joueur vise, en memorisant sa position pour que « renvoyer » fonctionne.
+local function pedTeleport(resolve, message)
+    return function(source, ent)
+        local target, err = contextTarget(source, ent)
+        if not target then return { ok = false, err = err } end
+
+        local destination, failure = resolve(source, target)
+        if not destination then return { ok = false, err = failure or "Destination inconnue." } end
+
+        bringOrigins[target.source] = coordsTable(target)
+        TriggerClientEvent("vfw:teleportTo", target.source, destination.x, destination.y, destination.z)
+        logStaff(source, "context_teleport_player", { target = target.source })
+
+        return { ok = true, msg = message }
+    end
+end
+
+CreateThread(function()
+    while type(VFW.ContextMenu) ~= "table" or type(VFW.ContextMenu.RegisterAction) ~= "function" do
+        Wait(100)
+    end
+
+    local register = VFW.ContextMenu.RegisterAction
+
+    register("ped:playAnim", pedRelay("ped:playAnim", "Animation jouee"), "alt_ped_management")
+    register("ped:stopAnim", pedRelay("ped:stopAnim", "Animation arretee"), "alt_ped_management")
+    register("ped:tackleDown", pedRelay("ped:tackleDown", "Joueur plaque au sol"), "alt_ped_management")
+
+    register("ped:teleportToMe", pedTeleport(function(source)
+        local me = VFW.GetPlayerFromId(source)
+        local coords = me and me.getCoords()
+        if not coords then return nil, "Votre position est introuvable." end
+        return coords
+    end, "Joueur amene jusqu'a vous"), "alt_teleport")
+
+    register("ped:teleportToPolice", pedTeleport(function()
+        return STAFF_DESTINATIONS.police
+    end, "Joueur envoye au commissariat"), "alt_teleport")
+
+    register("ped:teleportToPlaceDesCubes", pedTeleport(function()
+        return STAFF_DESTINATIONS.cubes
+    end, "Joueur envoye place des cubes"), "alt_teleport")
+
+    register("ped:teleportToPound", pedTeleport(function()
+        -- La fourriere est configurable en jeu : on prend la premiere enregistree.
+        local ok, rows = pcall(MySQL.query.await, "SELECT position FROM pounds ORDER BY id ASC LIMIT 1")
+        if not ok or type(rows) ~= "table" or not rows[1] then
+            return nil, "Aucune fourriere n'est configuree."
+        end
+
+        local position = VFW.DB.Decode(rows[1].position, nil)
+        if type(position) ~= "table" or not tonumber(position.x) then
+            return nil, "La position de la fourriere est illisible."
+        end
+
+        return { x = tonumber(position.x), y = tonumber(position.y), z = tonumber(position.z) or 30.0 }
+    end, "Joueur envoye a la fourriere"), "alt_teleport")
+
+    register("ped:returnBroughtPlayer", function(source, ent)
+        local target, err = contextTarget(source, ent)
+        if not target then return { ok = false, err = err } end
+
+        local origin = bringOrigins[target.source]
+        if not origin then return { ok = false, err = "Aucune position de retour enregistree." } end
+
+        bringOrigins[target.source] = nil
+        TriggerClientEvent("vfw:teleportTo", target.source, origin.x, origin.y, origin.z)
+        logStaff(source, "context_return_player", { target = target.source })
+
+        return { ok = true, msg = "Joueur renvoye a sa position" }
+    end, "alt_teleport")
+
+    register("ped:delete", function(source, ent)
+        if type(ent) ~= "table" then return { ok = false, err = "Cible introuvable." } end
+
+        -- Un joueur ne se supprime pas : seuls les PNJ sont concernes.
+        if ent.targetSource then
+            return { ok = false, err = "On ne supprime pas un joueur." }
+        end
+
+        local entity = ent.entity
+        if not entity or entity == 0 or not DoesEntityExist(entity) then
+            return { ok = false, err = "Ce PNJ n'existe plus." }
+        end
+
+        DeleteEntity(entity)
+        logStaff(source, "context_delete_ped", {})
+
+        return { ok = true, msg = "PNJ supprime" }
+    end, "alt_ped_management")
+end)
+
+--- Un joueur connecte au hasard, pour la teleportation aleatoire du noclip (touche J).
+---
+--- Le tirage se fait cote serveur : le client ne connait que les joueurs proches de lui,
+--- il ne pourrait donc tomber que sur ceux qu'il voit deja.
+RegisterServerCallback("vfw:staff:randomPlayerCoords", function(source)
+    local xPlayer = allow(source, "goto", "noclip", "staff_menu")
+    if not xPlayer then return nil end
+
+    local candidates, n = {}, 0
+    for _, src in ipairs(VFW.GetPlayers()) do
+        if src ~= source then
+            local other = VFW.GetPlayerFromId(src)
+            if other and other.getCoords() then
+                n = n + 1
+                candidates[n] = other
+            end
+        end
+    end
+
+    if n == 0 then return nil, "Aucun autre joueur connecte." end
+
+    local picked = candidates[math.random(1, n)]
+    local coords = picked.getCoords()
+
+    logStaff(source, "random_teleport", { target = picked.source })
+
+    return {
+        coords = { x = coords.x, y = coords.y, z = coords.z },
+        name = picked.name or ("#" .. picked.source),
+        source = picked.source,
+    }
+end)
+
+-- ── Apparence d'un joueur (menu Gestion Joueur) ─────────────────────────────────────────
+--
+-- « Recuperer son apparence » et « Appliquer une apparence » appelaient deux points d'entree
+-- qui n'ont jamais existe : le menu affichait donc toujours « Impossible de recuperer
+-- l'apparence ». Le skin vit sur le joueur cote serveur (xPlayer.skin) et s'applique chez le
+-- client par l'evenement `skinchanger:loadSkin`, deja en place.
+
+RegisterServerCallback("vfw:staff:getSkin", function(source, targetId)
+    local xPlayer = allow(source, "recup_apparence")
+    if not xPlayer then return nil end
+
+    local target = VFW.GetPlayerFromId(tonumber(targetId))
+    if not target then return nil end
+
+    local skin = target.skin
+    if type(skin) ~= "table" or not next(skin) then return nil end
+
+    return skin, target.tattoos
+end)
+
+RegisterServerCallback("vfw:staff:applySkinToPlayer", function(source, sourceId, targetId)
+    local xPlayer = allow(source, "recup_apparence")
+    if not xPlayer then return false end
+
+    local from = VFW.GetPlayerFromId(tonumber(sourceId))
+    local to = VFW.GetPlayerFromId(tonumber(targetId))
+    if not from or not to then return false end
+
+    local skin = from.skin
+    if type(skin) ~= "table" or not next(skin) then return false end
+
+    -- Volontairement temporaire : rien n'est ecrit en base, l'apparence d'origine revient
+    -- a la prochaine connexion du joueur. C'est ce qu'annonce le menu.
+    TriggerClientEvent("skinchanger:loadSkin", to.source, skin)
+
+    logStaff(source, "apply_skin", { from = from.source, target = to.source })
+
+    return true
+end)

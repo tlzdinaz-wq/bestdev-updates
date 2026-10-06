@@ -304,16 +304,22 @@ local function StartConfinementLoop()
                 local distToExit = #(coords - exitNpcCoords)
 
                 if distToExit < exitNpcRadius then
-                    -- Show prompt
                     showingExitPrompt = true
                     DrawText3D(exitNpcCoords.x, exitNpcCoords.y, exitNpcCoords.z + 1.0, "~g~[E]~w~ Quitter la zone AFK")
-
-                    if VFW.Interact.JustPressed(0, 38) then -- E key
-                        TriggerServerEvent('core:afk:exit')
-                    end
                 else
                     showingExitPrompt = false
                 end
+            end
+
+            -- E depuis n'importe ou dans la zone, pas seulement devant le PNJ : on
+            -- s'absente d'un mot, on revient d'une touche. Le PNJ reste utilisable, c'est
+            -- la meme touche et le meme evenement.
+            if not showingExitPrompt then
+                VFW.ShowHelpNotification("Appuyez sur ~INPUT_PICKUP~ pour quitter la zone AFK")
+            end
+
+            if VFW.Interact.JustPressed(0, 38) then
+                TriggerServerEvent('core:afk:exit')
             end
 
             -- Draw points above leaderboard NPCs

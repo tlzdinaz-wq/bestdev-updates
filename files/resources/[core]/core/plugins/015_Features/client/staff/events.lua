@@ -74,7 +74,8 @@ end)
 -- ══════════════════════════════════════════════════════════════════════════
 -- Spectate. Le serveur envoie la position de la cible au démarrage (sinon son ped
 -- n'est jamais streamé chez l'admin : écran noir), et la position d'origine de
--- l'admin à la sortie. `RETOUR ARRIÈRE` quitte le spectate à tout moment.
+-- l'admin à la sortie. `X` quitte le spectate à tout moment (retour arrière et Échap
+-- restent acceptés).
 -- ══════════════════════════════════════════════════════════════════════════
 
 StaffMenu = StaffMenu or {}
@@ -107,9 +108,14 @@ local function startSpectateWatcher()
 
     CreateThread(function()
         while spectateTargetId do
-            VFW.ShowHelpNotification("Spectate en cours~n~~INPUT_FRONTEND_RRIGHT~ pour quitter")
+            VFW.ShowHelpNotification("Spectate en cours~n~~INPUT_VEH_DUCK~ pour quitter")
 
-            if IsControlJustReleased(0, 194) or IsControlJustReleased(0, 202) then
+            -- X (73) en touche principale, comme pour annuler une animation. Retour arriere
+            -- (194) et Echap (202) restent acceptes : ceux qui les avaient pris l'habitude
+            -- ne perdent rien.
+            if IsControlJustReleased(0, 73)
+                or IsControlJustReleased(0, 194)
+                or IsControlJustReleased(0, 202) then
                 StaffMenu.StopSpectate()
                 break
             end

@@ -322,12 +322,17 @@ function VFW.GetActiveBanMessage(accountId)
     local reason = payload.reason
     if type(reason) ~= "string" or reason == "" then reason = "non précisé" end
 
+    -- L'identifiant du bannissement est la ligne du registre. Sans lui, un joueur qui
+    -- conteste ne peut rien donner au staff, et le staff doit fouiller l'historique pour
+    -- retrouver la sanction. C'est aussi lui qu'attend /unban.
     local expires = humanDate(payload.expiresAt)
     if expires then
-        return ("Vous êtes banni de ce serveur jusqu'au %s. Motif : %s"):format(expires, reason)
+        return ("Vous êtes banni de ce serveur jusqu'au %s.\nMotif : %s\nBan ID : %s")
+            :format(expires, reason, tostring(id))
     end
 
-    return ("Vous êtes banni définitivement de ce serveur. Motif : %s"):format(reason)
+    return ("Vous êtes banni définitivement de ce serveur.\nMotif : %s\nBan ID : %s")
+        :format(reason, tostring(id))
 end
 
 local function hasAnticheatBan(accountId)
@@ -1965,4 +1970,86 @@ end, {
         { name = "duree", help = "perm, 12h ou 7j" },
         { name = "raison", help = "Motif du bannissement" },
     },
+})
+
+--- Lever un bannissement par son identifiant.
+---
+--- Le menu staff le faisait deja (bouton UNBAN), mais il n'existait aucune commande : un
+--- staff sans acces au menu, ou la console du serveur, n'avait aucun moyen de debannir.
+--- L'identifiant demande est celui affiche au joueur banni et dans la liste ci-dessous.
+VFW.RegisterCommand("unban", "ban", function(source, xPlayer, args)
+    local banId = tonumber(args and args[1])
+
+    if not banId then
+        if source == 0 then
+            console.warn("Usage : unban <ban id>  (voir `banlist` pour les identifiants)")
+        else
+            Staff29.Notify(source, "ERROR", "Sanctions", "Indiquez l'identifiant du bannissement.")
+        end
+        return
+    end
+
+    -- Depuis la console, il n'y a pas de staff a qui attribuer la levee : on passe par le
+    -- meme chemin avec un auteur nul, le registre notera une levee console.
+    if revokeSanction(source, xPlayer, banId, { ban = true }, nil) then
+        if source == 0 then
+            console.info(("Bannissement #%d leve."):format(banId))
+        else
+            Staff29.Notify(source, "SUCCESS", "Sanctions", ("Bannissement #%d levé."):format(banId))
+        end
+        return
+    end
+
+    if source == 0 then
+        console.warn(("Bannissement #%d introuvable ou deja leve."):format(banId))
+    else
+        Staff29.Notify(source, "ERROR", "Sanctions", "Ce bannissement est introuvable ou déjà levé.")
+    end
+end, {
+    help = "Lever un bannissement par son identifiant",
+    params = { { name = "banid", help = "Identifiant affiche au joueur banni" } },
+    allowConsole = true,
+})
+
+--- Liste des bannissements actifs, avec leur identifiant.
+---
+--- Il n'y a pas de table `bans` a creer : une sanction est une ligne de `logs_staff`, et son
+--- `id` est l'identifiant du bannissement. Cette commande evite d'avoir a ecrire la requete.
+VFW.RegisterCommand("banlist", "ban", function(source)
+    local rows = Staff29.Query(([[
+        SELECT id, payload FROM logs_staff
+        WHERE action = ? AND payload LIKE '%%"active":true%%'
+        ORDER BY id DESC LIMIT %d
+    ]]):format(SCAN_LIMIT), { LEDGER.ban })
+
+    local lines, n = {}, 0
+    for i = 1, #rows do
+        local payload = Staff29.Decode(rows[i].payload, nil)
+        if type(payload) == "table" and payload.active and not isExpired(payload) then
+            n = n + 1
+            lines[n] = ("#%s  %s  %s  motif : %s"):format(
+                rows[i].id,
+                tostring(payload.targetName or payload.target or "?"),
+                humanDate(payload.expiresAt) or "definitif",
+                tostring(payload.reason or "non precise"))
+        end
+    end
+
+    if n == 0 then
+        if source == 0 then console.info("Aucun bannissement actif.")
+        else Staff29.Notify(source, "INFO", "Sanctions", "Aucun bannissement actif.") end
+        return
+    end
+
+    if source == 0 then
+        console.info(("%d bannissement(s) actif(s) :"):format(n))
+        for i = 1, n do print("  " .. lines[i]) end
+        return
+    end
+
+    Staff29.Notify(source, "INFO", "Sanctions", ("%d bannissement(s) actif(s) — detail en console."):format(n))
+    for i = 1, n do print("  " .. lines[i]) end
+end, {
+    help = "Lister les bannissements actifs et leur identifiant",
+    allowConsole = true,
 })

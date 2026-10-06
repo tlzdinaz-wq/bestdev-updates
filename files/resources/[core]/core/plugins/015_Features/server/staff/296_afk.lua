@@ -681,3 +681,26 @@ Staff29.Cb("core:afkshop:getPurchaseLogs", function(source, limit)
     end
     return { success = true, logs = logs }
 end)
+
+--- `/afk` cote serveur.
+---
+--- La commande n'existait que cote client. Le chat, quand il ne reconnait pas une commande
+--- locale, l'envoie au serveur : celui-ci n'avait pas d'`afk`, ne repondait rien, et le
+--- joueur voyait sa commande disparaitre sans le moindre message. On enregistre donc la
+--- meme commande ici, qui demande au client de faire ce qu'il sait deja faire — ses propres
+--- verifications (vehicule, menottes, zone safe) restent les siennes.
+VFW.RegisterCommand("afk", "", function(source, xPlayer)
+    if not xPlayer then return end
+
+    if sessions[source] then
+        xPlayer.showNotification({
+            type = "STAFF", variant = "INFO", subtitle = "Zone AFK",
+            message = "Utilisez le PNJ pour quitter la zone AFK.",
+        })
+        return
+    end
+
+    xPlayer.triggerEvent("core:afk:triggerEnter")
+end, {
+    help = "Rejoindre la zone AFK",
+})

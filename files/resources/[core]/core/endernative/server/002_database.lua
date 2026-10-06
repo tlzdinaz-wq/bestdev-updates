@@ -340,14 +340,38 @@ local function playerUuidFromAccountId(accountId)
     return tostring(math.floor(numericId))
 end
 
+--- Aligne l'UUID affiche sur l'identifiant du compte.
+---
+--- Rien ici ne doit refuser une connexion : l'UUID est une commodite d'affichage. Un compte
+--- dont l'`id` est inattendu, ou dont la mise a jour echoue (index unique en conflit apres
+--- une manipulation en base), entrainait l'echec du chargement et le joueur voyait
+--- « Erreur lors du chargement de votre compte » sans que personne ne sache pourquoi.
+--- On journalise l'anomalie et on laisse entrer.
 local function ensureSequentialPlayerUuid(account)
-    if account then
-        local uuid = playerUuidFromAccountId(account.id)
-        if tostring(account.uuid or "") ~= uuid then
-            MySQL.update.await("UPDATE users SET uuid = ? WHERE id = ?", { uuid, account.id })
-            account.uuid = uuid
-        end
+    if not account then return account end
+
+    local ok, uuid = pcall(playerUuidFromAccountId, account.id)
+    if not ok then
+        console.warn(("[comptes] UUID non calculable pour le compte %s : %s")
+            :format(tostring(account.id), tostring(uuid)))
+        return account
     end
+
+    if tostring(account.uuid or "") == uuid then
+        return account
+    end
+
+    local updated = pcall(MySQL.update.await, "UPDATE users SET uuid = ? WHERE id = ?",
+        { uuid, account.id })
+
+    if updated then
+        account.uuid = uuid
+    else
+        console.warn(("[comptes] UUID %s non enregistre pour le compte %s (conflit en base)")
+            :format(uuid, tostring(account.id)))
+        if account.uuid == nil or account.uuid == "" then account.uuid = uuid end
+    end
+
     return account
 end
 
@@ -464,25 +488,70 @@ function VFW.DB.LoadAccount(identifier)
     local role = isOwner and "niveau_6" or "user"
     local vip = isOwner and 3 or 0
 
+    -- Le mode d'identifiant est determine au demarrage. S'il manque (etape de boot qui n'a
+    -- pas abouti), on le redemande ici plutot que de refuser le joueur d'emblee.
+    if usersIdAutoIncrement == nil then
+        pcall(VFW.DB.EnsureSequentialPlayerUuids)
+    end
+
     if usersIdAutoIncrement == nil then
         error("Le mode d'identifiant des comptes n'a pas été initialisé")
     end
 
+    --- Le compte a-t-il ete cree entre-temps ? Deux tentatives de connexion rapprochees, ou
+    --- une insertion refusee pour doublon, doivent se terminer par une relecture et non par
+    --- un refus definitif.
+    local function reread()
+        local row = MySQL.single.await("SELECT * FROM users WHERE identifier = ?", { identifier })
+        if not row then return nil end
+        row.permissions = decode(row.permissions, {})
+        return ensureSequentialPlayerUuid(row)
+    end
+
     local id, uuid
     if usersIdAutoIncrement then
-        id = MySQL.insert.await(
+        local okInsert, inserted = pcall(MySQL.insert.await,
             "INSERT INTO users (identifier, slots, role, permissions, vip_tier) VALUES (?, ?, ?, ?, ?)",
             { identifier, Config.Multicharacter.Slots, role, json.encode(perms), vip }
         )
-        uuid = playerUuidFromAccountId(id)
-        MySQL.update.await("UPDATE users SET uuid = ? WHERE id = ?", { uuid, id })
+
+        if not okInsert then
+            console.warn(("[comptes] creation refusee pour %s : %s"):format(identifier, tostring(inserted)))
+            local existing = reread()
+            if existing then return VFW.DB.EnsureNiveau6Account(VFW.DB.ApplyOwnerAccount(existing)) end
+            error(inserted)
+        end
+
+        id = inserted
+        -- Certaines versions d'oxmysql renvoient 0 au lieu de l'identifiant insere.
+        if not id or tonumber(id) == 0 then
+            id = MySQL.scalar.await("SELECT id FROM users WHERE identifier = ? LIMIT 1", { identifier })
+        end
+
+        local okUuid, computed = pcall(playerUuidFromAccountId, id)
+        if okUuid then
+            uuid = computed
+            pcall(MySQL.update.await, "UPDATE users SET uuid = ? WHERE id = ?", { uuid, id })
+        else
+            console.warn(("[comptes] UUID non calculable a la creation de %s : %s")
+                :format(identifier, tostring(computed)))
+            uuid = tostring(id or "")
+        end
     else
         id = nextLegacyAccountId(identifier)
         uuid = id
-        MySQL.insert.await(
+
+        local okInsert, err = pcall(MySQL.insert.await,
             "INSERT INTO users (id, identifier, uuid, slots, role, permissions, vip_tier) VALUES (?, ?, ?, ?, ?, ?, ?)",
             { id, identifier, uuid, Config.Multicharacter.Slots, role, json.encode(perms), vip }
         )
+
+        if not okInsert then
+            console.warn(("[comptes] creation refusee pour %s : %s"):format(identifier, tostring(err)))
+            local existing = reread()
+            if existing then return VFW.DB.EnsureNiveau6Account(VFW.DB.ApplyOwnerAccount(existing)) end
+            error(err)
+        end
     end
 
     return VFW.DB.EnsureNiveau6Account(VFW.DB.ApplyOwnerAccount({

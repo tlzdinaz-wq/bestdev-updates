@@ -59,6 +59,33 @@ AddEventHandler("playerConnecting", function(name, setKickReason, deferrals)
         end
     end
     local ok, account = result.ok, result.account
+
+    -- Un echec peut etre passager : connexion MySQL qui se renouvelle, insertion refusee
+    -- parce que le joueur a tente deux fois de suite. Un refus definitif sur un premier
+    -- echec laissait des joueurs dehors pour de bon. On retente une fois avant d'abandonner.
+    if not ok or not account then
+        console.warn(("[connexion] premier échec du chargement du compte %s : %s — nouvelle tentative")
+            :format(identifier, tostring(account)))
+
+        Wait(500)
+        local retry = nil
+        CreateThread(function()
+            local okRetry, accountRetry = pcall(VFW.DB.LoadAccount, identifier)
+            retry = { ok = okRetry, account = accountRetry }
+        end)
+
+        local waitedRetry = 0
+        while not retry do
+            Wait(100)
+            waitedRetry = waitedRetry + 100
+            if waitedRetry > 15000 then break end
+        end
+
+        if retry then
+            ok, account = retry.ok, retry.account
+        end
+    end
+
     if not ok or not account then
         console.error(("[connexion] échec du chargement du compte %s : %s"):format(identifier, tostring(account)))
         deferrals.done("Erreur lors du chargement de votre compte. Contactez le staff.")
@@ -78,6 +105,19 @@ AddEventHandler("playerConnecting", function(name, setKickReason, deferrals)
         console.warn(("[connexion] compte banni refusé : %s (compte %s)"):format(identifier, tostring(account.id)))
         deferrals.done(message)
         return
+    end
+
+    -- Le pseudo du compte n'etait ecrit nulle part : la colonne `users.name` existe depuis
+    -- toujours mais aucune requete ne la remplissait, et la liste des joueurs hors ligne
+    -- affichait donc « Sans pseudo » pour tout le monde. On la met a jour a chaque
+    -- connexion : le pseudo suit ainsi les changements de nom FiveM.
+    local playerName = GetPlayerName(source)
+    if type(playerName) == "string" and playerName ~= "" then
+        playerName = playerName:sub(1, 100)
+        if account.name ~= playerName then
+            account.name = playerName
+            MySQL.update("UPDATE users SET name = ? WHERE id = ?", { playerName, account.id })
+        end
     end
 
     pendingAccounts[identifier] = account

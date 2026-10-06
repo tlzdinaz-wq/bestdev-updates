@@ -670,18 +670,50 @@ Staff29.Cb("core:gestion-factions:setPosition", function(source, name, key)
     return true
 end)
 
+--- L'activation renvoyait `false` pour quatre raisons differentes, et l'interface affichait
+--- toujours « Activez les 4 positions ». Quand la faction n'avait pas encore de ligne de hub,
+--- ou qu'une seule position manquait, le staff cherchait au mauvais endroit. On dit
+--- maintenant precisement ce qui bloque, au staff et dans la console.
 Staff29.Cb("core:gestion-factions:activate", function(source, name)
     if not staffOk(source) then return false end
-    local crew = crewRow(name)
-    if not crew then return false end
-    local hub = hubRow(name)
-    if not hub then return false end
-    if not (posSet(decodePos(hub.posLaboratory))
-        and posSet(decodePos(hub.posCraft))
-        and posSet(decodePos(hub.posStockage))
-        and posSet(decodePos(hub.posGarage))) then
+
+    local function refuse(reason)
+        local xPlayer = VFW.GetPlayerFromId(source)
+        if xPlayer then
+            xPlayer.showNotification({
+                type = "STAFF", variant = "ERROR", subtitle = "Factions", message = reason,
+            })
+        end
+        console.warn(("[factions] activation de %s refusee : %s"):format(tostring(name), reason))
         return false
     end
+
+    local crew = crewRow(name)
+    if not crew then return refuse("Cette faction n'existe pas en base.") end
+
+    local hub = hubRow(name)
+    if not hub then
+        return refuse("Aucune position n'a encore ete enregistree pour cette faction.")
+    end
+
+    local labels = {
+        posLaboratory = "laboratoire",
+        posCraft = "craft",
+        posStockage = "stockage",
+        posGarage = "garage",
+    }
+
+    local missing = {}
+    for key, label in pairs(labels) do
+        if not posSet(decodePos(hub[key])) then
+            missing[#missing + 1] = label
+        end
+    end
+
+    if #missing > 0 then
+        return refuse(("Position manquante : %s."):format(table.concat(missing, ", ")))
+    end
+
     upsertHub(name, { active = true })
     refreshClients()
     return true

@@ -157,7 +157,10 @@ AFKConfig.Shop = {
 AFKConfig.Restrictions = {
     noVehicle       = true,  -- Impossible d'entrer en véhicule
     noCuffed        = true,  -- Impossible d'entrer menotté
-    requireSafeZone = true,  -- Doit être dans une zone safe pour entrer
+    -- Exiger une zone safe rendait /afk inutilisable tant qu'aucune n'etait creee, et
+    -- obligeait a traverser la ville avant de pouvoir s'absenter. Le joueur part en AFK
+    -- d'ou il se trouve ; sa position est memorisee et il y revient en sortant.
+    requireSafeZone = false, -- Mettre a true pour n'autoriser l'AFK qu'en zone safe
 }
 
 -- =========================================================
