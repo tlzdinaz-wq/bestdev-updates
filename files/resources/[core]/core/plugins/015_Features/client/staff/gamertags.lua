@@ -108,6 +108,10 @@ end
 RegisterNetEvent("Admin:updateValue", function(ADMIN_KEY, ADMIN_DATA)
     local key = tonumber(ADMIN_KEY) or ADMIN_KEY
     datas[key] = ADMIN_DATA
+    if type(ADMIN_DATA) == "table" then
+        local remaining = tonumber(ADMIN_DATA.NEW_REMAINING)
+        ADMIN_DATA.newUntil = remaining and (GetGameTimer() + math.max(0, remaining) * 1000) or nil
+    end
     pendingPlayers[key] = nil
     hiddenPlayers[key] = nil
 
@@ -253,6 +257,9 @@ RegisterNetEvent("Admin:gamerTag", function(BOOLEAN)
                                 tag,
                                 tostring(playerData["SOURCE_ID"] or playerServerId)
                             )
+                            local isNew = playerData["NEW"] == true
+                                and (not playerData.newUntil or GetGameTimer() < playerData.newUntil)
+                            if isNew then displayText = '~y~[NEW]~s~ ' .. displayText end
 
                             -- Check if tag needs to be recreated (data changed or doesn't exist).
                             -- On compare aussi le serverId: les ped handles GTA peuvent être
@@ -317,13 +324,9 @@ RegisterNetEvent("Admin:gamerTag", function(BOOLEAN)
                           SetMpGamerTagVisibility(gamerTags[playerPed], 1, hasCrew)
                             SetMpGamerTagAlpha(gamerTags[playerPed], 1, hasCrew and 255 or 0)
 
-                            if playerData["NEW"] then
-                                SetMpGamerTagVisibility(gamerTags[playerPed], 6, true)
-                                SetMpGamerTagAlpha(gamerTags[playerPed], 6, 255)
-                            else
-                                SetMpGamerTagVisibility(gamerTags[playerPed], 6, false)
-                                SetMpGamerTagAlpha(gamerTags[playerPed], 6, 0)
-                            end
+                            -- Le composant 6 est l'icône du mode passif, pas NEW.
+                            SetMpGamerTagVisibility(gamerTags[playerPed], 6, false)
+                            SetMpGamerTagAlpha(gamerTags[playerPed], 6, 0)
 
                             if playerData["IS_GAMERTAG"] then
                                 SetMpGamerTagVisibility(gamerTags[playerPed], 14, true)

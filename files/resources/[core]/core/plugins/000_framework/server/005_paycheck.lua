@@ -52,7 +52,7 @@ RegisterNetEvent("core:playerTimer:start", function()
     local source = source
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer then return end
-    xPlayer.sessionStart = os.time()
+    xPlayer.sessionStart = xPlayer.sessionStart or os.time()
 end)
 
 AddEventHandler("vfw:playerDropped", function(source, xPlayer)

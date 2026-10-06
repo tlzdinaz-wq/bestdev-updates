@@ -11,11 +11,8 @@ local function panelManifestUrl()
     return ("%s/api/branding/%s"):format((PANEL_URL:gsub("/+$", "")), PANEL_SLUG)
 end
 
-local STORE = "global_branding"
 local JSON_FILE = "config/branding_overrides.json"
 local jsonCache = nil
-local jsonFileExists = false
-local migratedFromVariables = false
 local DEFAULT_LOGO = GetConvar("core_brand_logo", "logo/logo.svg")
 local DEFAULT_BANNER = GetConvar("core_brand_vui_banner", "")
 local DEFAULT_NOTIF = GetConvar("core_brand_notification_logo", "logo/logo.svg")
@@ -204,13 +201,19 @@ end
 
 local function writeOverridesFile(data)
     local body = encodeOverridesJson(data)
-    local ok = SaveResourceFile(GetCurrentResourceName(), JSON_FILE, body, -1)
-    if ok then
-        jsonCache = data
-        jsonFileExists = true
-        return true
+    local resource = GetCurrentResourceName()
+    local ok, saved = pcall(SaveResourceFile, resource, JSON_FILE, body, -1)
+    if not ok or not saved then
+        console.warn("[Branding] Impossible d'écrire " .. JSON_FILE)
+        return false
     end
-    return false
+    local readOk, persisted = pcall(LoadResourceFile, resource, JSON_FILE)
+    if not readOk or persisted ~= body then
+        console.warn("[Branding] Écriture JSON non confirmée : " .. JSON_FILE)
+        return false
+    end
+    jsonCache = data
+    return true
 end
 
 local function loadOverridesFile()
@@ -219,26 +222,16 @@ local function loadOverridesFile()
     if type(raw) == "string" and raw ~= "" then
         local ok, decoded = pcall(json.decode, raw)
         if ok and type(decoded) == "table" then
-            jsonFileExists = true
             jsonCache = decoded
             return jsonCache
         end
     end
     jsonCache = {}
-    jsonFileExists = false
     return jsonCache
 end
 
 function VFW.Branding.GetOverrides()
     local raw = loadOverridesFile()
-    if not jsonFileExists and not migratedFromVariables and VFW.Variables and VFW.Variables.GetVariable then
-        local fromVar = VFW.Variables.GetVariable(STORE)
-        if type(fromVar) == "table" and type(fromVar.displayName) == "string" and fromVar.displayName ~= "" then
-            migratedFromVariables = true
-            raw = fromVar
-            writeOverridesFile(snapshotOverrides(fromVar))
-        end
-    end
     if type(raw) ~= "table" then
         raw = {}
     end
@@ -267,19 +260,7 @@ function VFW.Branding.GetOverrides()
 end
 
 local function persistOverrides(current)
-    local payload = snapshotOverrides(current)
-    if not writeOverridesFile(payload) then
-        return false
-    end
-    if VFW.Variables and VFW.Variables.SetVariable then
-        VFW.Variables.SetVariable(STORE, payload)
-        CreateThread(function()
-            if VFW.Variables.Flush then
-                pcall(VFW.Variables.Flush, STORE)
-            end
-        end)
-    end
-    return true
+    return writeOverridesFile(snapshotOverrides(current))
 end
 
 function VFW.Branding.SetOverride(field, url)

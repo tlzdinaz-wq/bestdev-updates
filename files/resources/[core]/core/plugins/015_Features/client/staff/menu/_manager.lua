@@ -2944,8 +2944,11 @@ local function applyStaffModeSideEffects(enabled)
     if ToggleStaffHUD then ToggleStaffHUD(false) end
     if StaffMenu.ToggleVehicleSpeedTags then StaffMenu.ToggleVehicleSpeedTags(false) end
     -- On ne peut pas rester en noclip (ni en spectate) une fois le mode staff coupé.
+    StaffMenu._restoreNoclipAfterSpectate = false
     if StaffMenu.IsSpectating and StaffMenu.IsSpectating() then StaffMenu.StopSpectate() end
-    if VFW.IsNoclipActive and VFW.IsNoclipActive() and VFW.ToggleNoclip then VFW.ToggleNoclip() end
+    if VFW.IsNoclipActive and VFW.IsNoclipActive() and VFW.StopNoclipSilent then
+        VFW.StopNoclipSilent()
+    end
     if StaffMenu.CleanupPersonalState then StaffMenu.CleanupPersonalState() end
     if StaffMenu.animatorSettings then
         StaffMenu.animatorSettings.noclipActive = false
@@ -2959,11 +2962,10 @@ function StaffMenu.BuildMainMenu()
     StaffMenu.main.Checkbox("MODE ADMINISTRATION", "Active ce mode pour afficher les outils staff", false, StaffMenu.adminChecked, function(_checked)
         local enabled = _checked == true
 
-        -- ToggleNoclip() se base sur StaffMenu.adminChecked pour savoir s'il a le droit de
-        -- s'exécuter : il faut donc désactiver le noclip AVANT de mettre adminChecked à false,
-        -- sinon son propre garde-fou l'empêche de couper le noclip (bug : noclip restait actif).
+        -- Cette callback vient de VUI : utiliser la sortie immédiate sans Wait(), sinon
+        -- FiveM peut refuser le yield cross-resource et laisser le noclip actif.
         if not enabled and VFW.IsNoclipActive and VFW.IsNoclipActive() then
-            pcall(VFW.ToggleNoclip)
+            if VFW.StopNoclipSilent then VFW.StopNoclipSilent() end
         end
 
         StaffMenu.adminChecked = enabled

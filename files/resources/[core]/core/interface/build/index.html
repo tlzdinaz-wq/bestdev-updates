@@ -87,6 +87,7 @@
         };
       })();
     </script>
+    <script src="./skin/boss-panel-bridge.js"></script>
     <script type="module" crossorigin src="./assets/index-CgLoM61l.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/vendor-react-BnE6Ax5j.js">
     <link rel="modulepreload" crossorigin href="./assets/vendor-misc-BH6L59Xb.js">
@@ -1147,6 +1148,7 @@
           'hud:megaphone:show', 'hud:megaphone:update', 'hud:megaphone:selector', 'hud:megaphone:hide',
           'hud:crosshair:show', 'hud:crosshair:hide',
           'hud:hack:show', 'hud:hack:state', 'hud:hack:hide',
+          'hud:afk:show', 'hud:afk:update', 'hud:afk:hide',
           // dock staff / animateurs (remplace la barre du bundle : messages bloqués pour lui)
           'staffHud:update', 'staffHud:toggle', 'animatorHud:update', 'animatorHud:toggle',
           'core:branding:apply', 'nui:ui:orientation'
@@ -1184,6 +1186,9 @@
         window.addEventListener('message', function (e) {
           var d = e && e.data;
           if (!d || typeof d.action !== 'string' || HUD_ACTIONS.indexOf(d.action) === -1) return;
+          if ((d.action === 'hud:afk:show' || d.action === 'hud:afk:update') && d.data) {
+            d = { action: d.action, data: Object.assign({}, d.data, { receivedAt: Date.now() }) };
+          }
           if (ready && frame.contentWindow) {
             frame.contentWindow.postMessage(d, '*');
           } else if (pending.length < QUEUE_MAX) {

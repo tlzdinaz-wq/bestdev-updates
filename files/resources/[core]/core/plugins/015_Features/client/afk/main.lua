@@ -6,12 +6,65 @@
 local isInAFK = false
 VFW_IsInAFK = false -- Global flag for status manager (prevent hunger/thirst loss in AFK)
 local afkPoints = 0
+local afkEnteredAt = nil
 local leaderboardNPCs = {}
 local leaderboardData = {}  -- Store leaderboard data for DrawText3D
 local podiumProp = nil
 local exitNPC = nil
 local confinementThread = nil
 local afkIdleCamDisabled = false
+local afkProtection = nil
+local afkProtectionGeneration = 0
+
+-- Separate from confinement: protection must start before the teleport waits.
+local function RestoreAFKProtection()
+    local previous = afkProtection
+    if not previous then return end
+    afkProtection = nil
+    SetPlayerInvincible(PlayerId(), previous.playerInvincible)
+    if DoesEntityExist(previous.ped) then
+        SetEntityInvincible(previous.ped, previous.playerInvincible or not previous.canBeDamaged)
+        SetEntityCanBeDamaged(previous.ped, previous.canBeDamaged)
+    end
+end
+
+local function MaintainAFKProtection()
+    local ped = PlayerPedId()
+    if not DoesEntityExist(ped) then return end
+    if not afkProtection or afkProtection.ped ~= ped then
+        local previousInvincible = afkProtection and afkProtection.playerInvincible
+        RestoreAFKProtection()
+        afkProtection = {
+            ped = ped,
+            playerInvincible = previousInvincible or GetPlayerInvincible(PlayerId()),
+            canBeDamaged = GetEntityCanBeDamaged(ped),
+            health = GetEntityHealth(ped),
+        }
+    end
+    SetPlayerInvincible(PlayerId(), true)
+    SetEntityInvincible(ped, true)
+    SetEntityCanBeDamaged(ped, false)
+    local health = GetEntityHealth(ped)
+    -- Native invincibility does not prevent direct SetEntityHealth calls.
+    -- Preserve entry HP (and legitimate healing), without granting a full heal.
+    if health < afkProtection.health then
+        SetEntityHealth(ped, afkProtection.health)
+    else
+        afkProtection.health = health
+    end
+end
+
+local function StartAFKProtection()
+    afkProtectionGeneration = afkProtectionGeneration + 1
+    local generation = afkProtectionGeneration
+    MaintainAFKProtection()
+    CreateThread(function()
+        while isInAFK and afkProtectionGeneration == generation do
+            MaintainAFKProtection()
+            Wait(0)
+        end
+    end)
+end
 
 -- ========================================================================
 -- HELPER FUNCTIONS
@@ -265,6 +318,18 @@ local function SpawnLeaderboardNPCs(leaderboard)
     end
 end
 
+-- The browser advances this clock locally: no per-frame drawing or NUI traffic.
+local function ShowAfkTimer()
+    if not isInAFK or not afkEnteredAt then return end
+    SendNUIMessage({
+        action = "hud:afk:show",
+        data = {
+            elapsed = math.max(0, math.floor((GetGameTimer() - afkEnteredAt) / 1000)),
+            points = afkPoints
+        }
+    })
+end
+
 -- Start confinement loop
 local function StartConfinementLoop()
     if confinementThread then return end
@@ -306,20 +371,13 @@ local function StartConfinementLoop()
                 if distToExit < exitNpcRadius then
                     showingExitPrompt = true
                     DrawText3D(exitNpcCoords.x, exitNpcCoords.y, exitNpcCoords.z + 1.0, "~g~[E]~w~ Quitter la zone AFK")
+
+                    if VFW.Interact.JustPressed(0, 38) then
+                        TriggerServerEvent('core:afk:exit')
+                    end
                 else
                     showingExitPrompt = false
                 end
-            end
-
-            -- E depuis n'importe ou dans la zone, pas seulement devant le PNJ : on
-            -- s'absente d'un mot, on revient d'une touche. Le PNJ reste utilisable, c'est
-            -- la meme touche et le meme evenement.
-            if not showingExitPrompt then
-                VFW.ShowHelpNotification("Appuyez sur ~INPUT_PICKUP~ pour quitter la zone AFK")
-            end
-
-            if VFW.Interact.JustPressed(0, 38) then
-                TriggerServerEvent('core:afk:exit')
             end
 
             -- Draw points above leaderboard NPCs
@@ -344,6 +402,10 @@ end
 local function StopConfinementLoop()
     isInAFK = false
     VFW_IsInAFK = false
+    afkProtectionGeneration = afkProtectionGeneration + 1
+    RestoreAFKProtection()
+    afkEnteredAt = nil
+    SendNUIMessage({ action = "hud:afk:hide" })
     -- Thread will exit on next iteration
 end
 
@@ -408,9 +470,15 @@ end)
 
 -- Player successfully entered AFK zone
 RegisterNetEvent('core:afk:entered', function(data)
+    if isInAFK then return end
     isInAFK = true
     VFW_IsInAFK = true
+    StartAFKProtection()
     afkPoints = data.points or 0
+    -- `os` n'existe pas dans le Lua client : on compte avec l'horloge du jeu, decalee du
+    -- temps deja ecoule que le serveur nous donne (non nul apres une reconnexion).
+    afkEnteredAt = GetGameTimer() - ((tonumber(data.elapsed) or 0) * 1000)
+    ShowAfkTimer()
 
     local ped = PlayerPedId()
     local pos = data.position
@@ -516,7 +584,11 @@ end)
 
 -- Points update from server
 RegisterNetEvent('core:afk:updatePoints', function(totalPoints, pointsEarned)
+    local previousPoints = afkPoints
     afkPoints = totalPoints
+    if isInAFK and previousPoints ~= afkPoints then
+        SendNUIMessage({ action = "hud:afk:update", data = { points = afkPoints } })
+    end
 
     -- Show notification for points earned
     VFW.ShowNotification({
@@ -528,6 +600,21 @@ end)
 -- ========================================================================
 -- CALLBACKS
 -- ========================================================================
+
+AddEventHandler('vfw:playerReady', function()
+    TriggerServerEvent('core:afk:resume')
+end)
+
+RegisterNetEvent('core:afk:retryResume', function()
+    if VFW.PlayerLoaded and not isInAFK then TriggerServerEvent('core:afk:resume') end
+end)
+
+AddEventHandler('vfw:onPlayerLogout', function()
+    StopConfinementLoop()
+    afkIdleCamDisabled = false
+    CleanupLeaderboardNPCs()
+    CleanupExitNPC()
+end)
 
 -- Note: Player position is sent directly via core:afk:enterWithPosition event
 
@@ -549,6 +636,8 @@ end)
 
 AddEventHandler('onResourceStop', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
+    StopConfinementLoop()
+    afkIdleCamDisabled = false
 
     -- Cleanup NPCs and podium
     CleanupLeaderboardNPCs()
@@ -572,4 +661,3 @@ CreateThread(function()
         end
     end
 end)
-

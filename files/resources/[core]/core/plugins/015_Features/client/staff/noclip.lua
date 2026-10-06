@@ -1143,14 +1143,18 @@ end
 function VFW.StopNoclipSilent()
     if not inNoClip then return end
     inNoClip = false
+    isTogglingNoclip = false
+    TriggerServerEvent("vfw:stafflogs:noclipState", false)
+    SetCrosshairOverlay(false)
+    local silentPed = PlayerPedId()
 
     SetEveryoneIgnorePlayer(PlayerId(), false)
     SetPoliceIgnorePlayer(PlayerId(), false)
 
     if speconmod then
         NetworkSetInSpectatorMode(false, targetped)
-        if IsEntityAttached(VFW.PlayerData.ped) then
-            DetachEntity(VFW.PlayerData.ped, true, true)
+        if IsEntityAttached(silentPed) then
+            DetachEntity(silentPed, true, true)
         end
         speconmod = false
         targetped = nil
@@ -1159,10 +1163,11 @@ function VFW.StopNoclipSilent()
         instructionalButtons[idInstructionalButtons[3]] = nil
     end
 
-    RestoreNoclipVisuals(VFW.PlayerData.ped)
+    if silentPed ~= 0 and DoesEntityExist(silentPed) then
+        SetNoClipAttributes(silentPed, noclipVehicle or 0, false)
+    end
 
     -- Restaurer visibilité ped pour les autres clients
-    local silentPed = VFW.PlayerData and VFW.PlayerData.ped or PlayerPedId()
     if silentPed and DoesEntityExist(silentPed) then
         Entity(silentPed).state:set('noclipPed', nil, true)
     end
@@ -1174,6 +1179,9 @@ function VFW.StopNoclipSilent()
 
     if noclipVehicle and DoesEntityExist(noclipVehicle) then
         Entity(noclipVehicle).state:set('noclipHidden', nil, true)
+        SetEntityInvincible(noclipVehicle, false)
+        FreezeEntityPosition(noclipVehicle, false)
+        SetEntityCollision(noclipVehicle, true, true)
         ResetEntityAlpha(noclipVehicle)
         SetEntityVisible(noclipVehicle, true, true)
     end
@@ -1182,10 +1190,7 @@ function VFW.StopNoclipSilent()
     instructionalButtons[idInstructionalButtons[1]] = nil
     instructionalButtons[idInstructionalButtons[2]] = nil
 
-    if currententity then
-        SetEntityDrawOutline(currententity, false)
-        currententity = nil
-    end
+    ClearLookedAt()
 end
 
 --- Toggle le crosshair du noclip

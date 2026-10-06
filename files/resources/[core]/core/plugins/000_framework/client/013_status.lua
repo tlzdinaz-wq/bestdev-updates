@@ -126,7 +126,7 @@ end
 ---Handle HealthDamage
 ---@return any
 local function handleHealthDamage()
-    if StatusManager.state.isHealthDamaging then
+    if VFW_IsInAFK or StatusManager.state.isHealthDamaging then
         return
     end
 
@@ -147,6 +147,7 @@ local function handleHealthDamage()
     VFW.StatusDamageSource = StatusManager.state.healthDamageSource
 
     while thirst <= 0 or hunger <= 0 do
+        if VFW_IsInAFK then break end
         local ped = getPlayerPed()
 
         if not ped or GetEntityHealth(ped) <= 0 then

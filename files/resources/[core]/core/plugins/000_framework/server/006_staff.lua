@@ -671,13 +671,27 @@ local function gamerTagPayload(target)
         NAME = playerName,
         RP_NAME = rpName or playerName,
         CREW = gamerTagCrew(target),
-        NEW = gamerTagPlaytime(target) < 3600,
+        NEW = gamerTagPlaytime(target) <= 3600,
+        NEW_REMAINING = math.max(0, 3601 - gamerTagPlaytime(target)),
         PREMIUM = vipTier > 0,
         STAFF_DUTY = staffMode[source] == true,
         ANIMATOR_DUTY = animatorMode[source] == true,
         IS_GAMERTAG = true,
     }
 end
+
+-- Un ID serveur peut être réutilisé : envoyer les nouvelles données aux staff
+-- réinitialise aussi le cache client qui masquait l'ancien joueur déconnecté.
+AddEventHandler("vfw:characterLoaded", function(source, xPlayer)
+    local target = xPlayer or VFW.GetPlayerFromId(source)
+    if not target or hiddenGamerTags[source] then return end
+    local payload = gamerTagPayload(target)
+    for _, viewer in pairs(VFW.GetExtendedPlayers()) do
+        if canUseGamerTags(viewer) then
+            TriggerClientEvent("Admin:updateValue", viewer.source, source, payload)
+        end
+    end
+end)
 
 RegisterNetEvent("Admin:gamerTag", function(enabled)
     local source = source

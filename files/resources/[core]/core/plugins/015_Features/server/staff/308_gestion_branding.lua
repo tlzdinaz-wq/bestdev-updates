@@ -56,6 +56,6 @@ Staff29.Cb("gestionBranding:save", function(source, data)
     local ok, err = VFW.Branding.SetConfig(data)
     if not ok then return fail(err) end
     local out = panel()
-    out.message = data.reset and "Identité d’origine rétablie." or "Identité enregistrée dans branding_overrides.json."
+    out.message = data.reset and "Identité d’origine rétablie." or "Identité enregistrée dans config/branding_overrides.json (conservée après reboot)."
     return out
 end)

@@ -73,7 +73,15 @@ function Staff29.IsTable(value)
 end
 
 function Staff29.Vec(value)
-    if type(value) ~= "table" then return nil end
+    -- Un vector3 envoye par le client n'est PAS une table : CfxLua lui donne son propre
+    -- type. Le refuser ici faisait echouer en silence tout ce qui recoit une position
+    -- telle quelle — notamment /afk, qui ne teleportait jamais personne.
+    local kind = type(value)
+    if kind == "vector3" or kind == "vector4" then
+        return { x = value.x + 0.0, y = value.y + 0.0, z = value.z + 0.0 }
+    end
+
+    if kind ~= "table" then return nil end
     local x = tonumber(value.x or value[1])
     local y = tonumber(value.y or value[2])
     local z = tonumber(value.z or value[3])

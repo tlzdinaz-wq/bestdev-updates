@@ -647,6 +647,7 @@ RegisterNetEvent("vfw:tpm", function()
 end)
 
 RegisterNetEvent("vfw:killPlayer", function(staffSource)
+    if VFW_IsInAFK then return end
     if staffSource then
         VFW.DeathOverrideCause = "staff_kill"
         VFW.DeathOverrideStaffSource = staffSource

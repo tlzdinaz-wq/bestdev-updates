@@ -21,6 +21,7 @@ local currentAnimationPlayed = nil
 local currentAnimDict = nil
 local emoteSelect = false
 local previewMode = false
+local open = false -- État privé : ne pas partager `open` avec les autres menus.
 local opening = false
 local cachedCategories = nil
 local animOverrides = {}
@@ -1362,9 +1363,7 @@ VFW.RegisterInput("openNewAnimation", "Menu des emotes", "keyboard", "K", functi
     end
 end)
 
-RegisterNUICallback('nui:newanimation:select', function(data, cb)
-    cb("ok")
-
+local function playSelectedAnimation(data)
     if not open then
         return
     end
@@ -1426,9 +1425,24 @@ RegisterNUICallback('nui:newanimation:select', function(data, cb)
         Thread()
     else
         emoteSelect = true
-        EmoteCommandStart(data[1], VFW.PlayerData.ped, data[5] or nil)
+        EmoteCommandStart(data[1], PlayerPedId(), data[5] == true)
         TriggerServerEvent("vfw:newanim:sync", data[1])
     end
+end
+
+RegisterNUICallback('nui:newanimation:select', function(data, cb)
+    cb("ok")
+    if type(data) ~= "table" or type(data[1]) ~= "string" or data[1] == "" then return end
+    -- Chargement et sélection du partenaire hors du callback CEF, sans bloquer.
+    CreateThread(function()
+        local ok, err = pcall(playSelectedAnimation, data)
+        if not ok then
+            currentAction[PlayerPedId()] = nil
+            emoteSelect = false
+            console.warn(("[Emotes] Clic %s : %s"):format(data[1], tostring(err)))
+            VFW.ShowNotification({ type = 'ROUGE', content = "Impossible de lancer cette animation. Voir F8 pour le détail." })
+        end
+    end)
 end)
 
 RegisterNUICallback("nui:newanimation:refocus", function(_, cb)
@@ -2102,4 +2116,3 @@ AddStateBagChangeHandler("dead", "player:" .. GetPlayerServerId(PlayerId()), fun
         CleanupEmoteMenu()
     end
 end)
-

@@ -118,18 +118,16 @@ function StaffMenu.StopSpectate()
     -- Supprimer les instructional buttons
     instructionalButtons[spectateButtonsId] = nil
 
-    -- Hide the transition behind a fade so we never appear at the target's
-    -- coords during the round-trip back to noclip / normal state.
+    -- Le handler de sortie gère le fondu et le retour. Ne pas Wait() ici :
+    -- cette fonction est aussi appelée par les callbacks VUI cross-resource.
     DoScreenFadeOut(250)
-    while not IsScreenFadedOut() do
-        Wait(0)
-    end
+
+    StaffMenu._restoreNoclipAfterSpectate = additionalFeatures.wasNoclipActive == true
+        and (StaffMenu.adminChecked == true or StaffMenu.animatorModeEnabled == true)
 
     if spectateTarget then
         TriggerServerEvent("core:StaffSpectate", spectateTarget, false)
     end
-
-    StaffMenu._restoreNoclipAfterSpectate = additionalFeatures.wasNoclipActive or false
 
     if StaffMenu.ResetOutilsSpectate then
         StaffMenu.ResetOutilsSpectate()

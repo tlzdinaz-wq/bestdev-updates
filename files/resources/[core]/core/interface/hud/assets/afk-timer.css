@@ -1,0 +1,50 @@
+.afk-timer {
+    --afk-accent: var(--brand-primary, #7263ee);
+    --afk-accent-rgb: var(--brand-primary-rgb, 114, 99, 238);
+    position: fixed;
+    top: clamp(16px, 2.2vh, 28px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 338px;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    padding: 12px 18px 13px;
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 14px;
+    background: linear-gradient(125deg, rgba(var(--afk-accent-rgb), .13), transparent 55%),
+        linear-gradient(180deg, rgba(20, 23, 32, .97), rgba(10, 12, 18, .97));
+    box-shadow: inset 0 1px rgba(255, 255, 255, .08), 0 12px 28px -12px rgba(0, 0, 0, .75);
+    color: #fff;
+    font-family: Montserrat, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    pointer-events: none;
+    user-select: none;
+    overflow: hidden;
+    animation: afk-appear .22s ease-out both;
+}
+.afk-timer[hidden] { display: none; }
+.afk-timer::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 18px;
+    width: 42px;
+    height: 2px;
+    background: var(--afk-accent);
+    box-shadow: 0 0 12px rgba(var(--afk-accent-rgb), .7);
+}
+.afk-timer__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.afk-timer__badge { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 800; letter-spacing: .16em; color: #eeeaff; }
+.afk-timer__badge svg { width: 12px; height: 12px; color: var(--afk-accent); }
+.afk-timer__status { display: flex; align-items: center; gap: 5px; font-size: 8px; font-weight: 700; letter-spacing: .12em; color: #bec4d2; }
+.afk-timer__status::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: var(--afk-accent); box-shadow: 0 0 7px rgba(var(--afk-accent-rgb), .55); }
+.afk-timer__body { display: grid; grid-template-columns: minmax(0, 1fr) 95px; align-items: end; gap: 15px; }
+.afk-timer__clock { display: block; font-size: 28px; line-height: 1.05; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: .035em; white-space: nowrap; }
+.afk-timer__label { display: block; margin-top: 5px; color: #aeb7c9; font-size: 8px; font-weight: 700; letter-spacing: .16em; line-height: 1; }
+.afk-timer__points { min-width: 0; padding-left: 17px; border-left: 1px solid rgba(255, 255, 255, .11); }
+.afk-timer__points-value { display: block; font-size: 23px; line-height: 1.28; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; color: #eeeaff; }
+.afk-timer__points-value.is-long { font-size: 17px; line-height: 1.72; }
+.afk-timer__points-label { color: #c7cedd; }
+@keyframes afk-appear { from { opacity: 0; margin-top: -5px; } to { opacity: 1; margin-top: 0; } }
+@media (max-height: 800px) { .afk-timer { top: 16px; padding-top: 10px; padding-bottom: 11px; } }
+@media (prefers-reduced-motion: reduce) { .afk-timer { animation: none; } }

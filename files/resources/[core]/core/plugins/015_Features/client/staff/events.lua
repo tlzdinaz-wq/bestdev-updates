@@ -24,6 +24,12 @@ RegisterNetEvent("vfw:staff:syncStaffMode", function(staffModeList)
     end
 
     if wasInStaffMode and not isInStaffMode then
+        StaffMenu.adminChecked = false
+        StaffMenu._restoreNoclipAfterSpectate = false
+        if StaffMenu.IsSpectating and StaffMenu.IsSpectating() then StaffMenu.StopSpectate() end
+        if VFW.IsNoclipActive and VFW.IsNoclipActive() and VFW.StopNoclipSilent then
+            VFW.StopNoclipSilent()
+        end
         TriggerEvent("vfw:staff:setStaffClothes", false)
     end
     wasInStaffMode = isInStaffMode
@@ -59,12 +65,12 @@ end)
 
 ---@param resourceName number Player ID
 AddEventHandler("onResourceStop", function(resourceName)
-    if (GetCurrentResourceName() ~= "core") then
+    if resourceName ~= GetCurrentResourceName() then
         return
     end
 
-    if VFW.ToggleNoclip and VFW.IsNoclipActive and VFW.IsNoclipActive() then
-        VFW.ToggleNoclip()
+    if VFW.StopNoclipSilent and VFW.IsNoclipActive and VFW.IsNoclipActive() then
+        VFW.StopNoclipSilent()
     end
 end)
 
@@ -218,11 +224,13 @@ RegisterNetEvent("core:StaffSpectate", function(coords, id, isSpectating)
         SetEntityVelocity(playerPed, 0.0, 0.0, 0.0)
     end
 
-    if StaffMenu and StaffMenu._restoreNoclipAfterSpectate then
+    if StaffMenu and StaffMenu._restoreNoclipAfterSpectate
+        and (StaffMenu.adminChecked or StaffMenu.animatorModeEnabled) then
         StaffMenu._restoreNoclipAfterSpectate = false
         restorePed(playerPed, playerId)
         VFW.ToggleNoclip()
     else
+        StaffMenu._restoreNoclipAfterSpectate = false
         restorePed(playerPed, playerId)
     end
 
@@ -726,13 +734,16 @@ RegisterCommand("staff", function()
     end
 
     local newState = not StaffMenu.adminChecked
+    StaffMenu.adminChecked = newState
 
     if not newState then
+        StaffMenu._restoreNoclipAfterSpectate = false
         if StaffMenu.IsSpectating and StaffMenu.IsSpectating() then StaffMenu.StopSpectate() end
-        if VFW.IsNoclipActive() then VFW.ToggleNoclip() end
+        if VFW.IsNoclipActive and VFW.IsNoclipActive() and VFW.StopNoclipSilent then
+            VFW.StopNoclipSilent()
+        end
     end
 
-    StaffMenu.adminChecked = newState
     -- Tenue staff coupée : toujours signaler le bypass au serveur.
     local bypassOutfit = (VFW.StaffOutfitEnabled ~= true) or GetResourceKvpString("staff_bypass_outfit") == "true"
   TriggerServerEvent("vfw:staff:mode", newState, bypassOutfit)
@@ -1015,4 +1026,3 @@ RegisterNetEvent("vfw:animator:forceDisableAnimatorMode", function()
         message = "Mode animateur désactivé : permissions insuffisantes."
   })
 end)
-

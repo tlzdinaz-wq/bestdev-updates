@@ -1,5 +1,25 @@
 local sessions = {}
 local usedBuckets = {}
+local loading = {}
+local resumeSchemaReady, resumeSchemaChecking = false, false
+
+-- Les anciennes lignes sans exited_at ne sont pas fiables : l'ancienne sortie
+-- normale ne les fermait pas. Le marqueur vaut donc 0 pour tout l'historique.
+local function ensureResumeSchema()
+    while resumeSchemaChecking do Wait(50) end
+    if resumeSchemaReady then return true end
+    resumeSchemaChecking = true
+    local ok, err = pcall(function()
+        local column = MySQL.single.await("SHOW COLUMNS FROM afk_sessions LIKE 'resume_pending'")
+        if not column then
+            MySQL.query.await("ALTER TABLE afk_sessions ADD COLUMN resume_pending TINYINT(1) NOT NULL DEFAULT 0")
+        end
+    end)
+    resumeSchemaChecking = false
+    resumeSchemaReady = ok
+    if not ok then console.warn(("[AFK] Migration de reprise impossible : %s"):format(tostring(err))) end
+    return ok
+end
 
 local function bucketRange()
     local cfg = AFKConfig and AFKConfig.Instances or {}
@@ -140,17 +160,29 @@ end
 
 local function exitAFK(source, forced)
     local session = sessions[source]
-    if not session then return end
+    if not session or session.exiting then return end
 
+    session.exiting = true
+    local closed = Staff29.Update([[
+        UPDATE afk_sessions SET exited_at = ?, resume_pending = 0
+        WHERE identifier = ? AND resume_pending = 1 AND exited_at IS NULL
+    ]], { Staff29.Now(), session.identifier })
+    if not closed or closed < 1 then
+        session.exiting = false
+        Staff29.Notify(source, "ERROR", "Zone AFK", "La sortie n'a pas pu être sauvegardée. Réessayez.")
+        return
+    end
+
+    if sessions[source] ~= session then return end
+    local xPlayer = VFW.GetPlayerFromId(source)
+    local total = xPlayer and getPoints(session.identifier) or 0
+    if sessions[source] ~= session or VFW.GetPlayerFromId(source) ~= xPlayer then return end
     sessions[source] = nil
     releaseBucket(session.bucket)
 
-    local xPlayer = VFW.GetPlayerFromId(source)
     pcall(SetPlayerRoutingBucket, source, 0)
 
     if not xPlayer then return end
-
-    local total = getPoints(xPlayer.identifier)
 
     xPlayer.triggerEvent("core:afk:exited", {
         previousCoords = session.coords,
@@ -166,6 +198,82 @@ Staff29.AFK = {
     IsInAFK = function(source) return sessions[source] ~= nil end,
 }
 
+local function sendAFKEntry(source, xPlayer, session)
+    local afkPos = AFKConfig.Position.coords
+    local points = getPoints(session.identifier)
+    local leaderboard = topLeaderboard((AFKConfig.Leaderboard and AFKConfig.Leaderboard.topCount) or 3)
+    if sessions[source] ~= session or VFW.GetPlayerFromId(source) ~= xPlayer then return end
+    xPlayer.triggerEvent("core:afk:entered", {
+        points = points,
+        position = { x = afkPos.x, y = afkPos.y, z = afkPos.z },
+        heading = AFKConfig.Position.heading,
+        leaderboard = leaderboard,
+        elapsed = math.max(0, os.time() - session.enteredAt),
+    })
+end
+
+local function loadPendingSession(identifier)
+    if not ensureResumeSchema() then return nil, false end
+    local ok, row = pcall(MySQL.single.await, [[
+        SELECT id, prev_x, prev_y, prev_z, prev_heading,
+               GREATEST(0, TIMESTAMPDIFF(SECOND, entered_at, NOW())) AS elapsed
+        FROM afk_sessions
+        WHERE identifier = ? AND resume_pending = 1 AND exited_at IS NULL
+        ORDER BY id DESC LIMIT 1
+    ]], { identifier })
+    if not ok then
+        console.warn(("[AFK] Lecture de reprise impossible : %s"):format(tostring(row)))
+        return nil, false
+    end
+    return row, true
+end
+
+local function resumeSession(source, xPlayer, row)
+    if VFW.GetPlayerFromId(source) ~= xPlayer or sessions[source] then return end
+    local bucket = allocateBucket()
+    if not bucket then
+        Staff29.Notify(source, "ERROR", "Zone AFK", "La zone AFK est pleine. Votre session reste sauvegardée.")
+        VFW.SetTimeout(5000, function()
+            if VFW.GetPlayerFromId(source) == xPlayer and not sessions[source] then
+                TriggerClientEvent("core:afk:retryResume", source)
+            end
+        end)
+        return
+    end
+    local session = {
+        bucket = bucket,
+        coords = { x = tonumber(row.prev_x) or 0, y = tonumber(row.prev_y) or 0, z = tonumber(row.prev_z) or 0 },
+        heading = tonumber(row.prev_heading) or 0,
+        identifier = xPlayer.identifier,
+        enteredAt = os.time() - math.max(0, tonumber(row.elapsed) or 0),
+        lastTick = GetGameTimer(),
+    }
+    sessions[source] = session
+    SetPlayerRoutingBucket(source, bucket)
+    sendAFKEntry(source, xPlayer, session)
+end
+
+-- Demandé après le spawn complet, pas pendant la sélection du personnage.
+RegisterNetEvent("core:afk:resume", function()
+    local source = source
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not xPlayer or sessions[source] or loading[source] then return end
+    if not Staff29.RateLimit(source, "afkResume", 1500) then return end
+    loading[source] = xPlayer
+    local row, ok = loadPendingSession(xPlayer.identifier)
+    if loading[source] == xPlayer then loading[source] = nil end
+    if not ok then
+        if VFW.GetPlayerFromId(source) == xPlayer then
+            Staff29.Notify(source, "ERROR", "Zone AFK", "Impossible de vérifier votre session AFK. Nouvelle tentative dans quelques secondes.")
+            VFW.SetTimeout(5000, function()
+                if VFW.GetPlayerFromId(source) == xPlayer then TriggerClientEvent("core:afk:retryResume", source) end
+            end)
+        end
+        return
+    end
+    if row then resumeSession(source, xPlayer, row) end
+end)
+
 RegisterNetEvent("core:afk:enterWithPosition", function(coords, heading)
     local source = source
 
@@ -176,7 +284,21 @@ RegisterNetEvent("core:afk:enterWithPosition", function(coords, heading)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer then return end
     if sessions[source] then return end
+    if loading[source] then return end
     if not Staff29.RateLimit(source, "afkEnter", 3000) then return end
+
+    loading[source] = xPlayer
+    local pendingSession, resumeOk = loadPendingSession(xPlayer.identifier)
+    if loading[source] == xPlayer then loading[source] = nil end
+    if VFW.GetPlayerFromId(source) ~= xPlayer then return end
+    if not resumeOk then
+        Staff29.Notify(source, "ERROR", "Zone AFK", "Impossible de sauvegarder la session AFK. Réessayez.")
+        return
+    end
+    if pendingSession then
+        resumeSession(source, xPlayer, pendingSession)
+        return
+    end
 
     local bucket = allocateBucket()
     if not bucket then
@@ -184,6 +306,18 @@ RegisterNetEvent("core:afk:enterWithPosition", function(coords, heading)
             type = "STAFF", variant = "ERROR", subtitle = "Zone AFK",
             message = "La zone AFK est pleine, réessayez plus tard.",
         })
+        return
+    end
+
+    loading[source] = xPlayer
+    local sessionId = Staff29.Insert([[
+        INSERT INTO afk_sessions (identifier, bucket, entered_at, prev_x, prev_y, prev_z, prev_heading, resume_pending)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+    ]], { xPlayer.identifier, bucket, Staff29.Now(), position.x, position.y, position.z, h })
+    if loading[source] == xPlayer then loading[source] = nil end
+    if not sessionId or VFW.GetPlayerFromId(source) ~= xPlayer then
+        releaseBucket(bucket)
+        if not sessionId then Staff29.Notify(source, "ERROR", "Zone AFK", "La session AFK n'a pas pu être sauvegardée.") end
         return
     end
 
@@ -198,20 +332,7 @@ RegisterNetEvent("core:afk:enterWithPosition", function(coords, heading)
 
     pcall(SetPlayerRoutingBucket, source, bucket)
 
-    Staff29.Insert([[
-        INSERT INTO afk_sessions (identifier, bucket, entered_at, prev_x, prev_y, prev_z, prev_heading)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ]], { xPlayer.identifier, bucket, Staff29.Now(), position.x, position.y, position.z, h })
-
-    local afkPos = AFKConfig.Position.coords
-    local topCount = (AFKConfig.Leaderboard and AFKConfig.Leaderboard.topCount) or 3
-
-    xPlayer.triggerEvent("core:afk:entered", {
-        points = getPoints(xPlayer.identifier),
-        position = { x = afkPos.x, y = afkPos.y, z = afkPos.z },
-        heading = AFKConfig.Position.heading,
-        leaderboard = topLeaderboard(topCount),
-    })
+    sendAFKEntry(source, xPlayer, sessions[source])
 end)
 
 RegisterNetEvent("core:afk:exit", function()
@@ -325,12 +446,14 @@ CreateThread(function()
             local session = sessions[src]
             if session then
                 local xPlayer = VFW.GetPlayerFromId(src)
-                if not xPlayer then
+                if not xPlayer or xPlayer.identifier ~= session.identifier then
                     releaseBucket(session.bucket)
                     sessions[src] = nil
-                else
+                elseif not session.exiting then
                     local total = setPoints(xPlayer.identifier, getPoints(xPlayer.identifier) + perMinute, 1)
-                    xPlayer.triggerEvent("core:afk:updatePoints", total, perMinute)
+                    if sessions[src] == session and VFW.GetPlayerFromId(src) == xPlayer then
+                        xPlayer.triggerEvent("core:afk:updatePoints", total, perMinute)
+                    end
                 end
             end
         end
@@ -417,13 +540,12 @@ end, {
 })
 
 AddEventHandler("vfw:playerDropped", function(source)
+    loading[source] = nil
     local session = sessions[source]
     if not session then return end
 
-    Staff29.Update([[
-        UPDATE afk_sessions SET exited_at = ? WHERE identifier = ? AND exited_at IS NULL
-    ]], { Staff29.Now(), session.identifier })
-
+    -- Libérer uniquement l'instance : le marqueur en base reste actif jusqu'au PNJ
+    -- de sortie (ou une sortie staff). Aucun point n'est attribué hors ligne.
     releaseBucket(session.bucket)
     sessions[source] = nil
 end)

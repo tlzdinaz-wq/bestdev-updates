@@ -195,6 +195,7 @@ RegisterNetEvent("ac:checkHeadshot", function(payload)
 
     local entity = NetworkDoesEntityExistWithNetworkId(payload.netId) and NetworkGetEntityFromNetworkId(payload.netId) or 0
     if entity == 0 or not DoesEntityExist(entity) then return end
+    if VFW_IsInAFK and entity == PlayerPedId() then return end
 
     local existed, lastBone = GetPedLastDamageBone(entity)
     if not existed or not headBoneTags[lastBone] then return end

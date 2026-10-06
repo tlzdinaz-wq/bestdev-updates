@@ -1128,6 +1128,7 @@ local koRecoveryTimer = 0
 ---@param event any
 ---@param args any
 AddEventHandler("gameEventTriggered", function(event, args)
+    if VFW_IsInAFK and event == "CEventNetworkEntityDamage" and args[1] == PlayerPedId() then return end
     if event == "CEventNetworkEntityDamage" then
         if IsEntityAPed(args[1]) and IsPedAPlayer(args[1]) and args[1] == VFW.PlayerData.ped then
             local attacker = args[2]
@@ -1302,6 +1303,7 @@ end
 ---@param weapon any
 ---@param baseDamage any
 AddEventHandler("entityDamaged", function(victim, culprit, weapon, baseDamage)
+    if VFW_IsInAFK and victim == PlayerPedId() then return end
     -- entityDamaged fire sur tous les clients qui voient l'entité. On ne traite que notre propre KO :
     -- seul le client victime peut légitimement déclencher son KO (validé côté serveur par src==playerId).
     if victim ~= PlayerPedId() then

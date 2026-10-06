@@ -1,6 +1,7 @@
 local bossPanelModule = {
     isOpen = false,
     announceContext = nil,
+    openToken = 0,
 }
 
 local function playerCanEditAnnounces()
@@ -15,7 +16,6 @@ local function playerCanEditAnnounces()
     if name == "boss" or name == "patron" or name == "owner" or name == "pdg" then return true end
     if label:find("patron", 1, true) or label:find("boss", 1, true) or label == "pdg" then return true end
 
-    if bossPanelModule.isOpen then return true end
     return false
 end
 
@@ -135,6 +135,45 @@ function bossPanelModule.openBossPanel()
         return
     end
 
+    -- Ouvrir immédiatement un panneau léger. Les données détaillées sont chargées
+    -- ensuite : aucun callback lent ou défaillant ne doit laisser uniquement le focus
+    -- NUI actif sur un écran transparent.
+    bossPanelModule.openToken = bossPanelModule.openToken + 1
+    local openToken = bossPanelModule.openToken
+    local initialData = {
+        company = {
+            label = job.label or job.name,
+            name = job.name,
+            image = "",
+            employees = {}, roles = {}, permissions = {}, invoices = {},
+            balance = 0, revenue = {}, expenses = {}, chests = {}, lockers = {},
+            farming = {}, weazelPerms = {}, lifeinvaderPerms = {}, ltd = {}, restaurant = {},
+        },
+        player = {
+            id = playerData.uuid or playerData.identifier or playerData.id or "self",
+            firstname = playerData.firstName or playerData.firstname or "",
+            lastname = playerData.lastName or playerData.lastname or "",
+            onDuty = job.onDuty == true,
+            mugshot = playerData.mugshot or "",
+            role = {
+                name = job.grade_name or "employee",
+                label = job.grade_label or "Employé",
+                grade = tonumber(job.grade) or 0,
+                salary = tonumber(job.salary) or 0,
+                isBoss = playerCanEditAnnounces(),
+                permissions = {},
+            },
+            serviceStart = 0, serviceStop = 0, totalWeek = 0, totalLastWeek = 0,
+            timeInService = 0, isFavorite = false, startDate = "", phoneNumber = "",
+        },
+        liaisonUnreadCount = 0,
+    }
+
+    bossPanelModule.isOpen = true
+    VFW.Nui.HudVisible(false)
+    VFW.Nui.Focus(true, false)
+    SendNUIMessage({ action = "bossPanel:open", data = initialData })
+
     slowestCall, slowestMs = nil, 0
     local openStarted = GetGameTimer()
 
@@ -142,7 +181,7 @@ function bossPanelModule.openBossPanel()
     local stillLoading = true
     CreateThread(function()
         Wait(1200)
-        if not stillLoading then return end
+        if not stillLoading or not bossPanelModule.isOpen or bossPanelModule.openToken ~= openToken then return end
         VFW.ShowNotification({ type = 'JOB', title = "Tablette", content = "Chargement de l'entreprise…" })
     end)
 
@@ -188,7 +227,7 @@ function bossPanelModule.openBossPanel()
             type = 'ROUGE',
             content = "Erreur lors de la récupération des employés. Veuillez réessayer plus tard."
         })
-        return
+        employees = {}
     end
 
     -- Les modules coffres/farm/LTD sont optionnels. Une réponse absente ne doit jamais
@@ -438,7 +477,11 @@ function bossPanelModule.openBossPanel()
         player = currentPlayer,
         liaisonUnreadCount = liaisonUnreadCount,
     }
-    VFW.Nui.HudVisible(false)
+
+    -- Le joueur a pu fermer la version légère pendant le chargement.
+    if not bossPanelModule.isOpen or bossPanelModule.openToken ~= openToken then
+        return
+    end
 
     -- SendNUIMessage encode la table en JSON. Si un champ n'était pas encodable (fonction,
     -- valeur infinie, table cyclique), le message ne partirait pas du tout et l'écran
@@ -453,7 +496,7 @@ function bossPanelModule.openBossPanel()
             title = "Tablette",
             content = "Données de l'entreprise illisibles — voir F8.",
         })
-        VFW.Nui.HudVisible(true)
+        bossPanelModule.closeBossPanel()
         return
     end
 
@@ -465,11 +508,13 @@ function bossPanelModule.openBossPanel()
         data = data
     })
 
-    bossPanelModule.isOpen = true
-
-    -- La souris et l'animation d'abord : le HUD vient d'être masqué et la page a reçu ses
-    -- données, il ne faut plus rien attendre avant de rendre la tablette utilisable.
-    VFW.Nui.Focus(true, false)
+    -- Réémettre après le montage React protège les ouvertures juste après un restart.
+    CreateThread(function()
+        Wait(350)
+        if bossPanelModule.isOpen and bossPanelModule.openToken == openToken then
+            SendNUIMessage({ action = "bossPanel:open", data = data })
+        end
+    end)
 
     -- L'onglet Annonces demande une huitième réponse au serveur. Elle se faisait ici, en
     -- bloquant : tant qu'elle n'arrivait pas (jusqu'à 15 s), le joueur restait sans souris,
@@ -478,7 +523,7 @@ function bossPanelModule.openBossPanel()
     CreateThread(function()
         local announces = timedCallback("core:jobs:getAnnounces", job.name)
 
-        if not bossPanelModule.isOpen then return end
+        if not bossPanelModule.isOpen or bossPanelModule.openToken ~= openToken then return end
 
         if type(announces) ~= "table" then
             announces = {
@@ -503,7 +548,7 @@ function bossPanelModule.openBossPanel()
     end)
 
     CreateThread(function()
-        if not bossPanelModule.isOpen then
+        if not bossPanelModule.isOpen or bossPanelModule.openToken ~= openToken then
             return
         end
 
@@ -516,11 +561,13 @@ function bossPanelModule.openBossPanel()
         RequestAnimDict(dict)
         while not HasAnimDictLoaded(dict) do
             Wait(10)
+            if not bossPanelModule.isOpen or bossPanelModule.openToken ~= openToken then return end
         end
 
         RequestModel(propModel)
         while not HasModelLoaded(propModel) do
             Wait(10)
+            if not bossPanelModule.isOpen or bossPanelModule.openToken ~= openToken then return end
         end
 
         local tabletProp = CreateObject(GetHashKey(propModel), 0.0, 0.0, 0.0, false, true, false)
@@ -533,14 +580,14 @@ function bossPanelModule.openBossPanel()
 
         TaskPlayAnim(plyPed, dict, anim, 8.0, -8.0, -1, 49, 0, false, false, false)
 
-        while bossPanelModule.isOpen do
+        while bossPanelModule.isOpen and bossPanelModule.openToken == openToken do
             if not IsEntityPlayingAnim(plyPed, dict, anim, 3) then
                 TaskPlayAnim(plyPed, dict, anim, 8.0, -8.0, -1, 49, 0, false, false, false)
             end
             Wait(500)
         end
 
-        ClearPedTasks(plyPed)
+        if not bossPanelModule.isOpen then ClearPedTasks(plyPed) end
         if DoesEntityExist(tabletProp) then
             DeleteEntity(tabletProp)
         end
@@ -552,7 +599,9 @@ function bossPanelModule.closeBossPanel()
     VFW.Nui.HudVisible(true)
 
     bossPanelModule.isOpen = false
+    bossPanelModule.openToken = bossPanelModule.openToken + 1
     bossPanelModule.announceContext = nil
+    SendNUIMessage({ action = "bossPanel:close" })
     SendNUIMessage({ action = "bossAnnounces:close" })
 end
 
