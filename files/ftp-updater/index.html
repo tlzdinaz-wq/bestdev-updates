@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mise à jour Best Dev</title>
+<style>
+  :root {
+    --bg: #0b0d14;
+    --panel: #141823;
+    --line: #232838;
+    --text: #e6e9f2;
+    --muted: #8b93a8;
+    --accent: #7263ee;
+    --ok: #22c55e;
+    --warn: #f59e0b;
+    --err: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 28px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 18px;
+  }
+  .panel h2 { font-size: 14px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input, select {
+    width: 100%;
+    background: #0d1018;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    color: var(--text);
+    padding: 10px 12px;
+    font: inherit;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+  button {
+    background: var(--accent);
+    border: 0;
+    border-radius: 9px;
+    color: #fff;
+    padding: 11px 22px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 14px; }
+  .bar { height: 6px; background: #0d1018; border-radius: 99px; overflow: hidden; margin: 16px 0 10px; display: none; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  #log {
+    display: none;
+    background: #090b11;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    max-height: 340px;
+    overflow: auto;
+    font: 13px/1.6 "Cascadia Mono", Consolas, monospace;
+    white-space: pre-wrap;
+  }
+  #log div.info { color: var(--text); }
+  #log div.warn { color: var(--warn); }
+  #log div.error { color: var(--err); }
+  #log div.done { color: var(--ok); font-weight: 600; }
+  #log div.progress { color: var(--muted); }
+  .status { margin-top: 14px; font-size: 14px; }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--err); }
+  .note { border-left: 3px solid var(--accent); padding-left: 14px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mise à jour Best Dev</h1>
+  <p class="sub">Applique les mises à jour directement sur votre hébergeur, par FTP, FTPS ou SFTP.</p>
+
+  <div class="panel">
+    <h2>Accès à l'hébergeur</h2>
+    <div class="grid">
+      <div>
+        <label for="protocol">Protocole</label>
+        <select id="protocol">
+          <option value="ftp">FTP</option>
+          <option value="ftps">FTPS (FTP chiffré)</option>
+          <option value="sftp">SFTP (sur SSH)</option>
+        </select>
+      </div>
+      <div>
+        <label for="host">Hôte <span style="color:#7263ee">ou chaîne complète</span></label>
+        <input id="host" placeholder="ftp.monhebergeur.com  ou  sftp://user@machine:2022" autocomplete="off">
+      </div>
+      <div>
+        <label for="port">Port</label>
+        <input id="port" placeholder="21" inputmode="numeric" autocomplete="off">
+      </div>
+      <div>
+        <label for="user">Utilisateur</label>
+        <input id="user" autocomplete="off">
+      </div>
+      <div>
+        <label for="password">Mot de passe</label>
+        <input id="password" type="password" autocomplete="new-password">
+      </div>
+      <div>
+        <label for="remotePath">Dossier du serveur</label>
+        <input id="remotePath" placeholder="/ ou /serveur" autocomplete="off">
+      </div>
+    </div>
+
+    <p class="hint">
+      Le dossier du serveur est celui qui <strong>contient</strong> <code>resources/</code> et <code>server.cfg</code>.
+      Laissez vide si c'est la racine de votre accès FTP.
+    </p>
+
+    <div class="row">
+      <button class="ghost" id="test">Tester la connexion</button>
+      <button id="update" disabled>Mettre à jour</button>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Déroulement</h2>
+    <div class="bar" id="bar"><i></i></div>
+    <div id="log"></div>
+    <p class="note" id="idle">
+      Testez d'abord la connexion : l'outil lira la version installée sur l'hébergeur et la comparera
+      à la dernière version publiée. Rien n'est envoyé tant que vous n'avez pas cliqué sur « Mettre à jour ».
+    </p>
+  </div>
+
+  <p class="note">
+    Vos identifiants ne sont ni enregistrés ni envoyés ailleurs qu'à votre hébergeur. Ils restent en
+    mémoire le temps de l'opération, sur votre machine.
+  </p>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id)
+  const DEFAULT_PORTS = { ftp: '21', ftps: '21', sftp: '22' }
+
+  $('protocol').addEventListener('change', () => {
+    const port = $('port')
+    if (!port.value || Object.values(DEFAULT_PORTS).includes(port.value)) {
+      port.value = DEFAULT_PORTS[$('protocol').value]
+    }
+  })
+  $('port').value = '21'
+
+  let installedVersion = null
+
+  function form() {
+    return {
+      protocol: $('protocol').value,
+      host: $('host').value.trim(),
+      port: $('port').value.trim(),
+      user: $('user').value,
+      password: $('password').value,
+      remotePath: $('remotePath').value.trim(),
+      installedVersion,
+    }
+  }
+
+  function status(text, kind) {
+    const el = $('status')
+    el.textContent = text
+    el.className = 'status' + (kind ? ' ' + kind : '')
+  }
+
+  function logLine(kind, text) {
+    $('idle').style.display = 'none'
+    $('log').style.display = 'block'
+    const line = document.createElement('div')
+    line.className = kind
+    line.textContent = text
+    $('log').appendChild(line)
+    $('log').scrollTop = $('log').scrollHeight
+  }
+
+  $('test').addEventListener('click', async () => {
+    const data = form()
+    if (!data.host || !data.user) {
+      status('Indiquez au moins un hôte et un utilisateur.', 'err')
+      return
+    }
+
+    status('Connexion...')
+    $('test').disabled = true
+
+    try {
+      const response = await fetch('/api/test', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      const result = await response.json()
+
+      if (!result.ok) throw new Error(result.error || 'Connexion impossible.')
+
+      if (!result.hasResources) {
+        status("Connecté, mais aucun dossier « resources » ici. Corrigez le dossier du serveur.", 'err')
+        $('update').disabled = true
+        return
+      }
+
+      // L'outil accepte une chaine de connexion collee d'un bloc : on remet dans le
+      // formulaire ce qu'il en a tire, pour que l'utilisateur le voie.
+      if (result.parsed) {
+        $('protocol').value = result.parsed.protocol
+        $('host').value = result.parsed.host
+        $('port').value = result.parsed.port
+        if (result.parsed.user) $('user').value = result.parsed.user
+        if (result.parsed.remotePath) $('remotePath').value = result.parsed.remotePath
+      }
+
+      installedVersion = result.installed || null
+
+      if (!installedVersion) {
+        status(`Connecté. Version installée introuvable — la mise à jour la demandera. Dernière publiée : ${result.latest}.`, 'ok')
+      } else if (installedVersion === result.latest) {
+        status(`Connecté. Le serveur est déjà à jour (${installedVersion}).`, 'ok')
+      } else {
+        status(`Connecté. Installée : ${installedVersion} — disponible : ${result.latest}.`, 'ok')
+      }
+
+      $('update').disabled = false
+    } catch (error) {
+      status(error.message, 'err')
+      $('update').disabled = true
+    } finally {
+      $('test').disabled = false
+    }
+  })
+
+  $('update').addEventListener('click', async () => {
+    if (!confirm("Les fichiers vont être remplacés sur l'hébergeur. Continuer ?")) return
+
+    $('update').disabled = true
+    $('test').disabled = true
+    $('log').innerHTML = ''
+    $('bar').style.display = 'block'
+    status('Mise à jour en cours...')
+
+    try {
+      const response = await fetch('/api/update', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(form()),
+      })
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        const lines = buffer.split('\n')
+        buffer = lines.pop()
+
+        for (const line of lines) {
+          if (!line.trim()) continue
+          const event = JSON.parse(line)
+
+          if (event.type === 'progress') {
+            $('bar').firstElementChild.style.width = (event.done / event.total * 100) + '%'
+            logLine('progress', `  ${event.done}/${event.total}  ${event.message}`)
+          } else {
+            logLine(event.type, event.message)
+          }
+
+          if (event.type === 'done') status(event.message, 'ok')
+          if (event.type === 'error') status(event.message, 'err')
+        }
+      }
+    } catch (error) {
+      logLine('error', error.message)
+      status(error.message, 'err')
+    } finally {
+      $('update').disabled = false
+      $('test').disabled = false
+    }
+  })
+</script>
+</body>
+</html>

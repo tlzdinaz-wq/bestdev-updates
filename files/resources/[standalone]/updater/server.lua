@@ -27,6 +27,15 @@ local RAW_DIR = GetResourcePath(RES)
 local IS_WINDOWS = RAW_DIR:match("^%a:") ~= nil or RAW_DIR:find("\\", 1, true) ~= nil
 local APPLY_HINT = IS_WINDOWS and "update.bat (double-clic à la racine du serveur)" or "./update.sh (à la racine du serveur)"
 
+-- Outil de mise à jour par FTP/SFTP, pour les hébergeurs qui ne donnent pas d'accès console :
+-- il tourne sur VOTRE machine et pousse les fichiers chez l'hébergeur. Le dossier est livré
+-- avec la base. L'adresse est locale par construction ; `update_tool_url` permet de la
+-- changer si vous le lancez sur un autre port ou une autre machine.
+local function toolHint()
+    local url = GetConvar("update_tool_url", "http://127.0.0.1:7788")
+    return ("outil FTP : dossier ftp-updater → LANCER.bat → %s"):format(url)
+end
+
 local function log(msg) print("^5[update]^7 " .. msg) end
 local function warn(msg) print("^3[update]^7 " .. msg) end
 local function err(msg) print("^1[update]^7 " .. msg) end
@@ -342,6 +351,7 @@ local function command(args)
             log("rien à faire, la base est à jour.")
         else
             log("pour appliquer : " .. APPLY_HINT .. ", puis redémarre le serveur.")
+            log("sans accès console (hébergeur FTP) : " .. toolHint())
         end
     end)
     busy = false
@@ -357,6 +367,7 @@ AddEventHandler("onResourceStart", function(res)
     if res ~= RES then return end
     local state = readState()
     log("version installée : " .. ((state and state.version) or "inconnue") .. ". `update` vérifie ; " .. APPLY_HINT .. " applique.")
+    log(toolHint())
     local configured = GetConvar("update_url", ""):gsub("/+$", "")
     if configured == "" then warn("update_url non défini dans server.cfg.") return end
     -- au démarrage : un seul appel HTTP pour signaler une nouvelle version (pas de lecture des fichiers)
@@ -367,7 +378,9 @@ AddEventHandler("onResourceStart", function(res)
         if not manifest then return end
         local installed = state and state.version
         if manifest.version and manifest.version ~= installed then
-            warn(("nouvelle version disponible : %s (installée : %s). `update` pour le détail, %s pour l'appliquer."):format(tostring(manifest.version), tostring(installed or "inconnue"), APPLY_HINT))
+            warn(("nouvelle version disponible : %s (installée : %s)."):format(tostring(manifest.version), tostring(installed or "inconnue")))
+            warn("`update` pour le détail — pour l'appliquer : " .. APPLY_HINT .. ".")
+            warn("sans accès console (hébergeur FTP) : " .. toolHint())
         end
     end)
 end)

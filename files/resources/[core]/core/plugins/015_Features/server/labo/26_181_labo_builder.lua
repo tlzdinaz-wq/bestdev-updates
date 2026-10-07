@@ -749,11 +749,81 @@ RegisterServerCallback("laboBuilder:syncLabos", function(source)
     return { success = true }
 end)
 
+--- Trois templates de depart, une par interieur que la base charge deja pour les labos
+--- (plugins/015_Features/client/labo/cl_labo.lua : les trois entrepots du DLC Biker).
+--- Sans elles la liste reste vide, et on ne peut creer un labo qu'en posant chaque position
+--- a la main. Les coordonnees sont celles des interieurs reellement streames, pas des
+--- valeurs inventees : un labo cree depuis ces templates est jouable immediatement.
+---
+--- Elles ne sont posees qu'une fois, si la table est vide. Les supprimer ou les modifier
+--- depuis le menu ne les fera pas revenir.
+local STARTER_TEMPLATES <const> = {
+    {
+        name = "labo_meth",
+        label = "Laboratoire - Methamphetamine",
+        interior = { x = 1009.5, y = -3196.6, z = -38.99, heading = 180.0 },
+        chest = { x = 1004.3, y = -3202.1, z = -38.99 },
+        management = { x = 1013.9, y = -3193.4, z = -38.99 },
+        blipColor = 3,
+    },
+    {
+        name = "labo_weed",
+        label = "Laboratoire - Cannabis",
+        interior = { x = 1051.5, y = -3196.6, z = -38.99, heading = 180.0 },
+        chest = { x = 1046.3, y = -3202.1, z = -38.99 },
+        management = { x = 1055.9, y = -3193.4, z = -38.99 },
+        blipColor = 2,
+    },
+    {
+        name = "labo_cocaine",
+        label = "Laboratoire - Cocaine",
+        interior = { x = 1093.6, y = -3196.6, z = -38.99, heading = 180.0 },
+        chest = { x = 1088.4, y = -3202.1, z = -38.99 },
+        management = { x = 1098.0, y = -3193.4, z = -38.99 },
+        blipColor = 0,
+    },
+}
+
+local function seedTemplates()
+    local count = MySQL.scalar.await("SELECT COUNT(*) FROM labo_templates")
+    if (tonumber(count) or 0) > 0 then return 0 end
+
+    local added = 0
+    for i = 1, #STARTER_TEMPLATES do
+        local t = STARTER_TEMPLATES[i]
+        local id = insert([[
+            INSERT INTO labo_templates
+                (name, label, interior_x, interior_y, interior_z, interior_heading,
+                 chest_x, chest_y, chest_z, management_x, management_y, management_z,
+                 blip_sprite, blip_color, blip_scale)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ]], {
+            t.name, t.label,
+            t.interior.x, t.interior.y, t.interior.z, t.interior.heading,
+            t.chest.x, t.chest.y, t.chest.z,
+            t.management.x, t.management.y, t.management.z,
+            499, t.blipColor, 0.8,
+        })
+        if id then added = added + 1 end
+    end
+
+    return added
+end
+
 MySQL.ready(function()
     local ok, err = pcall(ensureSchema)
     if not ok then
         console.error("[labo builder] schema : " .. tostring(err))
         return
     end
+
+    local seeded = 0
+    local okSeed, result = pcall(seedTemplates)
+    if okSeed then seeded = result or 0 end
+
+    if seeded > 0 then
+        console.info(("[labo builder] %d template(s) de depart creee(s)"):format(seeded))
+    end
+
     console.info("[labo builder] points d'entree prets")
 end)

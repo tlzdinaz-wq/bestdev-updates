@@ -1391,6 +1391,18 @@ StaffMenu.builderLaboTemplateList.OnOpen(function()
     StaffMenu.builderLaboTemplateList.ClearItems()
     cachedTemplates = TriggerServerCallback("laboBuilder:getTemplates") or {}
 
+    -- Le menu savait lister et modifier des templates, mais aucun bouton n'en creait :
+    -- la liste ne pouvait donc jamais que rester vide.
+    StaffMenu.builderLaboTemplateList.Button(
+        ":plus: CREER UNE TEMPLATE",
+        "Nouveau modele d'interieur reutilisable",
+        nil, "chevron", false,
+        function()
+            ResetTemplateEditData()
+        end,
+        StaffMenu.builderLaboTemplateManage
+    )
+
     StaffMenu.builderLaboTemplateList.Separator("TEMPLATES (" .. #cachedTemplates .. ")")
 
     if #cachedTemplates == 0 then
@@ -1428,9 +1440,13 @@ end)
 StaffMenu.builderLaboTemplateManage.OnOpen(function()
     StaffMenu.builderLaboTemplateManage.ClearItems()
 
-    if not templateEditData.id then return end
+    -- Sans identifiant on est en creation : la fiche doit s'afficher quand meme, sinon le
+    -- bouton « creer » ouvrirait un menu vide.
+    local isNew = templateEditData.id == nil
 
-    StaffMenu.builderLaboTemplateManage.Separator("TEMPLATE: " .. (templateEditData.label or "?"))
+    StaffMenu.builderLaboTemplateManage.Separator(isNew
+        and "NOUVELLE TEMPLATE"
+        or ("TEMPLATE: " .. (templateEditData.label or "?")))
 
     StaffMenu.builderLaboTemplateManage.Button(":tag: NOM", "Identifiant unique", templateEditData.name or "Non défini", "chevron", false, function()
         local input = VFW.Nui.KeyboardInput(true, "Nom technique", templateEditData.name or "", 50)
@@ -1473,14 +1489,18 @@ StaffMenu.builderLaboTemplateManage.OnOpen(function()
         StaffMenu.builderLaboTemplateManage.refresh()
     end)
 
-    StaffMenu.builderLaboTemplateManage.Separator("POINTS")
+    StaffMenu.builderLaboTemplateManage.Separator(isNew
+        and "POINTS (enregistrez la template d'abord)"
+        or "POINTS")
 
-    StaffMenu.builderLaboTemplateManage.Button(":leaf: POINTS DE RÉCOLTE", "Gérer les spots de récolte", nil, "chevron", false, function()
+    -- Un point se rattache a une template par son identifiant : tant qu'elle n'est pas
+    -- enregistree, il n'y a rien a quoi le rattacher. On le dit au lieu d'echouer en silence.
+    StaffMenu.builderLaboTemplateManage.Button(":leaf: POINTS DE RÉCOLTE", "Gérer les spots de récolte", nil, "chevron", isNew, function()
         harvestData.templateId = templateEditData.id
         harvestData.laboId = nil
     end, StaffMenu.builderLaboTemplateHarvestList)
 
-    StaffMenu.builderLaboTemplateManage.Button(":flask: POINTS DE TRANSFORMATION", "Gérer les spots de transfo", nil, "chevron", false, function()
+    StaffMenu.builderLaboTemplateManage.Button(":flask: POINTS DE TRANSFORMATION", "Gérer les spots de transfo", nil, "chevron", isNew, function()
         transformData.templateId = templateEditData.id
         transformData.laboId = nil
     end, StaffMenu.builderLaboTemplateTransformList)
@@ -1499,7 +1519,15 @@ StaffMenu.builderLaboTemplateManage.OnOpen(function()
             blipScale = templateEditData.blipScale
         })
         if result and result.success then
-            VFW.ShowNotification({ type = "VERT", content = "Template mise à jour." })
+            local created = templateEditData.id == nil
+            -- On retient l'identifiant rendu : sans lui, chaque sauvegarde suivante
+            -- creerait une nouvelle template au lieu de modifier celle-ci.
+            templateEditData.id = result.id or templateEditData.id
+            VFW.ShowNotification({
+                type = "VERT",
+                content = created and "Template créée." or "Template mise à jour.",
+            })
+            StaffMenu.builderLaboTemplateManage.refresh()
         else
             VFW.ShowNotification({ type = "ROUGE", content = result and result.error or "Erreur" })
         end

@@ -1,37 +1,24 @@
 {
-  "version": "1.12.56",
-  "date": "2026-10-06T20:10:46.682Z",
-  "notes": "**AFK : protection et reprise** — Protection contre les dégâts dès l’entrée en AFK, interruption des pertes de vie par faim/soif et protection retirée à la sortie. Reprise de la session après déconnexion ou reboot du serveur, sans attribuer de points pendant la déconnexion.\n\n**Timer AFK** — Nouvelle interface harmonisée avec le HUD ; le navigateur fait avancer le chronomètre sans envoi NUI à chaque frame.\n\n**Configuration du serveur** — Le nom, les couleurs et le lien Discord sont sauvegardés dans config/branding_overrides.json, puis relus au démarrage. Les anciennes valeurs SQL ne remplacent plus le JSON ; une écriture non confirmée n’est pas annoncée comme réussie. Les configurations personnelles ne sont pas incluses dans cette archive.\n\n**Tablette entreprise** — Correction de l’ouverture et du chargement initial de l’interface, avec normalisation des listes Lua vides pour éviter un écran invisible.\n\n**Mode staff / noclip** — Quitter le mode staff coupe immédiatement le noclip et restaure les propriétés du personnage et du véhicule.\n\n**Nouveaux arrivants** — Indication NEW fondée sur le temps de jeu cumulé, retirée après plus d’une heure et conservant le cumul après reconnexion.\n\n**Menus et animations** — Ajustements de l’ouverture des menus et de leurs effets visuels ; sélection d’une animation avec réponse NUI immédiate et état local isolé.\n\nPour appliquer : update.bat / ./update.sh (hébergeur : archive ZIP par FTP), puis redémarrage du serveur. Les tests locaux sont validés ; les comportements restent à vérifier en jeu.",
-  "added": [
-    "resources/[core]/core/interface/build/skin/boss-panel-bridge.js",
-    "resources/[core]/core/interface/hud/assets/afk-timer.css",
-    "resources/[core]/core/interface/hud/assets/afk-timer.js"
-  ],
-  "changed": [
-    "resources/[core]/core/interface/build/index.html",
-    "resources/[core]/core/interface/hud/index.html",
-    "resources/[core]/core/plugins/000_framework/client/005_events.lua",
-    "resources/[core]/core/plugins/000_framework/client/006_death.lua",
-    "resources/[core]/core/plugins/000_framework/client/013_status.lua",
-    "resources/[core]/core/plugins/000_framework/client/ac.lua",
-    "resources/[core]/core/plugins/000_framework/server/005_paycheck.lua",
-    "resources/[core]/core/plugins/000_framework/server/006_staff.lua",
-    "resources/[core]/core/plugins/000_framework/server/026_eve_branding.lua",
-    "resources/[core]/core/plugins/015_Features/client/afk/main.lua",
-    "resources/[core]/core/plugins/015_Features/client/Animation/functions.lua",
-    "resources/[core]/core/plugins/015_Features/client/boss/000_bossPanelModule.lua",
-    "resources/[core]/core/plugins/015_Features/client/staff/events.lua",
-    "resources/[core]/core/plugins/015_Features/client/staff/gamertags.lua",
-    "resources/[core]/core/plugins/015_Features/client/staff/menu/_manager.lua",
-    "resources/[core]/core/plugins/015_Features/client/staff/menu/additional_features.lua",
-    "resources/[core]/core/plugins/015_Features/client/staff/noclip.lua",
-    "resources/[core]/core/plugins/015_Features/server/staff/290_permissions.lua",
-    "resources/[core]/core/plugins/015_Features/server/staff/296_afk.lua",
-    "resources/[core]/core/plugins/015_Features/server/staff/308_gestion_branding.lua",
-    "resources/[core]/VUI/web/dist/assets/skin.css",
-    "resources/[core]/VUI/web/dist/index.html"
-  ],
-  "removed": [],
-  "total": 292785775,
-  "fileCount": 3393
+ "version": "1.12.57",
+ "date": "2026-10-07T15:44:51.596Z",
+ "notes": "**Mise a jour par FTP / SFTP, sans acces console** — beaucoup d'hebergeurs FiveM ne donnent qu'un acces FTP : `update.bat` et `update.sh` ne peuvent pas y tourner, et la mise a jour devenait un televersement manuel fichier par fichier. Un outil est desormais livre avec la base, dans le dossier `ftp-updater` : double-clic sur `LANCER.bat`, une page s'ouvre sur votre machine, vous saisissez l'acces de votre hebergeur et un bouton applique la mise a jour.\n\nIl lit la version installee **sur l'hebergeur**, telecharge les archives publiees depuis cette version jusqu'a la derniere, et televerse uniquement les fichiers concernes. Un serveur en retard de plusieurs versions les recoit toutes, fusionnees pour n'envoyer chaque fichier qu'une fois dans sa version la plus recente. La nouvelle version est inscrite a la fin, pour que la prochaine mise a jour reparte du bon point. Aucun fichier n'est jamais supprime, et les fichiers proteges — configurations, images de marque — arrivent en `.new` comme lors d'une installation manuelle.\n\nFTP, FTPS et SFTP sont acceptes. Le champ hote accepte aussi une chaine de connexion collee d'un bloc (`sftp://utilisateur@machine:2022/dossier`) : l'outil en deduit le protocole, le port, l'utilisateur et le dossier, sans jamais remplacer ce que vous avez saisi vous-meme. Les identifiants ne sont ni enregistres ni transmis ailleurs qu'a votre hebergeur ; la page n'ecoute que sur votre machine.\n\n**Console : l'information d'abord** — le message de demarrage annoncait la version installee et l'arrivee d'une nouvelle version sur une seule ligne, trop chargee pour etre lue. Elle est coupee en trois, et indique les deux facons d'appliquer : `update.bat` si vous avez la main sur la machine, l'outil FTP sinon, avec son adresse.\n\n**Builder des laboratoires : creation de templates** — le menu savait lister et modifier des templates, mais aucun bouton n'en creait : la liste ne pouvait que rester vide. Le bouton existe, la fiche s'ouvre en mode creation, et l'identifiant rendu par le serveur est retenu pour que les sauvegardes suivantes modifient la template au lieu d'en creer une copie. Les boutons de points sont grises tant qu'elle n'est pas enregistree, avec le motif affiche.\n\nTrois templates de depart sont creees au premier demarrage, une par interieur que la base charge deja pour les labos — methamphetamine, cannabis et cocaine. Un labo cree depuis l'une d'elles est jouable immediatement. Elles ne sont posees qu'une fois : les supprimer ou les modifier ne les fera pas revenir.\n\n**Version installee** — l'affichage de la version lit desormais la version reellement installee plutot que la derniere disponible en ligne.\n\n**Panneau de marque** — l'acces au panneau de configuration de la marque verifie la permission de gestion, en plus de l'ouverture du hub.\n\nPour appliquer : `update.bat` / `./update.sh`, ou le nouvel outil `ftp-updater`, puis redemarrer le serveur.",
+ "added": [
+  "ftp-updater/index.html",
+  "ftp-updater/LANCER.bat",
+  "ftp-updater/package.json",
+  "ftp-updater/public/index.html",
+  "ftp-updater/README.md",
+  "ftp-updater/server.mjs"
+ ],
+ "changed": [
+  "resources/[core]/core/endernative/server/000_bestdev.lua",
+  "resources/[core]/core/plugins/000_framework/shared/009_variables.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderLabo.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_branding.lua",
+  "resources/[core]/core/plugins/015_Features/server/labo/26_181_labo_builder.lua",
+  "resources/[standalone]/updater/server.lua"
+ ],
+ "removed": [],
+ "total": 292828824,
+ "fileCount": 3399
 }

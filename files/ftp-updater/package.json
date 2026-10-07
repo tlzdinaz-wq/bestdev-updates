@@ -1,0 +1,14 @@
+{
+  "name": "bestdev-ftp-updater",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Met a jour une installation Best Dev directement sur l'hebergeur, par FTP, FTPS ou SFTP.",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "basic-ftp": "^5.0.5",
+    "ssh2-sftp-client": "^11.0.0"
+  }
+}
