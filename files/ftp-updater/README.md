@@ -1,8 +1,10 @@
 # Mise à jour Best Dev par FTP / SFTP
 
 Applique les mises à jour publiées **directement sur l'hébergeur**, sans accès console.
-Utile pour les hébergeurs FiveM qui ne donnent qu'un accès FTP : `update.bat` et `update.sh`
-ne peuvent pas y tourner.
+
+**À lancer sur votre ordinateur, pas sur le serveur de jeu.** C'est tout l'intérêt : sur un
+hébergeur FiveM on ne peut rien exécuter, ni `update.bat` ni `update.sh`. L'outil tourne
+chez vous et pousse les fichiers par FTP.
 
 ## Lancer
 
@@ -44,9 +46,12 @@ C'est le même principe qu'une installation manuelle par zip.
 
 ## L'ouvrir depuis l'extérieur
 
+Ce mode ne sert que si vous disposez d'une **machine à vous** sur laquelle lancer l'outil —
+un VPS, un serveur dédié. Sur un hébergeur FiveM classique, vous ne pouvez rien y exécuter :
+restez sur le mode normal, depuis votre ordinateur.
+
 Par défaut l'outil n'écoute que sur la machine qui le lance : `http://127.0.0.1:7788`, rien
-n'est joignable de l'extérieur. Si vous le lancez **sur le serveur** et voulez l'ouvrir
-depuis chez vous :
+n'est joignable de l'extérieur. Pour l'ouvrir depuis ailleurs :
 
 ```
 node server.mjs --public

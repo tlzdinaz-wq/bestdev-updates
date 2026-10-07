@@ -32,9 +32,33 @@ const PUBLIC = process.argv.includes('--public') || process.env.HOST === '0.0.0.
 const HOST = PUBLIC ? '0.0.0.0' : '127.0.0.1'
 const KEY = PUBLIC ? (process.env.UPDATER_KEY || randomBytes(9).toString('base64url')) : null
 
-// Source des mises a jour : la meme que celle du publicateur.
-const config = JSON.parse(await readFile(join(HERE, '..', 'release.config.json'), 'utf8'))
-const DOWNLOAD_BASE = (config.downloadBase || '').replace(/\/$/, '')
+// Source des mises a jour.
+//
+// L'outil est livre a la racine des serveurs : il ne peut pas dependre des fichiers du
+// poste de publication. L'adresse par defaut est donc inscrite ici. Elle reste
+// remplacable, dans l'ordre : la variable UPDATE_BASE, un updater.config.json pose a cote,
+// puis le release.config.json du publicateur quand l'outil tourne depuis ses sources.
+const DEFAULT_BASE = 'https://raw.githubusercontent.com/tlzdinaz-wq/bestdev-updates/main'
+
+async function resolveDownloadBase() {
+  if (process.env.UPDATE_BASE) return process.env.UPDATE_BASE
+
+  for (const candidate of [
+    join(HERE, 'updater.config.json'),
+    join(HERE, '..', 'release.config.json'),
+  ]) {
+    try {
+      const config = JSON.parse(await readFile(candidate, 'utf8'))
+      if (config.downloadBase) return config.downloadBase
+    } catch {
+      // fichier absent ou illisible : on passe au suivant
+    }
+  }
+
+  return DEFAULT_BASE
+}
+
+const DOWNLOAD_BASE = (await resolveDownloadBase()).replace(/\/$/, '')
 
 const STATE_PATH = 'resources/[standalone]/updater/state.txt'
 

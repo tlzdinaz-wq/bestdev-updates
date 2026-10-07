@@ -195,23 +195,14 @@ local function httpGet(url)
     return Citizen.Await(p)
 end
 
--- Adresse a laquelle joindre l'outil. Dans l'ordre : ce que l'admin a fixe, l'IP annoncee
--- par le serveur, puis l'IP publique trouvee une fois pour toutes. `127.0.0.1` ne reste
--- qu'en dernier recours : affiche dans une console lue a distance, il ne mene nulle part.
-local toolHost = nil
-
-local function resolveToolHost()
-    if toolHost then return toolHost end
-
-    local listed = GetConvar("sv_listingIPOverride", "")
-    if listed ~= "" then
-        toolHost = listed
-        return toolHost
-    end
-
-    return nil
-end
-
+-- Lien vers l'outil de mise a jour.
+--
+-- Il ne tourne PAS sur le serveur de jeu : sur un hebergeur FiveM on ne peut rien lancer.
+-- Il se telecharge et s'execute sur l'ordinateur de l'administrateur, et c'est de la qu'il
+-- pousse les fichiers par FTP. L'adresse affichee est donc locale a cette machine.
+--
+-- `update_tool_url` permet d'afficher autre chose : une page hebergee, ou l'adresse d'un
+-- VPS sur lequel l'outil tournerait en mode ouvert.
 local function toolHint()
     local url = GetConvar("update_tool_url", "")
     if url ~= "" then
@@ -219,30 +210,48 @@ local function toolHint()
     end
 
     local port = GetConvar("update_tool_port", "7788")
-    local host = resolveToolHost()
-
-    if not host then
-        return ("outil de mise à jour : dossier ftp-updater → LANCER.bat, puis http://<ip-du-serveur>:%s")
-            :format(port)
-    end
-
-    return ("outil de mise à jour : dossier ftp-updater → LANCER.bat, puis http://%s:%s")
-        :format(host, port)
+    return ("outil de mise à jour : récupérez le dossier ftp-updater, lancez-le sur VOTRE ordinateur (LANCER.bat), puis http://127.0.0.1:%s")
+        :format(port)
 end
 
---- Cherche l'IP publique une seule fois, pour que le lien affiche en console soit cliquable
---- depuis l'exterieur. Sans reponse, on garde la formulation generique.
+-- Adresse de la page d'etat servie par la ressource. Le port est celui du serveur de jeu :
+-- FiveM sert les ressources sur son propre port, il n'y a rien a ouvrir de plus.
+local pageHost = nil
+
+local function serverPort()
+    local endpoint = GetConvar("endpoint_add_tcp", "")
+    local port = endpoint:match(":(%d+)")
+    return port or "30120"
+end
+
+local function pageHint()
+    if GetConvar("update_page", "true") ~= "true" then return nil end
+
+    local host = pageHost or GetConvar("sv_listingIPOverride", "")
+    if host == "" then host = nil end
+
+    if not host then
+        return ("état des mises à jour : http://<ip-du-serveur>:%s/%s/"):format(serverPort(), RES)
+    end
+
+    return ("état des mises à jour : http://%s:%s/%s/"):format(host, serverPort(), RES)
+end
+
+--- L'IP publique est cherchee une seule fois, pour que le lien affiche en console soit
+--- cliquable depuis l'exterieur. Sans reponse, la formulation generique suffit.
+--- `set update_page_lookup "false"` evite cet appel.
 local function discoverToolHost()
-    if toolHost or GetConvar("update_tool_url", "") ~= "" then return end
-    if GetConvar("update_tool_lookup", "true") ~= "true" then return end
+    if pageHost or GetConvar("update_page_lookup", "true") ~= "true" then return end
+    if GetConvar("sv_listingIPOverride", "") ~= "" then return end
 
     CreateThread(function()
         local r = httpGet("https://api.ipify.org")
         if r.status == 200 and type(r.body) == "string" then
             local ip = r.body:match("^%s*([%d%.]+)%s*$")
             if ip then
-                toolHost = ip
-                log(toolHint())
+                pageHost = ip
+                local hint = pageHint()
+                if hint then log(hint) end
             end
         end
     end)
@@ -417,6 +426,8 @@ AddEventHandler("onResourceStart", function(res)
     local state = readState()
     log("version installée : " .. ((state and state.version) or "inconnue") .. ". `update` vérifie ; " .. APPLY_HINT .. " applique.")
     log(toolHint())
+    local hint = pageHint()
+    if hint then log(hint) end
     discoverToolHost()
     local configured = GetConvar("update_url", ""):gsub("/+$", "")
     if configured == "" then warn("update_url non défini dans server.cfg.") return end
@@ -432,5 +443,143 @@ AddEventHandler("onResourceStart", function(res)
             warn("`update` pour le détail — pour l'appliquer : " .. APPLY_HINT .. ".")
             warn("sans accès console (hébergeur FTP) : " .. toolHint())
         end
+    end)
+end)
+
+-- ── page d'état, servie par le serveur lui-même ────────────────────
+--
+-- Une ressource FiveM peut servir du HTTP sur le port du serveur : la page est donc
+-- joignable à `http://<ip-du-serveur>:<port>/updater/`, sans ouvrir de port
+-- supplémentaire. Le lien est affiché au démarrage.
+--
+-- Elle montre l'état et ce qui changerait ; elle n'applique rien. FXServer interdit à une
+-- ressource d'écrire hors de son dossier — c'est la raison d'être de update.bat et de
+-- l'outil FTP, et aucun bouton ici ne pourra contourner cela.
+--
+-- `set update_page "false"` la désactive.
+
+local pageCache = { at = 0, body = nil }
+local PAGE_TTL = 60000
+
+local function buildReport()
+    local now = GetGameTimer()
+    if pageCache.body and (now - pageCache.at) < PAGE_TTL then return pageCache.body end
+
+    local state = readState()
+    local report = {
+        installed = (state and state.version) or nil,
+        installedDate = state and state.date or nil,
+        available = nil,
+        notes = nil,
+        download = {},
+        skipped = {},
+        deleted = {},
+        unchanged = 0,
+        error = nil,
+    }
+
+    local configured = GetConvar("update_url", ""):gsub("/+$", "")
+    if configured == "" then
+        report.error = "update_url n'est pas defini dans server.cfg."
+        pageCache = { at = now, body = report }
+        return report
+    end
+
+    local manifest, merr = fetchManifest(configured)
+    if not manifest then
+        report.error = merr
+        pageCache = { at = now, body = report }
+        return report
+    end
+
+    report.available = manifest.version
+    report.notes = manifest.notes
+
+    local ok, p = pcall(plan, manifest, state, serverRoot())
+    if ok and type(p) == "table" then
+        for _, d in ipairs(p.download) do
+            report.download[#report.download + 1] = {
+                rel = d.rel,
+                size = tonumber(d.remote and d.remote.s) or 0,
+                new = not d.existed,
+            }
+        end
+        for _, sk in ipairs(p.skipped) do
+            report.skipped[#report.skipped + 1] = { rel = sk.rel, reason = sk.reason }
+        end
+        for _, del in ipairs(p.deleted) do
+            report.deleted[#report.deleted + 1] = del
+        end
+        report.unchanged = p.unchanged
+    else
+        report.error = "comparaison impossible : " .. tostring(p)
+    end
+
+    pageCache = { at = now, body = report }
+    return report
+end
+
+local PAGE = [==[<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Best Dev - mises a jour</title><style>
+:root{--bg:#0b0d14;--panel:#141823;--line:#232838;--text:#e6e9f2;--muted:#8b93a8;--accent:#7263ee;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 "Segoe UI",system-ui,sans-serif}
+.w{max-width:900px;margin:0 auto;padding:32px 20px 64px}h1{font-size:26px;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 26px}.p{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:18px}
+.p h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+.v{display:flex;gap:28px;flex-wrap:wrap}.v div span{display:block;color:var(--muted);font-size:13px}
+.v div b{font-size:20px;font-weight:600}.ok{color:var(--ok)}.warn{color:var(--warn)}.err{color:var(--err)}
+ul{margin:0;padding-left:18px}li{font:13px/1.7 "Cascadia Mono",Consolas,monospace;color:var(--muted)}
+li b{color:var(--text);font-weight:400}.note{border-left:3px solid var(--accent);padding-left:14px;color:var(--muted);font-size:14px}
+pre{white-space:pre-wrap;color:var(--muted);font:13px/1.6 inherit;margin:0}
+</style></head><body><div class="w">
+<h1>Best Dev - mises a jour</h1><p class="sub">Etat de cette installation.</p>
+<div id="c"><div class="p"><h2>Chargement</h2><p class="sub">Comparaison avec la version publiee...</p></div></div>
+<div class="p"><h2>Appliquer</h2><p class="note" id="how"></p></div>
+</div><script>
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))
+const ko=n=>n>1048576?(n/1048576).toFixed(1)+' Mo':(n/1024).toFixed(0)+' Ko'
+fetch('data').then(r=>r.json()).then(d=>{
+  let h=''
+  h+='<div class="p"><h2>Versions</h2><div class="v">'
+  h+='<div><span>Installee</span><b>'+esc(d.installed||'inconnue')+'</b></div>'
+  h+='<div><span>Disponible</span><b class="'+(d.available&&d.available!==d.installed?'warn':'ok')+'">'+esc(d.available||'?')+'</b></div>'
+  const n=(d.download||[]).length+(d.skipped||[]).length+(d.deleted||[]).length
+  h+='<div><span>A jour</span><b class="'+(n===0?'ok':'warn')+'">'+(n===0?'oui':'non')+'</b></div>'
+  h+='</div></div>'
+  if(d.error){h+='<div class="p"><h2>Probleme</h2><p class="err">'+esc(d.error)+'</p></div>'}
+  if(d.notes){h+='<div class="p"><h2>Nouveautes</h2><pre>'+esc(d.notes)+'</pre></div>'}
+  if((d.download||[]).length){let t=0;d.download.forEach(f=>t+=f.size)
+    h+='<div class="p"><h2>'+d.download.length+' fichier(s) a telecharger - '+ko(t)+'</h2><ul>'
+    d.download.forEach(f=>h+='<li><b>'+esc(f.rel)+'</b>'+(f.new?'  (nouveau)':'')+'</li>');h+='</ul></div>'}
+  if((d.skipped||[]).length){h+='<div class="p"><h2>'+d.skipped.length+' fichier(s) modifies chez vous - poses en .new</h2><ul>'
+    d.skipped.forEach(f=>h+='<li><b>'+esc(f.rel)+'</b> - '+esc(f.reason)+'</li>');h+='</ul></div>'}
+  if((d.deleted||[]).length){h+='<div class="p"><h2>'+d.deleted.length+' fichier(s) retires par la mise a jour</h2><ul>'
+    d.deleted.forEach(f=>h+='<li><b>'+esc(f)+'</b></li>');h+='</ul></div>'}
+  document.getElementById('c').innerHTML=h
+  document.getElementById('how').innerHTML=
+    "Cette page informe, elle n'applique rien : une ressource FiveM ne peut pas ecrire en dehors de son dossier. "
+    +"Pour appliquer : <b>update.bat</b> ou <b>./update.sh</b> a la racine du serveur si vous avez acces a la machine, "
+    +"sinon le dossier <b>ftp-updater</b>, a lancer depuis votre ordinateur."
+}).catch(err=>{document.getElementById('c').innerHTML='<div class="p"><h2>Probleme</h2><p class="err">'+esc(err)+'</p></div>'})
+</script></body></html>]==]
+
+CreateThread(function()
+    if GetConvar("update_page", "true") ~= "true" then return end
+
+    SetHttpHandler(function(req, res)
+        local path = (req.path or "/"):gsub("^/+", ""):gsub("%?.*$", "")
+
+        if path == "data" then
+            CreateThread(function()
+                local okReport, report = pcall(buildReport)
+                res.writeHead(200, { ["Content-Type"] = "application/json; charset=utf-8" })
+                res.send(json.encode(okReport and report or { error = tostring(report) }))
+            end)
+            return
+        end
+
+        res.writeHead(200, { ["Content-Type"] = "text/html; charset=utf-8" })
+        res.send(PAGE)
     end)
 end)

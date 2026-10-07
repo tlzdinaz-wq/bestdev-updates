@@ -1,4 +1,4 @@
-#version	1.12.58	2026-10-07T16:02:39.498Z
+#version	1.12.59	2026-10-07T16:15:31.509Z
 #protected	resources/[core]/core/config/**
 #protected	resources/[core]/core/plugins/015_Features/config/**
 #protected	resources/[core]/eve_bridge/config.lua
@@ -9,8 +9,8 @@
 862043df9e4a03f281b96f38ccce9c04c591e38fbf202c7a9a4fd04478f64cab	703	ftp-updater/LANCER.bat
 a33446bed893d33fa9df0af05986d67bb1b0602893579825d40121f5d0be6bbb	343	ftp-updater/package.json
 599f96e14fb1584eb56933574e6a6ee17e3125766692dbc594d36100b88a2bb3	10243	ftp-updater/public/index.html
-fe2172d0f7398f15c2bf589c21de84a82a0f8488922372e22e86fe7580bed359	3596	ftp-updater/README.md
-ae447e03f9f7de3c745927c0d36ec39c328b3c36705f01a0dc3d619d79d9580e	17537	ftp-updater/server.mjs
+22c57b10b44cf65c8605f2f5d471474e0c33467f1982f71f41b2d909ce976dde	3906	ftp-updater/README.md
+4abf56ef3cf7af96d9e28bbcaf5ffa0229e2a12bc3717eadc49bddda7d4f8e40	18319	ftp-updater/server.mjs
 776407b9344f561c75274a6cbd3b55cbeda63dfa246439d7901d4eb493bae7ea	458	resources/[assets]/cloudy_pd_weapons/fxmanifest.lua
 0a6d4ba72c9f2cc831da6795c140031a6911a5df812d7d5197703137400a0f41	194	resources/[assets]/cloudy_pd_weapons/metas/40 mm/components/40mm_contentunlocks.meta
 8974bf6869985803b9787f244a9abc1542ff4618a9a7357467d02bb234a4be5b	750	resources/[assets]/cloudy_pd_weapons/metas/40 mm/components/40mm_loadouts.meta
@@ -3373,7 +3373,7 @@ db176ae7dc4f11099472fe9247f77439cc6fe002be05d916d6b453b19d1e8ed4	2126	resources/
 0113f95f63c2827d1aa316db57fa883f4d53c92054a80a5575b0e60a8d950aeb	548006	resources/[standalone]/screenshot-basic/dist/ui.html
 d3e10678ae9d6c07408bb592cb8497349cf8fbefa1332c71f76ccbbf2711f08b	220	resources/[standalone]/screenshot-basic/fxmanifest.lua
 1d8e6678b34ad491ca8bfac4f39c889e3ce88d8fac56be0001679885258c6c34	466	resources/[standalone]/updater/fxmanifest.lua
-a389c9c1cf980fdca51dfd1a7a2013081ca2071bcc56a91f60d04afc214cef93	20298	resources/[standalone]/updater/server.lua
+5cfc5c15fc29551ae90631beb48030d0f81f665821ba6fcfb9ea8c2eb4bda4f2	27931	resources/[standalone]/updater/server.lua
 7662b2bf1efed24fe927f675f42e76513819a85a74954255032aec51bd0be0ec	13418	resources/[standalone]/updater/tools/update.ps1
 4ef749475c5f851f01b22868ce89d9a672b986d4934dafa17d2f28380504c04b	9690	resources/[standalone]/updater/tools/update.sh
 1c77cc1d54e3292936836736a928f4f9ceb080c703ef06815310a6533d3d2c66	7446	resources/[standalone]/xsound/addon/crewphone/client/client.lua
