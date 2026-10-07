@@ -136,6 +136,8 @@ end
 local function LoadLaboHarvestSpots(laboId)
     if harvestSpotsLoading then return end
     harvestSpotsLoading = true
+    isNearHarvestSpot = false
+    currentHarvestSpot = nil
 
     DeleteAllHarvestProps()
     laboHarvestSpots = {}

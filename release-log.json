@@ -1,13 +1,15 @@
 {
- "version": "1.12.62",
- "date": "2026-10-07T17:48:31.305Z",
- "notes": "**Outil FTP / SFTP : mémoriser la connexion**\n\nNouvelle case « Mémoriser cette connexion sur ce navigateur ». Après un test réussi, le protocole FTP/FTPS/SFTP, l’hôte, le port, l’utilisateur et le dossier sont sauvegardés et restaurés aux prochaines ouvertures dans le même navigateur, même après redémarrage. Le mot de passe, la clé d’accès et la version installée ne sont jamais enregistrés.\n\nLe bouton « Oublier la connexion », ou décocher la case, efface la sauvegarde. Un test échoué ne remplace pas les paramètres mémorisés. Modifier les accès impose un nouveau test avant de mettre à jour ; les champs sont verrouillés pendant les opérations.\n\n2 fichiers modifiés, aucun ajouté ou supprimé. Tests locaux validés.\n\n**Important :** mettre à jour le dossier ftp-updater sur le PC qui lance l’outil, puis recharger la page avec Ctrl + F5. La mise à jour du serveur distant ne remplace pas automatiquement l’outil local. Cette version ne corrige pas un identifiant ou un mot de passe SFTP refusé par l’hébergeur.",
+ "version": "1.12.63",
+ "date": "2026-10-07T18:11:16.563Z",
+ "notes": "**Laboratoires : sauvegarde des points**\n\nCorrection de l’écriture SQL quand des champs facultatifs sont vides. Les positions des labos, templates et points de récolte/transformation sont correctement sauvegardées et relues après un reboot. Les erreurs SQL et les éléments supprimés ne donnent plus une fausse confirmation de réussite.\n\n**Application après sauvegarde**\nLes joueurs déjà dans le labo rechargent aussi les points de récolte/transformation et leurs objets, sans sortir ni rentrer. Les anciennes interactions sont réinitialisées. Les réglages personnalisés des labos existants ne sont pas écrasés par une modification de template.\n\n4 fichiers modifiés, aucun ajouté ou supprimé. Tests locaux validés ; contrôle final en jeu à effectuer.\n\nAppliquer via l’outil FTP/SFTP ou update.bat / ./update.sh, puis redémarrer le serveur pour charger le correctif. Ensuite, les modifications s’appliquent après le bouton SAUVEGARDER du builder, sans nouveau reboot.",
  "added": [],
  "changed": [
-  "ftp-updater/public/index.html",
-  "ftp-updater/README.md"
+  "resources/[core]/core/plugins/015_Features/client/labo/cl_labo_harvest.lua",
+  "resources/[core]/core/plugins/015_Features/client/labo/cl_labo_transform.lua",
+  "resources/[core]/core/plugins/015_Features/client/labo/cl_labo.lua",
+  "resources/[core]/core/plugins/015_Features/server/labo/26_181_labo_builder.lua"
  ],
  "removed": [],
- "total": 294904026,
+ "total": 294905851,
  "fileCount": 3791
 }

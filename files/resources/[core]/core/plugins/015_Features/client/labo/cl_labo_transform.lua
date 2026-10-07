@@ -136,6 +136,8 @@ end
 local function LoadLaboTransformSpots(laboId)
     if transformSpotsLoading then return end
     transformSpotsLoading = true
+    isNearTransformSpot = false
+    currentTransformSpot = nil
 
     DeleteAllTransformProps()
     laboTransformSpots = {}

@@ -1,4 +1,4 @@
-#version	1.12.62	2026-10-07T17:48:31.305Z
+#version	1.12.63	2026-10-07T18:11:16.563Z
 #protected	resources/[core]/core/config/**
 #protected	resources/[core]/core/plugins/015_Features/config/**
 #protected	resources/[core]/eve_bridge/config.lua
@@ -2233,10 +2233,10 @@ f6cddf1b00cf2599e2d8b27f1fededc2368efae6bdbb923b619ed6edd45bd8ef	4413	resources/
 3546746a91ef8488d4f36624652359019363cf8263bd4d623b74f93470a6873c	22956	resources/[core]/core/plugins/015_Features/client/jobs/weazel/props.lua
 7a1110acf535e6b3c7f33e6ba9ffebe837c16225c5a0ac35c84c5c2f57279049	23145	resources/[core]/core/plugins/015_Features/client/jobsPropsMenu.lua
 b767f33a828e5093a078f571a446a72ff6520f265353b8dce335b7ab4de68327	8832	resources/[core]/core/plugins/015_Features/client/koth/cl_koth.lua
-c7c6ae48b8dbfbd5b2a0c243763088ade9f4984851c17c46c765274e4dcbf555	12857	resources/[core]/core/plugins/015_Features/client/labo/cl_labo_harvest.lua
+4fd838578a3f24beae2c468e9fecbaf4b0cfbd5063ad41efd78a87c185912a44	12913	resources/[core]/core/plugins/015_Features/client/labo/cl_labo_harvest.lua
 5529f5d2a299a73c385e37a3e09e93dc06ac6f5708b012bd41cdbd7ffc3a2ce6	15153	resources/[core]/core/plugins/015_Features/client/labo/cl_labo_management.lua
-242043eb12867cdf05ceab9cfbf906c2b21c2f6a00c7045fb80605975e7de853	12661	resources/[core]/core/plugins/015_Features/client/labo/cl_labo_transform.lua
-eac3a0c9de890b6826527f305154fb98c4c473980d9ae21cb35a3cb922ba8963	20546	resources/[core]/core/plugins/015_Features/client/labo/cl_labo.lua
+41cdc547d2ab29c82597fb5926607d2af7e508ab1373cff2d5acef4531c8566a	12721	resources/[core]/core/plugins/015_Features/client/labo/cl_labo_transform.lua
+48c54cddb7418b26f6cabe3a657e3e92d5de220a0db153ffac745a798f2fee01	20679	resources/[core]/core/plugins/015_Features/client/labo/cl_labo.lua
 f35a71f97a2e8c688833afb666f99dc50175d4dc6eec0b47e98c625bde05bf51	8711	resources/[core]/core/plugins/015_Features/client/legal_activities/config_sync.lua
 ceabe60bc631c69ec3ee51c05977d4bf1a3ab2d17120a361368f6a1fb724c67a	16137	resources/[core]/core/plugins/015_Features/client/legal_activities/diving.lua
 3b6f4a574c9f15ffe6d97499d3f1a054706f9b58de06ab8c4e63a6406c37fb7d	18816	resources/[core]/core/plugins/015_Features/client/legal_activities/fishing.lua
@@ -2741,7 +2741,7 @@ fa4e5ce6320f90d1d3e233a8b15f63b0763afe01e73f4c7c4a0337813387b471	11201	resources
 ed0d1123a86c163e0a47f4b6f35b91b96a04821eefceb53618dc74f1e070a02c	4857	resources/[core]/core/plugins/015_Features/server/inventory/25_12_commands.lua
 5fe9223d20f3f468de5626b3739733aefe1cbf65cc4a875a4cab39ba190b3e47	5214	resources/[core]/core/plugins/015_Features/server/inventory/25_13_api.lua
 f74e0fa4ed798ef8acaca1d5a277ba23019df2f2b906d15d899ce41b0e769180	48575	resources/[core]/core/plugins/015_Features/server/labo/26_180_labo.lua
-4573db425632d339a43aeefd5920223409f850bbf115d94f12c98c8b879499d2	35740	resources/[core]/core/plugins/015_Features/server/labo/26_181_labo_builder.lua
+628cf80518a548f8a6ff8e24b438385dc6cca5361c9160194d5b11fa8c9ff481	37316	resources/[core]/core/plugins/015_Features/server/labo/26_181_labo_builder.lua
 a06a0554e1763b03ca8199c22312785a8520bd8d566a9c549943e7de645da63c	6224	resources/[core]/core/plugins/015_Features/server/legal_activities/270_sellers_config.lua
 204b026bac99a9e876ee844cdba63e5d8b287a5d7975bcf82c9fd73ebd3de3f8	8185	resources/[core]/core/plugins/015_Features/server/legal_activities/271_diving.lua
 447067bb8a8879ff9facac64d64c8fb26be398dde793662bc0ce9cb28481baac	5369	resources/[core]/core/plugins/015_Features/server/legal_activities/272_fishing.lua

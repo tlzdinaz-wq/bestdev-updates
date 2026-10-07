@@ -459,8 +459,12 @@ local function updatePoint(table_, id, point)
 
     for i = 1, #POINT_COLUMNS do
         local column = POINT_COLUMNS[i]
-        sets[#sets + 1] = ("`%s` = ?"):format(column)
-        params[#params + 1] = point[column]
+        if point[column] == nil then
+            sets[#sets + 1] = ("`%s` = NULL"):format(column)
+        else
+            sets[#sets + 1] = ("`%s` = ?"):format(column)
+            params[#params + 1] = point[column]
+        end
     end
 
     params[#params + 1] = id
@@ -504,7 +508,13 @@ local function registerPointEndpoints(prefix, table_, ownerColumn)
         local point = sanitizePoint(data)
         if not id or not point then return { success = false, error = "Donnees invalides." } end
 
-        updatePoint(table_, id, point)
+        if not single(("SELECT id FROM `%s` WHERE id = ?"):format(table_), { id }) then
+            return { success = false, error = "Ce point n'existe plus. Rechargez la liste." }
+        end
+        local affected = updatePoint(table_, id, point)
+        if affected == false or affected == nil then
+            return { success = false, error = "Sauvegarde du point impossible. Consultez la console serveur." }
+        end
         TriggerEvent("labo:builder:changed")
         return { success = true }
     end)
@@ -653,18 +663,28 @@ RegisterServerCallback("laboBuilder:updateLabo", function(source, laboId, data)
     local id = int(laboId, nil)
     local labo = sanitizeLabo(data)
     if not id or not labo then return { success = false, error = "Donnees invalides." } end
+    if not single("SELECT id FROM labos WHERE id = ?", { id }) then
+        return { success = false, error = "Ce labo n'existe plus. Rechargez la liste." }
+    end
 
     local sets, params = {}, {}
     for i = 1, #LABO_COLUMNS do
         local column = LABO_COLUMNS[i]
         if labo[column] ~= nil or column:find("^chest_") or column:find("^management_") then
-            sets[#sets + 1] = ("`%s` = ?"):format(column)
-            params[#params + 1] = labo[column]
+            if labo[column] == nil then
+                sets[#sets + 1] = ("`%s` = NULL"):format(column)
+            else
+                sets[#sets + 1] = ("`%s` = ?"):format(column)
+                params[#params + 1] = labo[column]
+            end
         end
     end
 
     params[#params + 1] = id
-    execute(("UPDATE labos SET %s WHERE id = ?"):format(table.concat(sets, ", ")), params)
+    local affected = execute(("UPDATE labos SET %s WHERE id = ?"):format(table.concat(sets, ", ")), params)
+    if affected == false or affected == nil then
+        return { success = false, error = "Sauvegarde du labo impossible. Consultez la console serveur." }
+    end
 
     TriggerEvent("labo:builder:changed")
     return { success = true }
@@ -725,13 +745,24 @@ RegisterServerCallback("laboBuilder:updateTemplate", function(source, templateId
     local id = int(templateId, nil)
 
     if id then
+        if not single("SELECT id FROM labo_templates WHERE id = ?", { id }) then
+            return { success = false, error = "Ce template n'existe plus. Rechargez la liste." }
+        end
         local sets, params = {}, {}
         for i = 1, #columns do
-            sets[#sets + 1] = ("`%s` = ?"):format(columns[i])
-            params[#params + 1] = fields[columns[i]]
+            local column = columns[i]
+            if fields[column] == nil then
+                sets[#sets + 1] = ("`%s` = NULL"):format(column)
+            else
+                sets[#sets + 1] = ("`%s` = ?"):format(column)
+                params[#params + 1] = fields[column]
+            end
         end
         params[#params + 1] = id
-        execute(("UPDATE labo_templates SET %s WHERE id = ?"):format(table.concat(sets, ", ")), params)
+        local affected = execute(("UPDATE labo_templates SET %s WHERE id = ?"):format(table.concat(sets, ", ")), params)
+        if affected == false or affected == nil then
+            return { success = false, error = "Sauvegarde du template impossible. Consultez la console serveur." }
+        end
         return { success = true, id = id }
     end
 

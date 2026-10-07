@@ -199,9 +199,12 @@ RegisterNetEvent("laboBuilder:syncLabos", function()
     labos = TriggerServerCallback("labo:getLabos") or {}
     RefreshBlips()
     if isInsideLabo then
-        local fresh = TriggerServerCallback("labo:getInteriorData", isInsideLabo)
-        if fresh then
+        local laboId = isInsideLabo
+        local fresh = TriggerServerCallback("labo:getInteriorData", laboId)
+        if fresh and isInsideLabo == laboId then
+            HideFloating()
             currentLaboData = fresh
+            TriggerEvent("labo:refreshPoints", laboId)
         end
     end
 end)
