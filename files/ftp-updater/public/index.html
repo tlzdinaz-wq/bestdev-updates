@@ -60,6 +60,8 @@
   button.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
   button:disabled { opacity: .5; cursor: not-allowed; }
   .hint { color: var(--muted); font-size: 13px; margin-top: 14px; }
+  .remember { display: flex; align-items: center; gap: 10px; margin: 16px 0 6px; color: var(--text); }
+  .remember input { width: 18px; height: 18px; padding: 0; accent-color: var(--accent); }
   .bar { height: 6px; background: #0d1018; border-radius: 99px; overflow: hidden; margin: 16px 0 10px; display: none; }
   .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
   #log {
@@ -127,9 +129,16 @@
       Laissez vide si c'est la racine de votre accès FTP.
     </p>
 
+    <label class="remember" for="rememberConnection">
+      <input id="rememberConnection" type="checkbox">
+      Mémoriser cette connexion sur ce navigateur
+    </label>
+    <p class="hint" id="rememberStatus" aria-live="polite">Après une connexion réussie, les paramètres seront sauvegardés. Le mot de passe n'est jamais enregistré.</p>
+
     <div class="row">
       <button class="ghost" id="test">Tester la connexion</button>
       <button id="update" disabled>Mettre à jour</button>
+      <button class="ghost" id="forgetConnection" hidden>Oublier la connexion</button>
     </div>
 
     <div class="status" id="status"></div>
@@ -146,8 +155,8 @@
   </div>
 
   <p class="note">
-    Vos identifiants ne sont ni enregistrés ni envoyés ailleurs qu'à votre hébergeur. Ils restent en
-    mémoire le temps de l'opération, sur votre machine.
+    Si vous cochez « Mémoriser », seuls le protocole, l'hôte, le port, l'utilisateur et le dossier
+    sont conservés dans ce navigateur. Le mot de passe reste uniquement en mémoire le temps de l'opération.
   </p>
 </div>
 
@@ -169,6 +178,65 @@
   $('port').value = '21'
 
   let installedVersion = null
+  const CONNECTION_KEY = 'bestdev-ftp-updater.connection.v1'
+  const CONNECTION_FIELDS = ['protocol', 'host', 'port', 'user', 'remotePath']
+
+  function restoreConnection() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CONNECTION_KEY) || 'null')
+      if (!saved || !Object.hasOwn(DEFAULT_PORTS, saved.protocol)) return
+      if (!CONNECTION_FIELDS.every(key => typeof saved[key] === 'string' && saved[key].length <= 2048)) return
+      for (const key of CONNECTION_FIELDS) $(key).value = saved[key]
+      $('rememberConnection').checked = true
+      $('forgetConnection').hidden = false
+      $('rememberStatus').textContent = 'Paramètres restaurés. Saisissez votre mot de passe, puis testez la connexion.'
+    } catch {
+      $('rememberStatus').textContent = 'La mémorisation est indisponible dans ce navigateur. Vous pouvez quand même vous connecter.'
+    }
+  }
+
+  function saveConnection() {
+    if (!$('rememberConnection').checked) return
+    try {
+      // Liste explicite : ni mot de passe, ni clé d'accès, ni version installée.
+      const saved = Object.fromEntries(CONNECTION_FIELDS.map(key => [key, $(key).value]))
+      localStorage.setItem(CONNECTION_KEY, JSON.stringify(saved))
+      $('forgetConnection').hidden = false
+      $('rememberStatus').textContent = 'Connexion mémorisée sur ce navigateur, sans le mot de passe.'
+    } catch {
+      $('rememberStatus').textContent = 'Connexion réussie, mais ce navigateur ne permet pas de sauvegarder les paramètres.'
+    }
+  }
+
+  function forgetConnection() {
+    try {
+      localStorage.removeItem(CONNECTION_KEY)
+      $('rememberConnection').checked = false
+      $('forgetConnection').hidden = true
+      $('rememberStatus').textContent = 'Connexion oubliée. Les paramètres affichés restent utilisables pour cette session.'
+    } catch {
+      $('rememberStatus').textContent = 'Impossible d’effacer les paramètres dans ce navigateur. Effacez les données du site depuis ses réglages.'
+    }
+  }
+
+  $('forgetConnection').addEventListener('click', forgetConnection)
+  $('rememberConnection').addEventListener('change', () => {
+    if (!$('rememberConnection').checked) forgetConnection()
+    else $('rememberStatus').textContent = 'Les paramètres seront mémorisés après le prochain test de connexion réussi, sans le mot de passe.'
+  })
+  restoreConnection()
+
+  // Une connexion modifiée doit être testée à nouveau avant toute mise à jour.
+  for (const key of [...CONNECTION_FIELDS, 'password']) {
+    $(key).addEventListener('input', () => {
+      installedVersion = null
+      $('update').disabled = true
+    })
+    $(key).addEventListener('change', () => {
+      installedVersion = null
+      $('update').disabled = true
+    })
+  }
 
   function form() {
     return {
@@ -186,6 +254,10 @@
     const el = $('status')
     el.textContent = text
     el.className = 'status' + (kind ? ' ' + kind : '')
+  }
+
+  function lockConnectionFields(locked) {
+    for (const key of [...CONNECTION_FIELDS, 'password']) $(key).disabled = locked
   }
 
   function logLine(kind, text) {
@@ -207,6 +279,8 @@
 
     status('Connexion...')
     $('test').disabled = true
+    $('update').disabled = true
+    lockConnectionFields(true)
 
     try {
       const response = await fetch(api('/api/test'), {
@@ -231,10 +305,11 @@
         $('host').value = result.parsed.host
         $('port').value = result.parsed.port
         if (result.parsed.user) $('user').value = result.parsed.user
-        if (result.parsed.remotePath) $('remotePath').value = result.parsed.remotePath
+        if (typeof result.parsed.remotePath === 'string') $('remotePath').value = result.parsed.remotePath
       }
 
       installedVersion = result.installed || null
+      saveConnection()
 
       if (!installedVersion) {
         status(`Connecté. Version installée introuvable — la mise à jour la demandera. Dernière publiée : ${result.latest}.`, 'ok')
@@ -250,6 +325,7 @@
       $('update').disabled = true
     } finally {
       $('test').disabled = false
+      lockConnectionFields(false)
     }
   })
 
@@ -258,6 +334,7 @@
 
     $('update').disabled = true
     $('test').disabled = true
+    lockConnectionFields(true)
     $('log').innerHTML = ''
     $('bar').style.display = 'block'
     status('Mise à jour en cours...')
@@ -302,6 +379,7 @@
     } finally {
       $('update').disabled = false
       $('test').disabled = false
+      lockConnectionFields(false)
     }
   })
 </script>

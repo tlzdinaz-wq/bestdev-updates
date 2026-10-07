@@ -1,4 +1,4 @@
-#version	1.12.61	2026-10-07T17:26:40.196Z
+#version	1.12.62	2026-10-07T17:48:31.305Z
 #protected	resources/[core]/core/config/**
 #protected	resources/[core]/core/plugins/015_Features/config/**
 #protected	resources/[core]/eve_bridge/config.lua
@@ -8,8 +8,8 @@
 #protected	resources/[core]/VUI/web/dist/assets/banners/**
 862043df9e4a03f281b96f38ccce9c04c591e38fbf202c7a9a4fd04478f64cab	703	ftp-updater/LANCER.bat
 a33446bed893d33fa9df0af05986d67bb1b0602893579825d40121f5d0be6bbb	343	ftp-updater/package.json
-599f96e14fb1584eb56933574e6a6ee17e3125766692dbc594d36100b88a2bb3	10243	ftp-updater/public/index.html
-22c57b10b44cf65c8605f2f5d471474e0c33467f1982f71f41b2d909ce976dde	3906	ftp-updater/README.md
+9a678f0182538f67f21e3c7fda0c6418b8c527a54c2f3dccdb7f0198b4b926ae	14000	ftp-updater/public/index.html
+18b5de62db4b8e7d309a61ae8d736722a3f817c3e063be53fd29107edf8c5a64	4659	ftp-updater/README.md
 4c1c6b09f3a53fadca4192711c747062b53a9f29b0cb98b48df149c2047bd867	20377	ftp-updater/server.mjs
 776407b9344f561c75274a6cbd3b55cbeda63dfa246439d7901d4eb493bae7ea	458	resources/[assets]/cloudy_pd_weapons/fxmanifest.lua
 0a6d4ba72c9f2cc831da6795c140031a6911a5df812d7d5197703137400a0f41	194	resources/[assets]/cloudy_pd_weapons/metas/40 mm/components/40mm_contentunlocks.meta

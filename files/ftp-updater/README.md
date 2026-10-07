@@ -21,9 +21,10 @@ En ligne de commande : `npm install` puis `npm start`.
 2. Renseigner hôte, port, utilisateur, mot de passe.
 3. **Dossier du serveur** : celui qui *contient* `resources/` et `server.cfg`.
    Laisser vide si c'est la racine de l'accès FTP.
-4. **Tester la connexion** — l'outil vérifie l'accès, trouve `resources/`, et lit la version
+4. Facultatif : cocher **Mémoriser cette connexion sur ce navigateur**.
+5. **Tester la connexion** — l'outil vérifie l'accès, trouve `resources/`, et lit la version
    installée dans `resources/[standalone]/updater/state.txt`.
-5. **Mettre à jour** — il télécharge les archives publiées depuis la version installée
+6. **Mettre à jour** — il télécharge les archives publiées depuis la version installée
    jusqu'à la dernière, et téléverse uniquement les fichiers concernés.
 
 Redémarrer le serveur à la fin.
@@ -72,8 +73,16 @@ Ouvrez le port 7788 seulement si vous en avez besoin, et refermez-le ensuite.
 
 ## Identifiants
 
-Ils ne sont **ni enregistrés ni transmis ailleurs qu'à votre hébergeur**. Ils restent en
-mémoire le temps de l'opération, et disparaissent dès que la page est fermée.
+Avec la case **Mémoriser cette connexion**, le protocole (FTP, FTPS ou SFTP), l'hôte,
+le port, l'utilisateur et le dossier sont enregistrés dans le stockage local du navigateur
+après un test réussi et la présence du dossier `resources/`. Ils sont restaurés aux prochaines
+ouvertures, même après redémarrage de l'outil ou du PC, sur la même adresse et le même navigateur.
+Ne cochez pas cette case sur un ordinateur partagé. Le bouton **Oublier la connexion**, ou
+décocher la case, efface cette sauvegarde. Une connexion échouée ne remplace pas la précédente.
+
+Le **mot de passe n'est jamais sauvegardé**, ni la clé d'accès de l'outil. Le mot de passe
+reste en mémoire pendant la session et doit être saisi à nouveau à la prochaine ouverture.
+La version installée n'est pas mémorisée : elle est relue lors du test de connexion.
 
 En mode normal, l'outil n'écoute que sur `127.0.0.1` : rien n'est accessible de l'extérieur.
 En mode ouvert (`--public`), il l'est — d'où la clé d'accès, obligatoire à chaque requête.

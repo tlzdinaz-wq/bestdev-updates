@@ -1,14 +1,13 @@
 {
- "version": "1.12.61",
- "date": "2026-10-07T17:26:40.196Z",
- "notes": "**Laboratoires : porte et entrée** — Le marqueur de porte apparaît à proximité du labo. Le chargement initial ne reste plus bloqué lorsque le joueur ou le staff n’a pas de faction. La synchronisation existante permet de retrouver les labos créés sans attendre un reboot.\n\n**Propriétaires et accès** — Un laboratoire attribué à un joueur reconnaît désormais son identifiant de personnage ; les factions peuvent aussi être reconnues via le second métier lorsque le champ faction est absent. Les identifiants propriétaires ne sont plus tronqués à 60 caractères : la colonne SQL est élargie automatiquement au démarrage, sans supprimer les labos existants. Si un ancien propriétaire joueur avait déjà été tronqué, resélectionner ce joueur dans le builder puis sauvegarder le labo.\n\n**Test par le staff** — La permission labo_builder permet d’entrer pour vérifier un labo, sans donner automatiquement les droits de propriétaire, de gestion ou de coffre. Les joueurs sans accès restent refusés côté serveur ; le contrôle de distance devant la porte reste actif.\n\n3 fichiers modifiés, aucun ajouté ou supprimé. Aucun changement de l’outil FTP/SFTP livré en 1.12.60, aucun mapping ni ajout d’icônes dans cette mise à jour. Les données des personnages ne sont pas modifiées.\n\nPour appliquer : utiliser l’outil FTP/SFTP ou update.bat / ./update.sh, puis redémarrer le serveur. Tests locaux validés ; affichage et téléportation restent à vérifier en jeu.",
+ "version": "1.12.62",
+ "date": "2026-10-07T17:48:31.305Z",
+ "notes": "**Outil FTP / SFTP : mémoriser la connexion**\n\nNouvelle case « Mémoriser cette connexion sur ce navigateur ». Après un test réussi, le protocole FTP/FTPS/SFTP, l’hôte, le port, l’utilisateur et le dossier sont sauvegardés et restaurés aux prochaines ouvertures dans le même navigateur, même après redémarrage. Le mot de passe, la clé d’accès et la version installée ne sont jamais enregistrés.\n\nLe bouton « Oublier la connexion », ou décocher la case, efface la sauvegarde. Un test échoué ne remplace pas les paramètres mémorisés. Modifier les accès impose un nouveau test avant de mettre à jour ; les champs sont verrouillés pendant les opérations.\n\n2 fichiers modifiés, aucun ajouté ou supprimé. Tests locaux validés.\n\n**Important :** mettre à jour le dossier ftp-updater sur le PC qui lance l’outil, puis recharger la page avec Ctrl + F5. La mise à jour du serveur distant ne remplace pas automatiquement l’outil local. Cette version ne corrige pas un identifiant ou un mot de passe SFTP refusé par l’hébergeur.",
  "added": [],
  "changed": [
-  "resources/[core]/core/plugins/015_Features/client/labo/cl_labo.lua",
-  "resources/[core]/core/plugins/015_Features/server/labo/26_180_labo.lua",
-  "resources/[core]/core/plugins/015_Features/server/labo/26_181_labo_builder.lua"
+  "ftp-updater/public/index.html",
+  "ftp-updater/README.md"
  ],
  "removed": [],
- "total": 294899516,
+ "total": 294904026,
  "fileCount": 3791
 }
