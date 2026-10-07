@@ -12,7 +12,7 @@
 // ils vivent le temps de la requete, en memoire.
 
 import { createServer } from 'node:http'
-import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { inflateRawSync } from 'node:zlib'
 import { fileURLToPath } from 'node:url'
@@ -61,6 +61,47 @@ async function resolveDownloadBase() {
 const DOWNLOAD_BASE = (await resolveDownloadBase()).replace(/\/$/, '')
 
 const STATE_PATH = 'resources/[standalone]/updater/state.txt'
+
+// ── state.txt ───────────────────────────────────────────────────────────────────────────
+//
+// Ce n'est pas un numero de version : c'est l'inventaire de l'installation. Une ligne
+// d'entete `#version<TAB>1.2.3<TAB>date`, puis une ligne `sha256<TAB>chemin` par fichier.
+// La base s'en sert pour savoir quels fichiers ont ete modifies sur place et doivent
+// arriver en `.new`. L'ecraser avec le seul numero de version la rendrait aveugle, donc on
+// le relit, on met a jour les empreintes des fichiers envoyes, et on le reecrit entier.
+
+function parseState(text) {
+  const state = { version: null, date: null, files: new Map() }
+
+  for (const line of String(text || '').split(/\r?\n/)) {
+    if (!line) continue
+    const [a, b, c] = line.split('\t')
+    if (a === '#version') {
+      state.version = (b || '').trim() || null
+      state.date = (c || '').trim() || null
+    } else if (a && a.length === 64 && b) {
+      state.files.set(b, a)
+    }
+  }
+
+  return state
+}
+
+function serializeState(state) {
+  const lines = [`#version\t${state.version}\t${state.date || new Date().toISOString()}`]
+  for (const [path, sha] of [...state.files].sort((x, y) => x[0] < y[0] ? -1 : 1)) {
+    lines.push(`${sha}\t${path}`)
+  }
+  return Buffer.from(lines.join('\n') + '\n', 'utf8')
+}
+
+async function readState(client, form) {
+  try {
+    return parseState((await client.read(remotePath(form, STATE_PATH))).toString('utf8'))
+  } catch {
+    return null
+  }
+}
 
 // ── Archives zip (lecture seule, sans dependance) ───────────────────────────────────────
 //
@@ -308,11 +349,8 @@ async function testConnection(input) {
     let installed = null
 
     if (hasResources) {
-      try {
-        installed = (await client.read(remotePath(form, STATE_PATH))).toString('utf8').trim()
-      } catch {
-        installed = null
-      }
+      const state = await readState(client, form)
+      installed = state && state.version
     }
 
     return {
@@ -345,19 +383,17 @@ async function runUpdate(input, send) {
     const target = form.targetVersion || await latestVersion()
     send('info', `Derniere version publiee : ${target}`)
 
-    let installed = form.installedVersion || null
+    // L'inventaire sert deux fois : il donne la version installee, et c'est lui qu'on
+    // reecrira a la fin, empreintes a jour, au lieu de l'effacer.
+    const state = await readState(client, form) || { version: null, date: null, files: new Map() }
+
+    let installed = form.installedVersion || state.version
     if (!installed) {
-      try {
-        installed = (await client.read(remotePath(form, STATE_PATH))).toString('utf8').trim()
-        send('info', `Version installee lue sur l'hebergeur : ${installed}`)
-      } catch {
-        throw new Error(
-          "Impossible de lire la version installee (resources/[standalone]/updater/state.txt). "
-          + "Verifiez le chemin distant, ou indiquez la version a la main.")
-      }
-    } else {
-      send('info', `Version installee indiquee : ${installed}`)
+      throw new Error(
+        "Impossible de lire la version installee (resources/[standalone]/updater/state.txt). "
+        + "Verifiez le chemin distant, ou indiquez la version a la main.")
     }
+    send('info', `Version installee : ${installed}`)
 
     if (installed === target) {
       send('done', 'Le serveur est deja a jour. Rien a faire.')
@@ -412,8 +448,17 @@ async function runUpdate(input, send) {
       send('progress', name, { done, total: files.size })
     }
 
-    await client.write(remotePath(form, STATE_PATH), Buffer.from(target, 'utf8'))
-    send('info', `Version enregistree sur l'hebergeur : ${target}`)
+    // Les fichiers proteges arrivent en `<nom>.new` et ne remplacent rien : leur empreinte
+    // est enregistree sous leur propre nom, le fichier d'origine garde la sienne et la base
+    // continuera a signaler qu'il differe.
+    for (const [name, data] of files) {
+      state.files.set(name, createHash('sha256').update(data).digest('hex'))
+    }
+    state.version = target
+    state.date = new Date().toISOString().replace(/\.\d+Z$/, 'Z')
+
+    await client.write(remotePath(form, STATE_PATH), serializeState(state))
+    send('info', `Version enregistree sur l'hebergeur : ${target} (${state.files.size} fichiers suivis)`)
 
     send('done',
       `Termine : ${files.size} fichier(s) envoye(s). Redemarrez le serveur, `
