@@ -158,9 +158,6 @@ CreateThread(function()
     while not VFW.IsPlayerLoaded() do
         Wait(500)
     end
-    while not VFW.PlayerData.faction do
-        Wait(1000)
-    end
     labos = TriggerServerCallback("labo:getLabos") or {}
     RefreshBlips()
 
@@ -440,6 +437,13 @@ CreateThread(function()
                 end
             end
 
+            if closestLabo and closestDist < 15.0 then
+                sleep = 0
+                DrawMarker(25, closestLabo.door_x, closestLabo.door_y, closestLabo.door_z - 0.98,
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.8, 0.8,
+                    114, 99, 238, 180, false, true, 2, false, nil, nil, false)
+            end
+
             if closestLabo and closestDist < INTERACT_DIST and GetGameTimer() - lastExitTime > 1000 then
                 sleep = 0
                 if closestLabo.has_access then
@@ -451,7 +455,7 @@ CreateThread(function()
                 else
                     VFW.ShowHelpNotification("Vous ~r~n'avez pas accès~w~ à cet endroit")
                 end
-            elseif closestLabo and closestDist < 50.0 then
+            elseif closestLabo and closestDist >= 15.0 and closestDist < 50.0 then
                 sleep = 500
             end
         end

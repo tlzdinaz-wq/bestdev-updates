@@ -270,8 +270,8 @@ local function FactionName(xPlayer)
     if not xPlayer then return "" end
     local faction = xPlayer.faction
     if type(faction) == "table" then return faction.name or "" end
-    if type(faction) == "string" then return faction end
-    return ""
+    if type(faction) == "string" and faction ~= "" then return faction end
+    return type(xPlayer.job2) == "table" and (xPlayer.job2.name or "") or ""
 end
 
 local function FactionLabel(xPlayer)
@@ -396,8 +396,12 @@ local function AccessFor(laboId, xPlayer)
 
     local factionName = FactionName(xPlayer)
     local isOwner = labo.owner_faction ~= "no_owner" and labo.owner_faction ~= "" and labo.owner_faction == factionName
+    local playerOwner = type(labo.owner_faction) == "string" and labo.owner_faction:match("^player:(.+)$")
+    if playerOwner then isOwner = playerOwner == xPlayer.identifier end
 
     local result = { has = isOwner, chest = isOwner, management = isOwner, owner = isOwner }
+    -- Builders can inspect their creations without gaining owner/chest rights.
+    if xPlayer.hasPermission and xPlayer.hasPermission(BUILDER_PERM) then result.has = true end
 
     local list = Labo.access[laboId] or {}
     for i = 1, #list do
@@ -1337,14 +1341,41 @@ CreateThread(function()
     end
 end)
 
-RegisterNetEvent("laboBuilder:reload", function()
-    local source = source
-    local xPlayer = LB.Player(source)
-    if not xPlayer or not xPlayer.hasPermission(BUILDER_PERM) then return end
-
+--- Relit la base et renvoie tout le monde sur l'etat frais.
+---
+--- Les labos vivent en memoire : tant que ce rechargement n'a pas lieu, un labo cree depuis
+--- le menu existe en base mais pour personne en jeu — ni blip, ni invite a la porte, ni
+--- entree possible, puisque `labo:enter` cherche l'identifiant dans `Labo.list`.
+local function ReloadAndSync()
     LoadLabos()
     LoadAccess()
     LoadPoints()
     TriggerClientEvent("laboBuilder:syncLabos", -1)
     TriggerClientEvent("labo:refreshBlips", -1)
+end
+
+RegisterNetEvent("laboBuilder:reload", function()
+    local source = source
+    local xPlayer = LB.Player(source)
+    if not xPlayer or not xPlayer.hasPermission(BUILDER_PERM) then return end
+
+    ReloadAndSync()
+end)
+
+-- Le menu de construction signale chacune de ses ecritures. Personne n'ecoutait : les
+-- creations, modifications et suppressions restaient invisibles jusqu'au redemarrage.
+--
+-- Un labo se construit en plusieurs ecritures d'affilee (le labo, puis ses points recopies
+-- du template) ; on attend donc la fin de la rafale avant de recharger, pour ne pas relire
+-- toute la base a chaque ligne.
+local reloadQueued = false
+
+AddEventHandler("labo:builder:changed", function()
+    if reloadQueued then return end
+    reloadQueued = true
+
+    SetTimeout(250, function()
+        reloadQueued = false
+        ReloadAndSync()
+    end)
 end)

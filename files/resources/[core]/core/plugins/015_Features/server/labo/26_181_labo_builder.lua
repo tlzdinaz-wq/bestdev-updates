@@ -143,6 +143,14 @@ local function pointColumns(table_)
 end
 
 local function ensureSchema()
+    -- "player:" + a character identifier can exceed the original 60 chars.
+    local ownerLength = MySQL.scalar.await([[
+        SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'labos' AND COLUMN_NAME = 'owner_faction'
+    ]])
+    if tonumber(ownerLength) and tonumber(ownerLength) < 80 then
+        execute("ALTER TABLE labos MODIFY COLUMN owner_faction VARCHAR(80) DEFAULT NULL")
+    end
     -- Colonnes attendues par le menu et absentes de `labos`.
     addColumn("labos", "template_id", "INT(11) DEFAULT NULL")
     addColumn("labos", "owner_player_name", "VARCHAR(100) DEFAULT NULL")
@@ -552,7 +560,7 @@ local function sanitizeLabo(data)
         name = str(data.name, 100) or label:lower():gsub("[^%w]+", "_"),
         label = label,
         template_id = int(data.templateId, nil),
-        owner_faction = str(data.ownerFaction, 60) or "no_owner",
+        owner_faction = str(data.ownerFaction, 80) or "no_owner",
         owner_player_name = str(data.ownerPlayerName, 100),
         door_x = num(door.x, 0.0), door_y = num(door.y, 0.0), door_z = num(door.z, 0.0),
         door_heading = num(door.heading, 0.0),
