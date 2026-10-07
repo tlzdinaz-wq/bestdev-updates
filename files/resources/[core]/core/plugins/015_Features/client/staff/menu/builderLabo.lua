@@ -238,6 +238,7 @@ StaffMenu.builderLabo.OnOpen(function()
                 "#" .. labo.id,
                 "chevron", false,
                 function()
+                    ResetLaboData()
                     laboData.id = labo.id
                     laboData.name = labo.name
                     laboData.label = labo.label
@@ -1507,7 +1508,7 @@ StaffMenu.builderLaboTemplateManage.OnOpen(function()
 
     StaffMenu.builderLaboTemplateManage.Separator("")
 
-    StaffMenu.builderLaboTemplateManage.Button(":save: SAUVEGARDER", "Enregistrer les modifications", nil, "check", false, function()
+    StaffMenu.builderLaboTemplateManage.Button(":save: SAUVEGARDER", "Appliquer les points intérieur, coffre et gestion à tous les labos utilisant ce template", nil, "check", false, function()
         local result = TriggerServerCallback("laboBuilder:updateTemplate", templateEditData.id, {
             name = templateEditData.name,
             label = templateEditData.label,
@@ -1525,7 +1526,7 @@ StaffMenu.builderLaboTemplateManage.OnOpen(function()
             templateEditData.id = result.id or templateEditData.id
             VFW.ShowNotification({
                 type = "VERT",
-                content = created and "Template créée." or "Template mise à jour.",
+                content = created and "Template créée." or "Template sauvegardé et appliqué aux labos associés.",
             })
             StaffMenu.builderLaboTemplateManage.refresh()
         else
@@ -1584,4 +1585,3 @@ end)
 StaffMenu.builderLaboTemplateTransformCreate.OnClose(function()
     DeletePreviewProp("transform")
 end)
-

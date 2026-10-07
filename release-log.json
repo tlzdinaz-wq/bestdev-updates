@@ -1,15 +1,15 @@
 {
- "version": "1.12.63",
- "date": "2026-10-07T18:11:16.563Z",
- "notes": "**Laboratoires : sauvegarde des points**\n\nCorrection de l’écriture SQL quand des champs facultatifs sont vides. Les positions des labos, templates et points de récolte/transformation sont correctement sauvegardées et relues après un reboot. Les erreurs SQL et les éléments supprimés ne donnent plus une fausse confirmation de réussite.\n\n**Application après sauvegarde**\nLes joueurs déjà dans le labo rechargent aussi les points de récolte/transformation et leurs objets, sans sortir ni rentrer. Les anciennes interactions sont réinitialisées. Les réglages personnalisés des labos existants ne sont pas écrasés par une modification de template.\n\n4 fichiers modifiés, aucun ajouté ou supprimé. Tests locaux validés ; contrôle final en jeu à effectuer.\n\nAppliquer via l’outil FTP/SFTP ou update.bat / ./update.sh, puis redémarrer le serveur pour charger le correctif. Ensuite, les modifications s’appliquent après le bouton SAUVEGARDER du builder, sans nouveau reboot.",
+ "version": "1.12.64",
+ "date": "2026-10-07T18:29:18.370Z",
+ "notes": "**Templates : application aux labos déjà créés**\nLa sauvegarde du template applique ses positions intérieur, coffre et gestion et ses blips aux labos associés, dans une transaction SQL. Les portes et propriétaires restent inchangés ; les positions intérieures des labos liés suivent désormais le template.\n\nLes modifications de points de récolte/transformation sont répercutées sur leurs copies. Leur origine est conservée après renommage et reboot. Les anciennes copies sont reliées uniquement lorsque le nom ou label est unique ; les correspondances ambiguës sont refusées. Les points manuels distincts et les autres labos restent inchangés.\n\n**Modification d’un labo : rafraîchissement**\nLa confirmation attend le rechargement serveur et l’envoi des données aux joueurs, y compris ceux déjà dans le labo. Changer le template applique ses positions ; le retrait du template est aussi sauvegardé. Le formulaire ne garde plus les positions résiduelles d’un autre labo.\n\n**Coffre et gestion : métier principal**\nLe patron du métier auquel le labo est attribué, par exemple concess, est maintenant reconnu comme propriétaire. Les changements de métier/grade rafraîchissent les accès. Un employé, le patron d’un autre métier ou un staff disposant seulement du builder ne reçoit pas automatiquement ces droits.\n\n4 fichiers modifiés, aucun ajouté ou supprimé. Migration automatique de deux colonnes d’origine des points, sans suppression de données. Tests locaux validés ; contrôle en jeu à effectuer.\n\nAppliquer via FTP/SFTP ou update.bat / ./update.sh, puis redémarrer une fois pour charger le correctif. Ensuite, les sauvegardes s’appliquent sans reboot.",
  "added": [],
  "changed": [
-  "resources/[core]/core/plugins/015_Features/client/labo/cl_labo_harvest.lua",
-  "resources/[core]/core/plugins/015_Features/client/labo/cl_labo_transform.lua",
   "resources/[core]/core/plugins/015_Features/client/labo/cl_labo.lua",
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderLabo.lua",
+  "resources/[core]/core/plugins/015_Features/server/labo/26_180_labo.lua",
   "resources/[core]/core/plugins/015_Features/server/labo/26_181_labo_builder.lua"
  ],
  "removed": [],
- "total": 294905851,
+ "total": 294911503,
  "fileCount": 3791
 }

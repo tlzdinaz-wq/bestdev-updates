@@ -274,6 +274,14 @@ local function FactionName(xPlayer)
     return type(xPlayer.job2) == "table" and (xPlayer.job2.name or "") or ""
 end
 
+local function IsPrimaryJobOwner(xPlayer, ownerName)
+    local job = xPlayer and xPlayer.job
+    if type(job) ~= "table" or job.name ~= ownerName then return false end
+    -- Un metier principal peut etre choisi dans le builder, pas uniquement une
+    -- faction. Seul son patron obtient les droits de proprietaire/gestion.
+    return job.grade_is_boss == true or job.grade_is_boss == 1 or job.grade_is_boss == "1"
+end
+
 local function FactionLabel(xPlayer)
     if not xPlayer then return "" end
     local faction = xPlayer.faction
@@ -396,6 +404,9 @@ local function AccessFor(laboId, xPlayer)
 
     local factionName = FactionName(xPlayer)
     local isOwner = labo.owner_faction ~= "no_owner" and labo.owner_faction ~= "" and labo.owner_faction == factionName
+    if labo.owner_faction and labo.owner_faction ~= "no_owner" and labo.owner_faction ~= "" then
+        isOwner = isOwner or IsPrimaryJobOwner(xPlayer, labo.owner_faction)
+    end
     local playerOwner = type(labo.owner_faction) == "string" and labo.owner_faction:match("^player:(.+)$")
     if playerOwner then isOwner = playerOwner == xPlayer.identifier end
 
@@ -1352,6 +1363,16 @@ local function ReloadAndSync()
     LoadPoints()
     TriggerClientEvent("laboBuilder:syncLabos", -1)
     TriggerClientEvent("labo:refreshBlips", -1)
+end
+
+-- Appel direct depuis le builder : le callback de sauvegarde attend que les
+-- caches soient relus et que la notification client soit envoyee.
+VFW.LaboBuilderSync = ReloadAndSync
+
+for _, eventName in ipairs({ "vfw:setJob", "vfw:setJob2" }) do
+    AddEventHandler(eventName, function(playerSource)
+        if tonumber(playerSource) then TriggerClientEvent("laboBuilder:syncLabos", playerSource) end
+    end)
 end
 
 RegisterNetEvent("laboBuilder:reload", function()

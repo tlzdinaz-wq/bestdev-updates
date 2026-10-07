@@ -112,6 +112,19 @@ local function builder(source)
     return xPlayer
 end
 
+local function finishSave(id)
+    if VFW and type(VFW.LaboBuilderSync) == "function" then
+        local ok, err = pcall(VFW.LaboBuilderSync)
+        if not ok then
+            console.error("[labo builder] synchronisation : " .. tostring(err))
+            return { success = false, error = "Donnees enregistrees, mais synchronisation impossible. Consultez la console serveur." }
+        end
+    else
+        TriggerEvent("labo:builder:changed")
+    end
+    return { success = true, id = id }
+end
+
 -- ── Schema ──────────────────────────────────────────────────────────────────────────────
 
 local function hasColumn(table_, column)
@@ -155,6 +168,8 @@ local function ensureSchema()
     addColumn("labos", "template_id", "INT(11) DEFAULT NULL")
     addColumn("labos", "owner_player_name", "VARCHAR(100) DEFAULT NULL")
     addColumn("labos", "chest_max_weight", "INT(11) NOT NULL DEFAULT 100000")
+    addColumn("labo_harvest_points", "template_point_id", "INT(11) DEFAULT NULL")
+    addColumn("labo_transform_points", "template_point_id", "INT(11) DEFAULT NULL")
 
     MySQL.query.await([[
         CREATE TABLE IF NOT EXISTS labo_templates (
@@ -437,8 +452,12 @@ local POINT_COLUMNS <const> = {
 
 --- Insertion montee colonne par colonne : un `nil` au milieu d'un tableau de parametres en
 --- tronque la longueur et la requete partirait decalee.
-local function insertPoint(table_, ownerColumn, ownerId, point)
+local function insertPoint(table_, ownerColumn, ownerId, point, templatePointId)
     local names, marks, params = { ("`%s`"):format(ownerColumn) }, { "?" }, { ownerId }
+    if templatePointId then
+        names[#names + 1], marks[#marks + 1] = "`template_point_id`", "?"
+        params[#params + 1] = templatePointId
+    end
 
     for i = 1, #POINT_COLUMNS do
         local column = POINT_COLUMNS[i]
@@ -454,7 +473,7 @@ local function insertPoint(table_, ownerColumn, ownerId, point)
         :format(table_, table.concat(names, ", "), table.concat(marks, ", ")), params)
 end
 
-local function updatePoint(table_, id, point)
+local function pointUpdateStatement(table_, id, point, templatePointId)
     local sets, params = {}, {}
 
     for i = 1, #POINT_COLUMNS do
@@ -467,8 +486,49 @@ local function updatePoint(table_, id, point)
         end
     end
 
+    if templatePointId then
+        sets[#sets + 1] = "`template_point_id` = ?"
+        params[#params + 1] = templatePointId
+    end
     params[#params + 1] = id
-    return execute(("UPDATE `%s` SET %s WHERE id = ?"):format(table_, table.concat(sets, ", ")), params)
+    return { query = ("UPDATE `%s` SET %s WHERE id = ?"):format(table_, table.concat(sets, ", ")), values = params }
+end
+
+local function samePointIdentity(a, b)
+    -- Les anciennes copies n'ont pas d'identifiant d'origine. Ne les rattacher
+    -- qu'avec un nom (ou label) non vide et unique des deux cotes.
+    if a.name and a.name ~= "" and b.name and b.name ~= "" then return a.name == b.name end
+    return a.label and a.label ~= "" and a.label == b.label
+end
+
+local function templatePointStatements(table_, id, point, previous)
+    local kind = table_:match("^labo_template_(%w+)_points$")
+    local targetTable = "labo_" .. kind .. "_points"
+    local statements = { pointUpdateStatement(table_, id, point) }
+    -- Ne pas transformer une erreur de lecture en liste vide puis annoncer un succes.
+    local templates = MySQL.query.await(("SELECT * FROM `%s` WHERE template_id = ?"):format(table_), { previous.template_id })
+    local copies = MySQL.query.await(("SELECT p.* FROM `%s` p JOIN labos l ON l.id = p.labo_id WHERE l.template_id = ?")
+        :format(targetTable), { previous.template_id })
+    if type(templates) ~= "table" or type(copies) ~= "table" then error("Lecture des copies du template impossible") end
+    local templateMatches = 0
+    for _, candidate in ipairs(templates) do
+        if samePointIdentity(candidate, previous) then templateMatches = templateMatches + 1 end
+    end
+    for _, copy in ipairs(copies) do
+        local linked = tonumber(copy.template_point_id) == id
+        if not copy.template_point_id and samePointIdentity(copy, previous) then
+            local matches = 0
+            for _, other in ipairs(copies) do
+                if other.labo_id == copy.labo_id and samePointIdentity(other, previous) then matches = matches + 1 end
+            end
+            if templateMatches ~= 1 or matches ~= 1 then
+                error("Copies de points ambigues dans le labo " .. tostring(copy.labo_id) .. ". Donnez un nom unique aux points avant de les relier au template.")
+            end
+            linked = true
+        end
+        if linked then statements[#statements + 1] = pointUpdateStatement(targetTable, copy.id, point, id) end
+    end
+    return statements
 end
 
 --- Enregistre les quatre points d'entree d'un type de point (lister, creer, modifier,
@@ -497,8 +557,7 @@ local function registerPointEndpoints(prefix, table_, ownerColumn)
         local newId = insertPoint(table_, ownerColumn, id, point)
         if not newId then return { success = false, error = "Creation impossible." } end
 
-        TriggerEvent("labo:builder:changed")
-        return { success = true, id = newId }
+        return finishSave(newId)
     end)
 
     RegisterServerCallback("laboBuilder:update" .. prefix, function(source, pointId, data)
@@ -508,15 +567,24 @@ local function registerPointEndpoints(prefix, table_, ownerColumn)
         local point = sanitizePoint(data)
         if not id or not point then return { success = false, error = "Donnees invalides." } end
 
-        if not single(("SELECT id FROM `%s` WHERE id = ?"):format(table_), { id }) then
+        local previous = single(("SELECT * FROM `%s` WHERE id = ?"):format(table_), { id })
+        if not previous then
             return { success = false, error = "Ce point n'existe plus. Rechargez la liste." }
         end
-        local affected = updatePoint(table_, id, point)
-        if affected == false or affected == nil then
+        local ok, affected
+        if ownerColumn == "template_id" then
+            ok, affected = pcall(function()
+                return MySQL.transaction.await(templatePointStatements(table_, id, point, previous))
+            end)
+        else
+            local statement = pointUpdateStatement(table_, id, point)
+            ok, affected = true, execute(statement.query, statement.values)
+        end
+        if not ok or affected == false or affected == nil then
+            console.error("[labo builder] sauvegarde point : " .. tostring(affected))
             return { success = false, error = "Sauvegarde du point impossible. Consultez la console serveur." }
         end
-        TriggerEvent("labo:builder:changed")
-        return { success = true }
+        return finishSave()
     end)
 
     RegisterServerCallback("laboBuilder:delete" .. prefix, function(source, pointId)
@@ -548,7 +616,7 @@ local function copyTemplatePoints(templateId, laboId)
             for j = 1, #POINT_COLUMNS do
                 point[POINT_COLUMNS[j]] = row[POINT_COLUMNS[j]]
             end
-            insertPoint(("labo_%s_points"):format(kind), "labo_id", laboId, point)
+            insertPoint(("labo_%s_points"):format(kind), "labo_id", laboId, point, row.id)
         end
     end
 end
@@ -653,8 +721,7 @@ RegisterServerCallback("laboBuilder:createLabo", function(source, data)
 
     if labo.template_id then copyTemplatePoints(labo.template_id, id) end
 
-    TriggerEvent("labo:builder:changed")
-    return { success = true, id = id }
+    return finishSave(id)
 end)
 
 RegisterServerCallback("laboBuilder:updateLabo", function(source, laboId, data)
@@ -666,11 +733,18 @@ RegisterServerCallback("laboBuilder:updateLabo", function(source, laboId, data)
     if not single("SELECT id FROM labos WHERE id = ?", { id }) then
         return { success = false, error = "Ce labo n'existe plus. Rechargez la liste." }
     end
+    if labo.template_id then
+        if not single("SELECT id FROM labo_templates WHERE id = ?", { labo.template_id }) then
+            return { success = false, error = "Ce template n'existe plus. Rechargez la liste." }
+        end
+        applyTemplate(labo)
+    end
 
     local sets, params = {}, {}
     for i = 1, #LABO_COLUMNS do
         local column = LABO_COLUMNS[i]
-        if labo[column] ~= nil or column:find("^chest_") or column:find("^management_") then
+        if labo[column] ~= nil or column == "template_id" or column == "owner_player_name"
+            or column:find("^chest_") or column:find("^management_") then
             if labo[column] == nil then
                 sets[#sets + 1] = ("`%s` = NULL"):format(column)
             else
@@ -686,8 +760,7 @@ RegisterServerCallback("laboBuilder:updateLabo", function(source, laboId, data)
         return { success = false, error = "Sauvegarde du labo impossible. Consultez la console serveur." }
     end
 
-    TriggerEvent("labo:builder:changed")
-    return { success = true }
+    return finishSave()
 end)
 
 RegisterServerCallback("laboBuilder:deleteLabo", function(source, laboId)
@@ -759,11 +832,23 @@ RegisterServerCallback("laboBuilder:updateTemplate", function(source, templateId
             end
         end
         params[#params + 1] = id
-        local affected = execute(("UPDATE labo_templates SET %s WHERE id = ?"):format(table.concat(sets, ", ")), params)
-        if affected == false or affected == nil then
-            return { success = false, error = "Sauvegarde du template impossible. Consultez la console serveur." }
+        -- Les labos stockaient une copie du template : modifier le modele seul ne
+        -- changeait donc jamais leurs points. Sauver les deux dans la meme transaction.
+        local inherited = {}
+        for i = 3, #columns do
+            local column = columns[i]
+            inherited[#inherited + 1] = ("l.`%s` = t.`%s`"):format(column, column)
         end
-        return { success = true, id = id }
+        local ok, saved = pcall(MySQL.transaction.await, {
+            { query = ("UPDATE labo_templates SET %s WHERE id = ?"):format(table.concat(sets, ", ")), values = params },
+            { query = ("UPDATE labos l JOIN labo_templates t ON t.id = l.template_id SET %s WHERE t.id = ?")
+                :format(table.concat(inherited, ", ")), values = { id } },
+        })
+        if not ok or not saved then
+            console.error("[labo builder] synchronisation template : " .. tostring(saved))
+            return { success = false, error = "Sauvegarde et application du template impossibles. Consultez la console serveur." }
+        end
+        return finishSave(id)
     end
 
     local names, marks, params = {}, {}, {}

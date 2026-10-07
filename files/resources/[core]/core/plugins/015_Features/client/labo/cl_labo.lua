@@ -219,6 +219,10 @@ RegisterNetEvent("vfw:setJob2", function()
     RefreshBlips()
 end)
 
+RegisterNetEvent("vfw:setFaction", function()
+    TriggerEvent("laboBuilder:syncLabos")
+end)
+
 CreateThread(function()
     while not VFW.IsPlayerLoaded() do
         Wait(500)
