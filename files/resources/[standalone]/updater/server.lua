@@ -31,10 +31,6 @@ local APPLY_HINT = IS_WINDOWS and "update.bat (double-clic à la racine du serve
 -- il tourne sur VOTRE machine et pousse les fichiers chez l'hébergeur. Le dossier est livré
 -- avec la base. L'adresse est locale par construction ; `update_tool_url` permet de la
 -- changer si vous le lancez sur un autre port ou une autre machine.
-local function toolHint()
-    local url = GetConvar("update_tool_url", "http://127.0.0.1:7788")
-    return ("outil FTP : dossier ftp-updater → LANCER.bat → %s"):format(url)
-end
 
 local function log(msg) print("^5[update]^7 " .. msg) end
 local function warn(msg) print("^3[update]^7 " .. msg) end
@@ -197,6 +193,59 @@ local function httpGet(url)
         p:resolve({ status = 0, body = nil })
     end)
     return Citizen.Await(p)
+end
+
+-- Adresse a laquelle joindre l'outil. Dans l'ordre : ce que l'admin a fixe, l'IP annoncee
+-- par le serveur, puis l'IP publique trouvee une fois pour toutes. `127.0.0.1` ne reste
+-- qu'en dernier recours : affiche dans une console lue a distance, il ne mene nulle part.
+local toolHost = nil
+
+local function resolveToolHost()
+    if toolHost then return toolHost end
+
+    local listed = GetConvar("sv_listingIPOverride", "")
+    if listed ~= "" then
+        toolHost = listed
+        return toolHost
+    end
+
+    return nil
+end
+
+local function toolHint()
+    local url = GetConvar("update_tool_url", "")
+    if url ~= "" then
+        return ("outil de mise à jour : %s"):format(url)
+    end
+
+    local port = GetConvar("update_tool_port", "7788")
+    local host = resolveToolHost()
+
+    if not host then
+        return ("outil de mise à jour : dossier ftp-updater → LANCER.bat, puis http://<ip-du-serveur>:%s")
+            :format(port)
+    end
+
+    return ("outil de mise à jour : dossier ftp-updater → LANCER.bat, puis http://%s:%s")
+        :format(host, port)
+end
+
+--- Cherche l'IP publique une seule fois, pour que le lien affiche en console soit cliquable
+--- depuis l'exterieur. Sans reponse, on garde la formulation generique.
+local function discoverToolHost()
+    if toolHost or GetConvar("update_tool_url", "") ~= "" then return end
+    if GetConvar("update_tool_lookup", "true") ~= "true" then return end
+
+    CreateThread(function()
+        local r = httpGet("https://api.ipify.org")
+        if r.status == 200 and type(r.body) == "string" then
+            local ip = r.body:match("^%s*([%d%.]+)%s*$")
+            if ip then
+                toolHost = ip
+                log(toolHint())
+            end
+        end
+    end)
 end
 
 -- GitHub : raw.githubusercontent.com met la branche en cache plusieurs minutes ; on lit
@@ -368,6 +417,7 @@ AddEventHandler("onResourceStart", function(res)
     local state = readState()
     log("version installée : " .. ((state and state.version) or "inconnue") .. ". `update` vérifie ; " .. APPLY_HINT .. " applique.")
     log(toolHint())
+    discoverToolHost()
     local configured = GetConvar("update_url", ""):gsub("/+$", "")
     if configured == "" then warn("update_url non défini dans server.cfg.") return end
     -- au démarrage : un seul appel HTTP pour signaler une nouvelle version (pas de lecture des fichiers)

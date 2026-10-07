@@ -13,6 +13,17 @@ if not exist node_modules (
   )
 )
 
-start "" http://127.0.0.1:7788
-node server.mjs
+echo.
+echo  1 - Sur cette machine uniquement   (recommande)
+echo  2 - Ouvert a l'exterieur, joignable a l'IP du serveur
+echo.
+set /p mode=Votre choix [1] :
+if "%mode%"=="2" (
+  echo.
+  echo Lancement ouvert. L'adresse et la cle d'acces s'affichent ci-dessous.
+  node server.mjs --public
+) else (
+  start "" http://127.0.0.1:7788
+  node server.mjs
+)
 pause

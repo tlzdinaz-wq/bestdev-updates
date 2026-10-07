@@ -42,11 +42,36 @@ Les fichiers protégés — configurations, images de marque — arrivent en `<n
 n'écrasent rien. Comparez-les avec les vôtres et reportez ce qui vous intéresse.
 C'est le même principe qu'une installation manuelle par zip.
 
+## L'ouvrir depuis l'extérieur
+
+Par défaut l'outil n'écoute que sur la machine qui le lance : `http://127.0.0.1:7788`, rien
+n'est joignable de l'extérieur. Si vous le lancez **sur le serveur** et voulez l'ouvrir
+depuis chez vous :
+
+```
+node server.mjs --public
+```
+
+Il écoute alors sur toutes les interfaces et affiche une adresse de ce genre :
+
+```
+Mise a jour Best Dev : http://<ip-du-serveur>:7788/?k=UCtzpj7x2Ann
+```
+
+La **clé d'accès** dans le lien est obligatoire : sans elle, toute requête est refusée.
+Elle est tirée au hasard à chaque démarrage — fixez-la avec la variable d'environnement
+`UPDATER_KEY` si vous voulez une adresse stable.
+
+Ne diffusez pas ce lien : il donne le pouvoir de remplacer les fichiers de votre serveur.
+Ouvrez le port 7788 seulement si vous en avez besoin, et refermez-le ensuite.
+
 ## Identifiants
 
 Ils ne sont **ni enregistrés ni transmis ailleurs qu'à votre hébergeur**. Ils restent en
-mémoire le temps de l'opération, sur votre machine. Le serveur n'écoute que sur
-`127.0.0.1` : rien n'est accessible depuis l'extérieur.
+mémoire le temps de l'opération, et disparaissent dès que la page est fermée.
+
+En mode normal, l'outil n'écoute que sur `127.0.0.1` : rien n'est accessible de l'extérieur.
+En mode ouvert (`--public`), il l'est — d'où la clé d'accès, obligatoire à chaque requête.
 
 ## Si ça bloque
 

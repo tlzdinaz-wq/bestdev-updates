@@ -153,6 +153,11 @@
 
 <script>
   const $ = id => document.getElementById(id)
+
+  // Ouvert a distance, le serveur exige une cle : elle arrive dans l'adresse de la page et
+  // doit accompagner chaque appel. En local il n'y en a pas, et api() ne change rien.
+  const ACCESS_KEY = new URLSearchParams(location.search).get('k')
+  const api = path => ACCESS_KEY ? `${path}?k=${encodeURIComponent(ACCESS_KEY)}` : path
   const DEFAULT_PORTS = { ftp: '21', ftps: '21', sftp: '22' }
 
   $('protocol').addEventListener('change', () => {
@@ -204,7 +209,7 @@
     $('test').disabled = true
 
     try {
-      const response = await fetch('/api/test', {
+      const response = await fetch(api('/api/test'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(data),
@@ -258,7 +263,7 @@
     status('Mise à jour en cours...')
 
     try {
-      const response = await fetch('/api/update', {
+      const response = await fetch(api('/api/update'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(form()),

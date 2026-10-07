@@ -12,6 +12,7 @@
 // ils vivent le temps de la requete, en memoire.
 
 import { createServer } from 'node:http'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { inflateRawSync } from 'node:zlib'
 import { fileURLToPath } from 'node:url'
@@ -19,6 +20,17 @@ import { dirname, join, extname } from 'node:path'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PORT = Number(process.env.PORT || 7788)
+
+// Par defaut l'outil n'ecoute que sur la machine qui le lance : rien n'est joignable de
+// l'exterieur. `--public` (ou HOST=0.0.0.0) l'expose sur toutes les interfaces, pour qu'il
+// soit atteignable a l'IP du serveur — indispensable quand on le lance sur l'hebergeur et
+// qu'on l'ouvre depuis chez soi.
+//
+// Expose, il devient une porte vers les fichiers du serveur : une cle d'acces est alors
+// exigee a chaque requete. Elle est tiree au hasard au demarrage, ou fixee par UPDATER_KEY.
+const PUBLIC = process.argv.includes('--public') || process.env.HOST === '0.0.0.0'
+const HOST = PUBLIC ? '0.0.0.0' : '127.0.0.1'
+const KEY = PUBLIC ? (process.env.UPDATER_KEY || randomBytes(9).toString('base64url')) : null
 
 // Source des mises a jour : la meme que celle du publicateur.
 const config = JSON.parse(await readFile(join(HERE, '..', 'release.config.json'), 'utf8'))
@@ -397,16 +409,36 @@ async function body(request) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
 }
 
+/** Comparaison a duree constante : une cle ne se devine pas a la vitesse des reponses. */
+function keyAccepted(provided) {
+  if (!KEY) return true
+  if (typeof provided !== 'string' || provided.length !== KEY.length) return false
+  return timingSafeEqual(Buffer.from(provided), Buffer.from(KEY))
+}
+
 const server = createServer(async (request, response) => {
   try {
-    if (request.method === 'POST' && request.url === '/api/test') {
+    if (KEY) {
+      const url = new URL(request.url, 'http://x')
+      const given = url.searchParams.get('k') || request.headers['x-updater-key']
+      if (!keyAccepted(given)) {
+        response.writeHead(403, { 'content-type': 'application/json; charset=utf-8' })
+        response.end(JSON.stringify({ ok: false, error: "Cle d'acces manquante ou invalide." }))
+        return
+      }
+    }
+
+    // La cle voyage dans l'adresse : tout le routage se fait sur le chemin seul.
+    const route = request.url.split('?')[0]
+
+    if (request.method === 'POST' && route === '/api/test') {
       const result = await testConnection(await body(request))
       response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
       response.end(JSON.stringify(result))
       return
     }
 
-    if (request.method === 'POST' && request.url === '/api/update') {
+    if (request.method === 'POST' && route === '/api/update') {
       response.writeHead(200, {
         'content-type': 'application/x-ndjson; charset=utf-8',
         'cache-control': 'no-cache',
@@ -426,7 +458,9 @@ const server = createServer(async (request, response) => {
       return
     }
 
-    const file = request.url === '/' ? '/index.html' : request.url.split('?')[0]
+    // La cle voyage dans l'adresse : on retire la requete AVANT de tester la racine,
+    // sinon « /?k=... » n'est plus reconnu comme la page d'accueil.
+    const file = (route === '/' || route === '') ? '/index.html' : route
     const data = await readFile(join(HERE, 'public', file.replace(/\.\./g, '')))
     response.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream' })
     response.end(data)
@@ -436,7 +470,14 @@ const server = createServer(async (request, response) => {
   }
 })
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`Mise a jour Best Dev : http://127.0.0.1:${PORT}`)
+server.listen(PORT, HOST, () => {
+  if (!PUBLIC) {
+    console.log(`Mise a jour Best Dev : http://127.0.0.1:${PORT}`)
+    console.log("Accessible depuis cette machine uniquement. Pour l'ouvrir a distance : node server.mjs --public")
+  } else {
+    console.log(`Mise a jour Best Dev : http://<ip-du-serveur>:${PORT}/?k=${KEY}`)
+    console.log("Ouvert sur toutes les interfaces. Le lien ci-dessus contient la cle d'acces :")
+    console.log('sans elle, toute requete est refusee. Ne la diffusez pas.')
+  }
   console.log(`Source des mises a jour : ${DOWNLOAD_BASE}`)
 })

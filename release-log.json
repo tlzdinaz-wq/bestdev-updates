@@ -1,24 +1,18 @@
 {
- "version": "1.12.57",
- "date": "2026-10-07T15:44:51.596Z",
- "notes": "**Mise a jour par FTP / SFTP, sans acces console** — beaucoup d'hebergeurs FiveM ne donnent qu'un acces FTP : `update.bat` et `update.sh` ne peuvent pas y tourner, et la mise a jour devenait un televersement manuel fichier par fichier. Un outil est desormais livre avec la base, dans le dossier `ftp-updater` : double-clic sur `LANCER.bat`, une page s'ouvre sur votre machine, vous saisissez l'acces de votre hebergeur et un bouton applique la mise a jour.\n\nIl lit la version installee **sur l'hebergeur**, telecharge les archives publiees depuis cette version jusqu'a la derniere, et televerse uniquement les fichiers concernes. Un serveur en retard de plusieurs versions les recoit toutes, fusionnees pour n'envoyer chaque fichier qu'une fois dans sa version la plus recente. La nouvelle version est inscrite a la fin, pour que la prochaine mise a jour reparte du bon point. Aucun fichier n'est jamais supprime, et les fichiers proteges — configurations, images de marque — arrivent en `.new` comme lors d'une installation manuelle.\n\nFTP, FTPS et SFTP sont acceptes. Le champ hote accepte aussi une chaine de connexion collee d'un bloc (`sftp://utilisateur@machine:2022/dossier`) : l'outil en deduit le protocole, le port, l'utilisateur et le dossier, sans jamais remplacer ce que vous avez saisi vous-meme. Les identifiants ne sont ni enregistres ni transmis ailleurs qu'a votre hebergeur ; la page n'ecoute que sur votre machine.\n\n**Console : l'information d'abord** — le message de demarrage annoncait la version installee et l'arrivee d'une nouvelle version sur une seule ligne, trop chargee pour etre lue. Elle est coupee en trois, et indique les deux facons d'appliquer : `update.bat` si vous avez la main sur la machine, l'outil FTP sinon, avec son adresse.\n\n**Builder des laboratoires : creation de templates** — le menu savait lister et modifier des templates, mais aucun bouton n'en creait : la liste ne pouvait que rester vide. Le bouton existe, la fiche s'ouvre en mode creation, et l'identifiant rendu par le serveur est retenu pour que les sauvegardes suivantes modifient la template au lieu d'en creer une copie. Les boutons de points sont grises tant qu'elle n'est pas enregistree, avec le motif affiche.\n\nTrois templates de depart sont creees au premier demarrage, une par interieur que la base charge deja pour les labos — methamphetamine, cannabis et cocaine. Un labo cree depuis l'une d'elles est jouable immediatement. Elles ne sont posees qu'une fois : les supprimer ou les modifier ne les fera pas revenir.\n\n**Version installee** — l'affichage de la version lit desormais la version reellement installee plutot que la derniere disponible en ligne.\n\n**Panneau de marque** — l'acces au panneau de configuration de la marque verifie la permission de gestion, en plus de l'ouverture du hub.\n\nPour appliquer : `update.bat` / `./update.sh`, ou le nouvel outil `ftp-updater`, puis redemarrer le serveur.",
- "added": [
-  "ftp-updater/index.html",
+ "version": "1.12.58",
+ "date": "2026-10-07T16:02:39.498Z",
+ "notes": "**L'outil de mise a jour accessible a distance** — il ne tournait que sur la machine qui le lance, a l'adresse `127.0.0.1`. Affichee dans la console d'un serveur qu'on administre depuis chez soi, cette adresse ne menait nulle part. Au lancement, `LANCER.bat` propose desormais deux modes : sur cette machine uniquement, ou ouvert a l'exterieur et joignable a l'IP du serveur.\n\nOuvrir sur Internet un outil capable de remplacer les fichiers d'un serveur ne se fait pas sans protection : le mode ouvert exige une **cle d'acces**, tiree au hasard a chaque demarrage et comparee a duree constante. Sans elle, page et API repondent 403. L'adresse complete, cle comprise, s'affiche au demarrage. `UPDATER_KEY` permet de la figer si vous preferez une adresse stable. En mode normal, rien ne change : aucune cle, et rien n'est joignable de l'exterieur.\n\n**Console : un lien qui mene quelque part** — le serveur cherche son IP publique une fois au demarrage et compose le lien avec, au lieu d'afficher `127.0.0.1`. S'il ne la trouve pas, il ecrit `http://<ip-du-serveur>:7788` plutot que d'afficher une adresse fausse. `set update_tool_url \"...\"` dans server.cfg prime sur tout, et `set update_tool_lookup \"false\"` desactive la recherche.\n\n**Chaine de connexion collee** — le champ hote accepte ce que votre hebergeur vous donne d'un bloc, par exemple `sftp://utilisateur@machine:2022/dossier` : l'outil en deduit le protocole, le port, l'utilisateur et le dossier. Colle tel quel auparavant, il provoquait une erreur de resolution DNS et le protocole choisi dans la liste ne correspondait plus. Ce que vous avez saisi vous-meme n'est jamais remplace, et le formulaire se remplit apres le test pour que vous voyiez ce qui sera utilise.\n\nPour appliquer : `update.bat` / `./update.sh`, ou l'outil `ftp-updater`, puis redemarrer le serveur.",
+ "added": [],
+ "changed": [
   "ftp-updater/LANCER.bat",
-  "ftp-updater/package.json",
   "ftp-updater/public/index.html",
   "ftp-updater/README.md",
-  "ftp-updater/server.mjs"
- ],
- "changed": [
-  "resources/[core]/core/endernative/server/000_bestdev.lua",
-  "resources/[core]/core/plugins/000_framework/shared/009_variables.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/builderLabo.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_branding.lua",
-  "resources/[core]/core/plugins/015_Features/server/labo/26_181_labo_builder.lua",
+  "ftp-updater/server.mjs",
   "resources/[standalone]/updater/server.lua"
  ],
- "removed": [],
- "total": 292828824,
- "fileCount": 3399
+ "removed": [
+  "ftp-updater/index.html"
+ ],
+ "total": 292824293,
+ "fileCount": 3398
 }
