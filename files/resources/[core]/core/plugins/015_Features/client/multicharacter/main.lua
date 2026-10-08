@@ -22,11 +22,7 @@ end)
 
 ---@param data table
 ---@param slots any
----@param ambience any reglages du hub Gestion (musique, slot VIP)
-RegisterNetEvent("vfw:multicharacter:SetupUI", function(data, slots, ambience)
-    if type(ambience) == "table" and type(VFW.CharCreatorAmbience) == "table" then
-        VFW.CharCreatorAmbience.Put(ambience)
-    end
+RegisterNetEvent("vfw:multicharacter:SetupUI", function(data, slots)
     Multicharacter:SetupUI(data, slots)
 end)
 

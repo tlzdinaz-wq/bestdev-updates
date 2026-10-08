@@ -1,4 +1,4 @@
-#version	1.12.61	2026-10-08T19:03:51.947Z
+#version	1.12.64	2026-10-07T18:29:18.370Z
 #protected	resources/[core]/core/config/**
 #protected	resources/[core]/core/plugins/015_Features/config/**
 #protected	resources/[core]/eve_bridge/config.lua
@@ -1570,7 +1570,7 @@ b4afb3b24640c83a062151ca742466cf5fe664efc96a0f494010a3d97b1935b3	52579	resources
 764ab9514eb337b8279bdd7f3d8d92f22258be3bb11683156370c31def8c36d0	68155	resources/[core]/core/interface/build/assets/gift3-CSGDlv3k.png
 fc82bedb2cda8ea25319b414c5e23dc5a9305be064e03fb076c4706de42768ce	1595561	resources/[core]/core/interface/build/assets/gorgonzola_chunk-4h_eIoVR.png
 1c8538fca84772ef200ca20044e35e9852a2c09753bce5f62912477c1b7798de	677283	resources/[core]/core/interface/build/assets/IdentificationCard-C6WlWpYL.png
-ea9b66f75c2b79ad0a6d902d179cfe13685cfbed89a051ec5c2069c1acd36793	3403093	resources/[core]/core/interface/build/assets/index-CgLoM61l.js
+27a0accab79b87705931de928ac068acda2d0cf71a0779e897d44a42edc4f577	3402967	resources/[core]/core/interface/build/assets/index-CgLoM61l.js
 654d72e2227fe0f5d4016da49b0a6907252611beebae12ea10979ee58a2e386d	2733262	resources/[core]/core/interface/build/assets/index-yMOrF4qJ.css
 725cbfd30ffe6a35164e14a711c352a72fe85f81144431b4fd6950a450a47c83	12456	resources/[core]/core/interface/build/assets/InvoicesPage-B5aLfWUE.css
 ec3b0d373c773c5fb27751758ec540959ab019557ceb413d13bca27f189311ec	11321	resources/[core]/core/interface/build/assets/InvoicesPage-BLQwy2xc.js
@@ -1630,11 +1630,10 @@ c416f68bb99ddbbf1c30b4815565a077d870094483941960eb0e84d79a80214b	140262	resource
 245c3c4b72dff6cafb795e68c65e7a8d761f66f4b46a90b05bdf110b9b0b7f35	174699	resources/[core]/core/interface/build/assets/vendor-react-BnE6Ax5j.js
 32eb418f830cb8b390b9540dd68052cd3ad4ec4cd9ec2c1c372a3290b75a2d45	11441	resources/[core]/core/interface/build/assets/ZonesPage-CqVix_gB.js
 8a337709681248cfcdddcf9ce7809e87537bf5ff32419d144ae6356f0d277796	11400	resources/[core]/core/interface/build/assets/ZonesPage-Szg65o-q.css
-1da0a50180ffc638425c981eaf624a39097875b0689cdef3b6778ec207f24fbc	56124	resources/[core]/core/interface/build/index.html
+84e0fc2166630d4ce9520dfd542ac17960e63f046477f17b520675310f0867d3	55978	resources/[core]/core/interface/build/index.html
 acb95c9767b646fad5f2e4436fd38e8ef86d819925b4c702832b9fd3f71b1958	1294	resources/[core]/core/interface/build/skin/boss-panel-bridge.js
 f4e7a2b82d939435e3c71ddab11564ed81d1d0bddb667a0c395e0ac1e794f47e	29488	resources/[core]/core/interface/build/skin/boss-panel.css
 972d0e41f9743ed5fe61d80058c31100c02585649a536e99c911647beec1f7fa	27930	resources/[core]/core/interface/build/skin/char-creator.css
-89ec6827fcb54d9fc09a322e747465ce32cd489a43c87f3b90155656732ae99e	1049	resources/[core]/core/interface/build/skin/char-music.js
 e555a827fd47ef6f983df4917dfb181359f4b3354548be4722a05860c078427c	20985	resources/[core]/core/interface/build/skin/clothing-shop.css
 cacb0bffce019953255e94b801e3872d8833c2023b8a272fc37f982294e6b3e6	9521	resources/[core]/core/interface/build/skin/notifications.css
 846238a4c76d70987bbba6b26c7ae775d22b47eb3ccacf201d9162cd2449fb9b	9241	resources/[core]/core/interface/build/skin/nui-fallbacks.css
@@ -1650,8 +1649,8 @@ cdbbc5610960ad2f9af1e2dae306f7cf932461738157dbfb02063060215efc17	669	resources/[
 4bad657ad6d6a912833a3bc24850c675987a1d8cf270c531d849be76926ba759	2112	resources/[core]/core/interface/gasstation/index.html
 8f7ad5cfdd4f09d52b35dc0beef96d2e289fa3c7c262302532908e5eea718e76	2649	resources/[core]/core/interface/gasstation/script.js
 bf733b5fee78d6b9630fee52a16fc932299774819150c27b22731483c84dd8e9	1917	resources/[core]/core/interface/gasstation/styles.css
-6021f9cce06ef60e125e98859635d260006026c417a7bc7d7b754fd81ae27dd4	787827	resources/[core]/core/interface/gestion/assets/index.js
-7f288ae83fda19202cf4369ca50b992d1eeb7eb91ac657f78e75d4588aa3bc7d	49737	resources/[core]/core/interface/gestion/assets/style.css
+0089e25589fbfff8380db8153c926744bdad21958c9d428d3f5023d47243754c	781395	resources/[core]/core/interface/gestion/assets/index.js
+12bfe80b878d0f24376a6839d0099a0f1d7a1389c14f027dbeb779812adbb486	48696	resources/[core]/core/interface/gestion/assets/style.css
 911561e2d876caac8552cb69b66386cecc54adca2fc116da2d01557e1b8c4f5a	1626	resources/[core]/core/interface/gestion/assets/uilayout.css
 4402b24128cb85057cad8a48945ca9ddd81c7883f728c8d6149a8a5302f4e966	3378	resources/[core]/core/interface/gestion/assets/uilayout.js
 2316d45abb0e3740f852c4fe3c3b298840ee1f7ce2c9a2343222680bd46011d1	1029026	resources/[core]/core/interface/gestion/gta-sat.jpg
@@ -2087,7 +2086,7 @@ c037ce5f440d1591d9d3c00bfcecf5a95ba31bb62417d600321e852cd6590f26	11303	resources
 b5bbc8e4fe88241567b7ea260357a6330f4ccf898aad68dbc3967c4098cb96ab	2276	resources/[core]/core/plugins/015_Features/client/cayo_island.lua
 66a23b4f0441dc84adfbaa1081cfab992541cce1d08e2fd72d9150aa684ac8d4	57184	resources/[core]/core/plugins/015_Features/client/CBoutique.lua
 42881845b32020bc078932f4f11e3005aac6536c97d593b82845729b171b78fb	5866	resources/[core]/core/plugins/015_Features/client/chameleon/cl_chameleon.lua
-ff97c12d3b61b2f86ef3dba6fc9af8ae0625725a3130c2315916d4edcc362f07	106993	resources/[core]/core/plugins/015_Features/client/char_creator.lua
+11748ba35daf933c745ce19c4100f9efd714476125d49b35228062b2df9825a0	106731	resources/[core]/core/plugins/015_Features/client/char_creator.lua
 110419be463846575de25e2a13625655ce5560c4ccb96486a6244754c76c7af9	1962	resources/[core]/core/plugins/015_Features/client/chestBuilder/event.lua
 2bfa2a3e2be409fdc37dc1b221c70f45d89dd508bb9510a8af0ae8b7ed3e5e05	9260	resources/[core]/core/plugins/015_Features/client/chestBuilder/function.lua
 f98af02b709dfd4e7838b759559578144410746b35e0d8224b18f3b2af916b44	2614	resources/[core]/core/plugins/015_Features/client/chestBuilder/zone.lua
@@ -2264,9 +2263,8 @@ f6a28ec8314b457aa6b5098497e6ee5abd543a28351b638c6e21153758ba28a4	26678	resources
 490afb5d826689a3764a11b68293690a2f599e8dbd541087c68057d4da92109c	116586	resources/[core]/core/plugins/015_Features/client/menuf5.lua
 685241327026031250303ba1a43bcc035a3c967fe1d3f7685d6edf017daea942	3206	resources/[core]/core/plugins/015_Features/client/meteo.lua
 9efff3b0c5825199d2a793bbece5ef25a32a94cc941cd6527fdffdd9521721f4	21778	resources/[core]/core/plugins/015_Features/client/motel/cl_motel.lua
-8ab5def906579219a6d993d8a5c35d1cc12240dce269be23eee1752e9740cf81	2916	resources/[core]/core/plugins/015_Features/client/multicharacter/charcreator_ambience.lua
-1221a5a3dc33138d53b8f6feed52e4da2c63d2a66ebe3d8dabfee60725088bb7	2235	resources/[core]/core/plugins/015_Features/client/multicharacter/main.lua
-8a2c018edc47406249bfe81f5fa21919f0461fbc00c67250cb344f4eb5ff1a94	19690	resources/[core]/core/plugins/015_Features/client/multicharacter/modules/multicharacter.lua
+09a39ad8d6d96cb722d694fbcfec6876f68b0e331083dfc40bbc154fa21cb432	2017	resources/[core]/core/plugins/015_Features/client/multicharacter/main.lua
+8a025dd7011d127f5fac652fe0a43f6354f5af8182990142c2882adcaaa501af	19036	resources/[core]/core/plugins/015_Features/client/multicharacter/modules/multicharacter.lua
 fedad86fc66584e8724077d8c8321319e28c4583b63d4e1d959906cdc1fc2d08	4436	resources/[core]/core/plugins/015_Features/client/native_pausemenu.lua
 d906be72e0ec73fa73a8bb4dc357ae7ad5c75e1c94576ac3240feaec3885eb95	29368	resources/[core]/core/plugins/015_Features/client/newRadio/main.lua
 aee7f64c2393f60e35735cdd3c66d7acc00dac404f4ee7f2b7bda86e12368f88	1925	resources/[core]/core/plugins/015_Features/client/nui_callbacks.lua
@@ -2432,7 +2430,6 @@ a9f8b95ee9f612a7e00a317dce608c6515ce6c09b6e9424c0c585a47d3410269	20881	resources
 10069302735ce0770fd7c3c1b8e0fa982637c95a4d4e9cdfcd04132fb72677d6	4809	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_afk.lua
 27ec452502b0148cffb40c4bc37fef51aa8ef9306244c215eed7f7c31e22aa9a	3123	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_blackmarket.lua
 e8601accd3dc345e26ad396e48f443c103080f9e4f75e13dded58d7f1987234c	1714	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_branding.lua
-79b9ca2f7b298c8237ba928dcdf443f78dbd0430bb2810b9d7ebe28ec8258882	1548	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_charcreator.lua
 762d0cbb1a4e9918eb49bf0d43865d8d27f2459e802f91a1e873070b1802b060	65667	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_dev.lua
 25d5db1b439f71e17ee428140e751e64ed3af6e4fbbfc67cce7634a17388d7c0	1452	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_doj.lua
 c41cb0a22c7d886f86377fd09fb7adade671fef906ec86a5d4b4c8d290752c36	2452	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_drug_dealing.lua
@@ -2441,7 +2438,7 @@ a0665516f5516bff10642082c7b7b1a9a19fee8d421651033259fd3173ebac21	5222	resources/
 8ab81c00bccd8a60cfe0df04807ea4e4512e6014dfe0b7cb31c405081f4dca6f	8774	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_factions.lua
 0bba27550ddd81a2a4297643217917c73f26436b4dc7b4b5587d9c6ab3e36574	2547	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_fines.lua
 5a390a9cfe77e74e80aa2a4fa0cae136c408480f7b2ff97ce1fb61971d6e4b4f	3452	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_gofast.lua
-4331db3f776c268fffa191770dfe40db6b5c0162a3e4660650e07e71d32d52c7	28599	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_hub.lua
+48e44ad2f28eb349685130e5e6ace735f4918a7e2e5d0fbc31d1e4a0c4b75819	28437	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_hub.lua
 57540928a038bd0e269809fbb42a0a2f4c4f13bc4f238ba09719a09dd830e3b5	4352	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_illegal_craft.lua
 d4a5e5ac1614b7b368291e018a3b3f7e5631bb1179a59c37720285aa8e1d8b91	4188	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_illegal_garages.lua
 07430974ea5f85f780f7c3a39a5b97f8d95cf44da9b919e6907424f5117532a1	4140	resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_images.lua
@@ -2780,7 +2777,7 @@ faa1594a55967cedf2b76e13caba08cd4547970bb76bbe6ddb3b1cb8fb795ba0	44437	resources
 06103342be8d8de9b5f741d3162e0e198bf1e1ffd21d904ea7086cc7c81a46dd	14224	resources/[core]/core/plugins/015_Features/server/misc_b/34_17_police_alert_zones.lua
 31d0708cc6c0e83a40989a9953e2346a174a45666f3f8433ec2e10d28c803e67	8421	resources/[core]/core/plugins/015_Features/server/misc_b/34_18_police_fine_types.lua
 174e958379965a5619c14fcacc68f5aa2c7637099c348c5eccf3e62e25622e93	7303	resources/[core]/core/plugins/015_Features/server/misc_b/34_19_doj_staff.lua
-fbb94186c742205b1cf470859d05d50e3b150384829a160150f016425d74dbd9	22143	resources/[core]/core/plugins/015_Features/server/multicharacter.lua
+452bdf58d395d7694371fa638941b27248420f3281d8c2bc5e5b57a1ff7cebe1	21228	resources/[core]/core/plugins/015_Features/server/multicharacter.lua
 5bef04aba12c104988518d0ce8a491106364e26c663114ada3398c56c108fd6b	11541	resources/[core]/core/plugins/015_Features/server/paidshop/270_core.lua
 2d6f2b105f91ffefaed4ea05a43dabb43c53812dd67d6153feb514535f2d63e5	12570	resources/[core]/core/plugins/015_Features/server/paidshop/271_purchase.lua
 dbab7983b02ccb54fec988b1879c163be53df5a5521157a6040a6ac75836be12	10161	resources/[core]/core/plugins/015_Features/server/paidshop/272_admin.lua
@@ -2834,7 +2831,6 @@ d020e84dd998dc51c57f370276ccefa326da76bef946a45f3f3c60f787a927e7	3437	resources/
 b08962a8f017eabd2c2b3ed1b8ade73770942cb35547e0a58e55092439ef589e	2546	resources/[core]/core/plugins/015_Features/server/staff/315_doorlock_editor.lua
 3f789f724e066ce7148bdaa3c2a3392d7386093e0650a5d1c2d4b45fc1c427b3	9159	resources/[core]/core/plugins/015_Features/server/staff/316_safe_zones.lua
 177d844447124864f737835be5fc40df4748712cdace0c6e0a08c53452e74137	17215	resources/[core]/core/plugins/015_Features/server/staff/317_job_armory_builder.lua
-955450423a920c123972c7adbaf035b19b74eebb9e3b67e53e6f35067e17a0f3	5229	resources/[core]/core/plugins/015_Features/server/staff/318_gestion_charcreator.lua
 7ea1af3a66dcd5dcb7608213558cd7ebe785bace97ab683e08e550e49ccd89cf	3956	resources/[core]/core/plugins/015_Features/server/vehicle_lock.lua
 1db5967c9050b41c19db62eeeebaedac3f79ce28c84e73833c9cd3b4bd1d65ce	218	resources/[core]/core/plugins/015_Features/shared/afk_config.lua
 f3f28216713ed5ad575bc2a38b99baedf423fc48dde959f2eb825d6dd1853c11	80	resources/[core]/core/plugins/015_Features/shared/airsoft.lua
@@ -3019,7 +3015,7 @@ ae35657b6228fc440b278c976c3efa91631c75635eae4aacafb48a3c030c4965	14445	resources
 703a8cabd3d8ad7b97cbb7c4d168be2765511d44c7192313cd81680348f653e9	4090	resources/[core]/VUI/web/dist/assets/icons/trash.webp
 194c608f5c2bf6ebf488b42602acfc9b7927cb9bc07b90cdf7b8408787a49ee1	34170	resources/[core]/VUI/web/dist/assets/index-481858d4.css
 a2dbb2d79dfe91a1ac017ba31404a9d972a7f6a33317fddcb8c724f349586105	206762	resources/[core]/VUI/web/dist/assets/index-4ce6745c.js
-67ca1f23aa3f7dadeb7d3f255db2839c236ecdb72d72b134136851a16a0bf614	14038	resources/[core]/VUI/web/dist/assets/skin.css
+bffcafb81bf24c27945ff557a1e73b24bda94cd20433ec4371062f8df0a3de3e	14062	resources/[core]/VUI/web/dist/assets/skin.css
 361e0fdfa89861726adcf49038821af2410361a54819ac22fdaed14bd5afd165	9302	resources/[core]/VUI/web/dist/assets/sounds/click.mp3
 1ab7d7f7634431275a342dc6f69e490aaa448d5c0864f665954fa7e9dfb879d4	4914	resources/[core]/VUI/web/dist/assets/sounds/hover.mp3
 bc56775573cc5dd0fa8123a829b5b57f5cf1d8a6993a57fd0823f6fa9b6369eb	42768	resources/[core]/VUI/web/dist/assets/sounds/notification.mp3

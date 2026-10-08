@@ -8,23 +8,8 @@ local MULTICHAR_BUCKET <const> = 50000
 
 local pendingSlot = {}
 
---- Nombre de slots offerts a ce compte.
----
---- Les slots accordes a la main (/setslots) priment. Sinon on suit le reglage du hub
---- Gestion, qui pilote aussi le nombre de cases affichees a l ecran : les deux doivent
---- concorder, sans quoi un personnage existe sans case ou l inverse.
 local function getSlots(account)
-    local granted = tonumber(account.slots)
-    if granted then return granted end
-
-    if type(VFW.CharCreatorSettings) == "function" then
-        local settings = VFW.CharCreatorSettings()
-        if type(settings) == "table" and tonumber(settings.slots) then
-            return tonumber(settings.slots)
-        end
-    end
-
-    return Config.Multicharacter.Slots
+    return tonumber(account.slots) or Config.Multicharacter.Slots
 end
 
 local function buildSelectionEntry(row)
@@ -95,12 +80,7 @@ local function sendSelection(source)
         characters[i] = buildSelectionEntry(rows[i])
     end
 
-    -- Les reglages de l ecran partent avec les personnages : un aller-retour de callback
-    -- au moment de la connexion retarderait l affichage de l ecran de plusieurs secondes
-    -- si le serveur est charge.
-    local ambience = type(VFW.CharCreatorSettings) == "function" and VFW.CharCreatorSettings() or nil
-
-    TriggerClientEvent("vfw:multicharacter:SetupUI", source, characters, getSlots(account), ambience)
+    TriggerClientEvent("vfw:multicharacter:SetupUI", source, characters, getSlots(account))
 end
 
 -- Identifiant archivé d'un personnage supprimé : « w<id>:license:<hash> » (≤ 64 caractères),

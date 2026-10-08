@@ -357,12 +357,6 @@ function Multicharacter:SetupUI(characters, slots)
     self.slots = slots
     self.inSelection = true
 
-    -- L ambiance couvre la selection ET le createur : elle s arrete au spawn, pas au
-    -- changement d ecran.
-    if type(VFW.CharCreatorAmbience) == "table" then
-        VFW.CharCreatorAmbience.Start()
-    end
-
     local Character = next(self.Characters)
 
     NetworkOverrideClockTime(23, 0, 0)
@@ -398,8 +392,6 @@ function Multicharacter:SetupUI(characters, slots)
             }
         end
         
-        local ambience = type(VFW.CharCreatorAmbience) == "table" and VFW.CharCreatorAmbience.Get() or nil
-
         local tier = tonumber(VFW.PlayerGlobalData and VFW.PlayerGlobalData.vip_tier) or 0
         local perms = (VFW.PlayerGlobalData and VFW.PlayerGlobalData.permissions) or {}
         local isVip = tier >= 1 or perms["vip_bronze"] or perms["vip_silver"] or perms["vip_gold"] or false
@@ -418,10 +410,6 @@ function Multicharacter:SetupUI(characters, slots)
             uniqueId = uniqueId,
             vipTierLabel = vipTierLabel,
             brandName = (VFW.BrandName and VFW.BrandName()) or (BRANDING and BRANDING.name) or "",
-            -- Nombre de cases et premier slot VIP : regles dans le hub Gestion, l ecran
-            -- n en decide plus lui-meme.
-            slots = self.slots,
-            vipSlotFrom = ambience and ambience.vipSlotFrom or nil,
         })
     end
 
@@ -585,9 +573,6 @@ RegisterNuiCallback("multicharacter:PlayerSelected", function(id)
     VFW.Cam:Destroy("multichar")
     -- ClearFocus() moved to after spawn completes in VFW.SpawnPlayer
     Multicharacter:Cleanup()
-    if type(VFW.CharCreatorAmbience) == "table" then
-        VFW.CharCreatorAmbience.Stop()
-    end
     TriggerServerEvent("vfw:multicharacter:CharacterChosen", charId, false)
 
 end)

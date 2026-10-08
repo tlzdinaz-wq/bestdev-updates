@@ -71,7 +71,6 @@ local directCategories = {
         items = {
             { label = "Configuration serveur", desc = "Nom, Discord, et une couleur qui change toute la charte", icon = "palette", opens = "branding" },
             { label = "Loading screen", desc = "Vidéo ou image de fond, musique d’attente — visible à la connexion", icon = "film", opens = "loadingscreen" },
-            { label = "Création de personnage", desc = "Musique de l’écran, nombre de slots, slot VIP, suppression", icon = "users", opens = "charcreator" },
             { label = "Positions des interfaces", desc = "Déplacer HUD, menus et minimap pour tous les joueurs (comme F5)", icon = "settings", action = "hud_layout_server" },
             { label = "Tablette météo", desc = "Zones météo autour de toi ou sur la carte", icon = "globe", perm = "server_management", action = "weather_tablet", opens = "weather" },
             { label = "Météo, heure et stats", desc = "Heure, gel du temps, statistiques serveur", icon = "clock", perm = "server_management", action = "server_panel", opens = "server" },

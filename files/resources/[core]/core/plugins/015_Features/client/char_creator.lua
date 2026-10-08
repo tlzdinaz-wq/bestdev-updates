@@ -873,12 +873,6 @@ end
 local function SpawnPlayerCharCreator(spawnPoint)
     local playerPed = PlayerPedId()
 
-    -- Fin du parcours selection -> creation : l ambiance s arrete ici, pas au
-    -- changement d ecran, pour ne pas se couper entre les deux interfaces.
-    if type(VFW.CharCreatorAmbience) == "table" then
-        VFW.CharCreatorAmbience.Stop()
-    end
-
     if VFW.Cam:Get("cam_creator") then
         VFW.Cam:Destroy("cam_creator")
     end
