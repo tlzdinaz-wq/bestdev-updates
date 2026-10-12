@@ -24,7 +24,7 @@ local function meatPrices()
     local items = huntingConfig().items or {}
     for _, entry in pairs(items) do
         if type(entry) == "table" and entry.name then
-            out[entry.name] = tonumber(entry.price) or 0
+            out[entry.name] = LegalActivities.Price("hunting", entry.name, entry.price)
         end
     end
     return out

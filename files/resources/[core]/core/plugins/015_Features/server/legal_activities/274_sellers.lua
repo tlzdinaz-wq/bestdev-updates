@@ -18,7 +18,7 @@ local function buildShopData(xPlayer, activityName)
             name = entry.name,
             label = Feat27.Inv.Label(entry.name),
             count = Feat27.Inv.Count(xPlayer, entry.name),
-            price = tonumber(entry.price) or 0,
+            price = LegalActivities.Price(activityName, entry.name, entry.price),
             category = entry.category or activityName,
             image = Feat27.Inv.Image(entry.name),
         }

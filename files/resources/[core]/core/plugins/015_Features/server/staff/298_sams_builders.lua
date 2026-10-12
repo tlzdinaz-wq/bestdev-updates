@@ -1,3 +1,62 @@
+-- Hopitaux et pharmacies : tables, creation et synchronisation.
+--
+-- Les tables viennent d'avrex.sql, qui n'est importe qu'a l'installation et ne part
+-- jamais avec les mises a jour. Une base montee avant leur ajout ne les a donc pas, et
+-- comme Staff29 avale les erreurs SQL dans un simple avertissement console, le batisseur
+-- voyait sa creation disparaitre sans un mot : ni blip, ni point au sol, ni ligne dans la
+-- liste. On les cree ici au demarrage, comme le font deja les autres modules de la base.
+--
+-- Les schemas reprennent avrex.sql au caractere pres : sur une base deja correcte, ces
+-- requetes ne font rien.
+local function ensureTables()
+    Staff29.Query([[
+        CREATE TABLE IF NOT EXISTS `sams_hospitals` (
+            `id`           INT(11)      NOT NULL AUTO_INCREMENT,
+            `name`         VARCHAR(100) NOT NULL,
+            `pos`          LONGTEXT     DEFAULT NULL,
+            `active`       TINYINT(1)   NOT NULL DEFAULT 1,
+            `blip_enabled` TINYINT(1)   NOT NULL DEFAULT 1,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ]], {})
+
+    Staff29.Query([[
+        CREATE TABLE IF NOT EXISTS `sams_hospital_spawns` (
+            `id`          INT(11)  NOT NULL AUTO_INCREMENT,
+            `hospital_id` INT(11)  NOT NULL,
+            `pos`         LONGTEXT DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            KEY `idx_sams_hospital_spawns` (`hospital_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ]], {})
+
+    Staff29.Query([[
+        CREATE TABLE IF NOT EXISTS `sams_pharmacies` (
+            `id`           INT(11)      NOT NULL AUTO_INCREMENT,
+            `name`         VARCHAR(100) NOT NULL,
+            `pos`          LONGTEXT     DEFAULT NULL,
+            `npc_pos`      LONGTEXT     DEFAULT NULL,
+            `active`       TINYINT(1)   NOT NULL DEFAULT 1,
+            `blip_enabled` TINYINT(1)   NOT NULL DEFAULT 1,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ]], {})
+
+    Staff29.Query([[
+        CREATE TABLE IF NOT EXISTS `sams_pharmacy_items` (
+            `id`           INT(11)      NOT NULL AUTO_INCREMENT,
+            `name`         VARCHAR(64)  NOT NULL,
+            `label`        VARCHAR(100) DEFAULT NULL,
+            `price`        INT(11)      NOT NULL DEFAULT 0,
+            `is_sams_item` TINYINT(1)   NOT NULL DEFAULT 0,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uk_sams_pharmacy_items` (`name`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ]], {})
+end
+
+CreateThread(ensureTables)
+
 local function hospitalRows()
     return Staff29.Query("SELECT id, name, pos, active, blip_enabled FROM sams_hospitals ORDER BY id ASC")
 end
@@ -12,8 +71,8 @@ local function hospitalArray()
             id = row.id,
             name = row.name or "",
             pos = Staff29.Decode(row.pos, { x = 0.0, y = 0.0, z = 0.0, h = 0.0 }),
-            active = row.active == 1,
-            blipEnabled = row.blip_enabled == 1,
+            active = Staff29.Bool(row.active),
+            blipEnabled = Staff29.Bool(row.blip_enabled),
         }
     end
     return out
@@ -49,8 +108,8 @@ local function pharmacyArray()
             name = row.name or "",
             pos = Staff29.Decode(row.pos, { x = 0.0, y = 0.0, z = 0.0 }),
             npcPos = Staff29.Decode(row.npc_pos, { x = 0.0, y = 0.0, z = 0.0, h = 0.0 }),
-            active = row.active == 1,
-            blipEnabled = row.blip_enabled == 1,
+            active = Staff29.Bool(row.active),
+            blipEnabled = Staff29.Bool(row.blip_enabled),
         }
     end
     return out
@@ -87,7 +146,7 @@ local function pharmacyItems()
             name = row.name,
             label = row.label or (item and item.label) or row.name,
             price = tonumber(row.price) or 0,
-            isSamsItem = row.is_sams_item == 1,
+            isSamsItem = Staff29.Bool(row.is_sams_item),
         }
     end
     return out
@@ -127,11 +186,20 @@ RegisterNetEvent("sn_sams:hospital:create", function(data)
     local pos = Staff29.IsTable(data.pos) and data.pos or nil
     if not pos then return end
 
-    Staff29.Insert([[
+    local id = Staff29.Insert([[
         INSERT INTO sams_hospitals (name, pos, active, blip_enabled) VALUES (?, ?, ?, ?)
     ]], { name, Staff29.Encode(pos), data.active ~= false and 1 or 0, data.blipEnabled ~= false and 1 or 0 })
 
+    -- Sans retour, une ecriture refusee laissait le batisseur devant une carte vide sans
+    -- savoir pourquoi : il faut le dire.
+    if not id then
+        Staff29.Notify(source, "ERROR", "Builder",
+            "Hopital non enregistre : la base de donnees a refuse l ecriture. Voir la console serveur.")
+        return
+    end
+
     syncHospitals()
+    Staff29.Notify(source, "SUCCESS", "Builder", ("Hopital « %s » cree."):format(name))
 end)
 
 RegisterNetEvent("sn_sams:hospital:update", function(hospitalId, field, value)
@@ -222,12 +290,19 @@ RegisterNetEvent("sn_sams:pharmacy:create", function(shopData)
     local name = Staff29.Clean(shopData.name, 80) or "Pharmacie"
     if not Staff29.IsTable(shopData.pos) then return end
 
-    Staff29.Insert([[
+    local id = Staff29.Insert([[
         INSERT INTO sams_pharmacies (name, pos, npc_pos, active, blip_enabled) VALUES (?, ?, ?, ?, ?)
     ]], { name, Staff29.Encode(shopData.pos), Staff29.Encode(shopData.npcPos or shopData.pos),
           shopData.active ~= false and 1 or 0, shopData.blipEnabled ~= false and 1 or 0 })
 
+    if not id then
+        Staff29.Notify(source, "ERROR", "Builder",
+            "Pharmacie non enregistree : la base de donnees a refuse l ecriture. Voir la console serveur.")
+        return
+    end
+
     syncPharmacies()
+    Staff29.Notify(source, "SUCCESS", "Builder", ("Pharmacie « %s » creee."):format(name))
 end)
 
 RegisterNetEvent("sn_sams:pharmacy:update", function(shopId, field, value)

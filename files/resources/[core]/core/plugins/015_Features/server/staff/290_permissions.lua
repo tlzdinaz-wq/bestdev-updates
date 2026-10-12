@@ -41,6 +41,16 @@ function Staff29.Encode(value)
     return VFW.DB.Encode(value)
 end
 
+--- Lit une colonne booleenne de MySQL.
+---
+--- Un TINYINT(1) revient tantot en nombre, tantot en booleen selon la version d'oxmysql.
+--- Comparer a 1 tout court rend donc false sur la moitie des installations : c'est ce qui
+--- faisait disparaitre les blips d'hopitaux et de pharmacies, lus comme inactifs alors que
+--- la ligne etait bien en base.
+function Staff29.Bool(value)
+    return value == true or value == 1 or value == "1"
+end
+
 function Staff29.IsNumber(value)
     return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
 end

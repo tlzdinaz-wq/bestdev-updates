@@ -12,7 +12,8 @@ local function fishPrices()
     local out = {}
     local list = fishes()
     for i = 1, #list do
-        out[list[i].name] = tonumber(list[i].price) or 0
+        -- Le prix regle depuis le builder prime sur celui du fichier de config.
+        out[list[i].name] = LegalActivities.Price("fishing", list[i].name, list[i].price)
     end
     return out
 end
@@ -116,7 +117,7 @@ RegisterServerCallback("core:legal_activities:fishing:getMyFishes", function(sou
             name = name,
             label = Feat27.Inv.Label(name),
             count = Feat27.Inv.Count(xPlayer, name),
-            price = tonumber(list[i].price) or 0,
+            price = LegalActivities.Price("fishing", name, list[i].price),
             image = Feat27.Inv.Image(name),
         }
     end

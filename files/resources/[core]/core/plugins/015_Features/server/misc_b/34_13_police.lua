@@ -910,9 +910,43 @@ end)
 
 local cameras = nil
 
+-- Le modele de la camera n'existait que cote client : la colonne manquait, et le prop
+-- choisi dans le builder etait perdu des le rechargement. On l'ajoute si besoin.
+local function ensureCameraModelColumn()
+    local exists = MiscB.Query([[
+        SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'police_cameras' AND COLUMN_NAME = 'prop_model'
+    ]], {})
+
+    if type(exists) == "table" and #exists > 0 then return end
+
+    MiscB.Query("ALTER TABLE police_cameras ADD COLUMN `prop_model` VARCHAR(64) DEFAULT NULL", {})
+end
+
+CreateThread(ensureCameraModelColumn)
+
+--- Qui peut poser, deplacer ou retirer une camera.
+---
+--- L'ancienne regle exigeait d'etre policier ET patron. Le menu staff « Cameras police »
+--- est pourtant garde par sa propre permission : un administrateur qui n'est pas en service
+--- police voyait la camera se poser a l'ecran puis disparaitre, sans message.
+local function cameraBuilder(source)
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not xPlayer then return nil end
+
+    if xPlayer.hasPermission("builder_cameras")
+        or xPlayer.hasPermission("dev")
+        or xPlayer.hasPermission("admin") then
+        return xPlayer
+    end
+
+    if MiscB.IsLawEnforcement(xPlayer) and MiscB.IsBoss(xPlayer) then return xPlayer end
+    return nil
+end
+
 local function loadCameras()
     if cameras then return cameras end
-    cameras = MiscB.Query("SELECT id, label, x, y, z, rx, ry, rz, job_name FROM police_cameras", {})
+    cameras = MiscB.Query("SELECT id, label, x, y, z, rx, ry, rz, job_name, prop_model FROM police_cameras", {})
     return cameras
 end
 
@@ -929,34 +963,71 @@ MiscB.Cb("police:getCameraCount", function(source)
 end)
 
 MiscB.Cb("police:placeCamera", function(source, data)
-    local xPlayer = officer(source)
-    if not xPlayer or not MiscB.IsBoss(xPlayer) then return { success = false } end
+    local xPlayer = cameraBuilder(source)
+    if not xPlayer then return { success = false, error = "Permission refusee." } end
     if type(data) ~= "table" then return { success = false } end
 
+    -- Jamais nil : un nil en fin de tableau de parametres tronque la liste et la requete
+    -- part avec un argument de moins.
+    local propModel = MiscB.Str(data.prop_model or data.model, 64) or "prop_cctv_cam_01a"
+
+    -- Le client envoie le nom sous `name` ; `label` n'arrivait jamais et toutes les
+    -- cameras s'appelaient « Camera ».
+    local label = MiscB.Str(data.label or data.name, 96) or "Camera"
+
     local id = MiscB.Insert([[
-        INSERT INTO police_cameras (label, x, y, z, rx, ry, rz, job_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO police_cameras (label, x, y, z, rx, ry, rz, job_name, prop_model)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ]], {
-        MiscB.Str(data.label, 96) or "Camera",
+        label,
         MiscB.ToNum(data.x, 0.0), MiscB.ToNum(data.y, 0.0), MiscB.ToNum(data.z, 0.0),
         MiscB.ToNum(data.rx, 0.0), MiscB.ToNum(data.ry, 0.0), MiscB.ToNum(data.rz, 0.0),
         MiscB.JobName(xPlayer) or "",
+        propModel,
     })
-    if not id then return { success = false } end
+    if not id then return { success = false, error = "Enregistrement refuse par la base." } end
 
     cameras = nil
     TriggerClientEvent("police:cameras:spawn", -1, {
         id = id,
-        label = MiscB.Str(data.label, 96) or "Camera",
+        label = label,
         x = MiscB.ToNum(data.x, 0.0), y = MiscB.ToNum(data.y, 0.0), z = MiscB.ToNum(data.z, 0.0),
         rx = MiscB.ToNum(data.rx, 0.0), ry = MiscB.ToNum(data.ry, 0.0), rz = MiscB.ToNum(data.rz, 0.0),
+        prop_model = propModel,
     })
     return { success = true, id = id }
 end)
 
+-- Le builder proposait six modeles de camera et appelait ce point d'entree pour
+-- enregistrer le choix. Il n'avait jamais ete ecrit : le menu attendait la reponse puis
+-- affichait « Erreur », et la camera reprenait son prop d'origine au rechargement.
+MiscB.Cb("police:updateCameraModel", function(source, data)
+    local xPlayer = cameraBuilder(source)
+    if not xPlayer then return { success = false, message = "Permission refusee." } end
+    if type(data) ~= "table" then return { success = false, message = "Donnees invalides." } end
+
+    local id = MiscB.ToInt(data.id, 1)
+    local propModel = MiscB.Str(data.prop_model, 64)
+    if not id or not propModel then return { success = false, message = "Donnees invalides." } end
+
+    MiscB.Update("UPDATE police_cameras SET prop_model = ? WHERE id = ?", { propModel, id })
+    cameras = nil
+
+    -- Aucun handler client pour un « modele change » : on retire puis on repose, avec les
+    -- deux evenements qui existent deja, pour que tous les joueurs voient le nouveau prop.
+    local row = MiscB.Query(
+        "SELECT id, label, x, y, z, rx, ry, rz, prop_model FROM police_cameras WHERE id = ?", { id })[1]
+    if row then
+        TriggerClientEvent("police:cameras:remove", -1, id)
+        TriggerClientEvent("police:cameras:spawn", -1, row)
+    end
+
+    return { success = true }
+end)
+
 MiscB.Cb("police:deleteCamera", function(source, data)
-    local xPlayer = officer(source)
-    if not xPlayer or not MiscB.IsBoss(xPlayer) then return { success = false } end
+    local xPlayer = cameraBuilder(source)
+    if not xPlayer then return { success = false, error = "Permission refusee." } end
 
     local id = type(data) == "table" and MiscB.ToInt(data.id or data.cameraId, 1) or MiscB.ToInt(data, 1)
     if not id then return { success = false } end

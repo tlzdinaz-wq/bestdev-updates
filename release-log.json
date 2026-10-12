@@ -1,26 +1,24 @@
 {
- "version": "1.12.65",
- "date": "2026-10-08T19:05:10.791Z",
- "notes": "Hub Gestion > Serveur > Creation de personnage : musique de l ecran (continue de la selection jusqu a l entree en jeu), nombre de slots et premier slot VIP reglables.",
+ "version": "1.12.66",
+ "date": "2026-10-12T16:37:47.338Z",
+ "notes": "Sirenes et gyrophares enfin fonctionnels, pharmacies et hopitaux visibles apres creation, cameras posables depuis le menu staff, activites legales entierement pilotables, PNJ go fast au bon niveau, tenues ajoutables aux vestiaires d entreprise.",
  "added": [
-  "resources/[core]/core/interface/build/skin/char-music.js",
-  "resources/[core]/core/plugins/015_Features/client/multicharacter/charcreator_ambience.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_charcreator.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/318_gestion_charcreator.lua"
+  "resources/[core]/core/plugins/000_framework/client/002_vehicle_state.lua",
+  "resources/[core]/core/plugins/015_Features/server/legal_activities/275_builder_endpoints.lua",
+  "resources/[core]/core/plugins/015_Features/server/vehicle/26_200_sirens.lua"
  ],
  "changed": [
-  "resources/[core]/core/interface/build/assets/index-CgLoM61l.js",
-  "resources/[core]/core/interface/build/index.html",
-  "resources/[core]/core/interface/gestion/assets/index.js",
-  "resources/[core]/core/interface/gestion/assets/style.css",
-  "resources/[core]/core/plugins/015_Features/client/char_creator.lua",
-  "resources/[core]/core/plugins/015_Features/client/multicharacter/main.lua",
-  "resources/[core]/core/plugins/015_Features/client/multicharacter/modules/multicharacter.lua",
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/gestion_hub.lua",
-  "resources/[core]/core/plugins/015_Features/server/multicharacter.lua",
-  "resources/[core]/VUI/web/dist/assets/skin.css"
+  "resources/[core]/core/modules/lockers/client/_main.lua",
+  "resources/[core]/core/plugins/015_Features/fl_illegal/client/gofast/cl_gofast.lua",
+  "resources/[core]/core/plugins/015_Features/server/legal_activities/270_sellers_config.lua",
+  "resources/[core]/core/plugins/015_Features/server/legal_activities/272_fishing.lua",
+  "resources/[core]/core/plugins/015_Features/server/legal_activities/273_hunting.lua",
+  "resources/[core]/core/plugins/015_Features/server/legal_activities/274_sellers.lua",
+  "resources/[core]/core/plugins/015_Features/server/misc_b/34_13_police.lua",
+  "resources/[core]/core/plugins/015_Features/server/staff/290_permissions.lua",
+  "resources/[core]/core/plugins/015_Features/server/staff/298_sams_builders.lua"
  ],
  "removed": [],
- "total": 294932177,
- "fileCount": 3795
+ "total": 294953913,
+ "fileCount": 3798
 }

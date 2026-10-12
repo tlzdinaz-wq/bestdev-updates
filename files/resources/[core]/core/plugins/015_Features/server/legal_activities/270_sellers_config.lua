@@ -43,7 +43,13 @@ function LegalActivities.LoadSellers()
 
     local out = {}
     for i = 1, #LegalActivities.Activities do
-        out[LegalActivities.Activities[i]] = { sellers = {} }
+        local activity = LegalActivities.Activities[i]
+        -- `items` doit exister meme vide : le menu du builder le parcourt avec ipairs, et
+        -- un nil y levait une erreur qui empechait le menu de s'ouvrir.
+        out[activity] = {
+            sellers = {},
+            items = (type(LegalActivities.ItemsFor) == "function" and LegalActivities.ItemsFor(activity)) or {},
+        }
     end
 
     for i = 1, #rows do
@@ -54,7 +60,9 @@ function LegalActivities.LoadSellers()
                 index = row.seller_index,
                 model = row.model,
                 coords = { x = row.x + 0.0, y = row.y + 0.0, z = row.z + 0.0, w = row.w + 0.0 },
-                visible = row.visible == 1,
+                -- Un TINYINT(1) revient tantot en nombre, tantot en booleen selon la
+                -- version d'oxmysql : comparer a 1 tout court rendait le vendeur masque.
+                visible = (row.visible == 1 or row.visible == true),
             }
         end
     end

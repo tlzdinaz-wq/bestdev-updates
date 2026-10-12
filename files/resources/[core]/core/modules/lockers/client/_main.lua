@@ -16,6 +16,32 @@ local currentOutfit = nil
 local currentLocker = nil
 local savedOutfit = nil
 
+--- Qui peut enregistrer une tenue dans ce vestiaire.
+---
+--- Cette regle doit coller a celle du serveur (canManageOutfits / isGroupBoss dans
+--- modules/lockers/server/220_lockers.lua). Le client n'acceptait que les grades 98 et 99
+--- en dur : un patron d'entreprise, reconnu par son indicateur `grade_is_boss` mais au
+--- grade 3 ou 4, ne voyait jamais le bouton — et un membre du staff non plus, alors que
+--- tous deux etaient autorises cote serveur. D'ou des vestiaires que l'on cree sans jamais
+--- pouvoir y mettre une tenue.
+local function IsBossGrade(group, whitelistValue)
+    if type(group) ~= "table" or group.name ~= whitelistValue then return false end
+    if group.grade_is_boss == true or group.grade_is_boss == 1 or group.grade_is_boss == "1" then
+        return true
+    end
+    return group.grade == 98 or group.grade == 99
+end
+
+local function CanManageOutfits(locker)
+    local perms = VFW.PlayerGlobalData and VFW.PlayerGlobalData.permissions
+    if perms and perms["manage_lockers"] == true then return true end
+
+    local data = VFW.PlayerData or {}
+    return IsBossGrade(data.job, locker.whitelistValue)
+        or IsBossGrade(data.job2, locker.whitelistValue)
+        or IsBossGrade(data.faction, locker.whitelistValue)
+end
+
 main.OnOpen(function()
     -- Utiliser la bannière custom de la société/faction si elle existe
     local customBanner = nil
@@ -32,12 +58,13 @@ main.OnOpen(function()
     local locker <const> = Locker.list[currentLocker]
 
     if locker then
-        if locker.whitelistType == "job" or locker.whitelistType == "faction" and locker.whitelistValue then
-            if (VFW.PlayerData.job.name == locker.whitelistValue and (VFW.PlayerData.job.grade == 99 or VFW.PlayerData.job.grade == 98))
-                    or (VFW.PlayerData.faction.name == locker.whitelistValue and (VFW.PlayerData.faction.grade == 99 or VFW.PlayerData.faction.grade == 98)) then
+        if (locker.whitelistType == "job" or locker.whitelistType == "faction") and locker.whitelistValue then
+            if CanManageOutfits(locker) then
                 main.Button("Enregistrer la tenue actuelle", "", nil, "chevron", false, function()
-                    local name <const> = VFW.Nui.KeyboardInput(true, "Entrez le nom de la tenue", "")
-                    if name == "" then
+                    -- Annuler la saisie rend nil, pas une chaine vide : sans ce cas le nom
+                    -- partait a nil et le serveur refusait la tenue sans rien dire.
+                    local name <const> = tostring(VFW.Nui.KeyboardInput(true, "Entrez le nom de la tenue", "") or "")
+                    if name:match("^%s*$") then
                         return
                     end
 

@@ -108,8 +108,12 @@ local function SpawnNPC(position, model)
     -- Attendre que le PED soit créé
     Wait(100)
 
+    -- `spawnZ` est la hauteur du SOL. Un ped se place par son centre, a un metre au-dessus
+    -- de ses pieds : l'y poser sans correction l'enfonce jusqu'a la taille, et
+    -- SetEntityCoordsNoOffset demande justement de ne pas corriger. SetEntityCoords, lui,
+    -- rattrape l'ecart et pose les pieds au sol.
+    SetEntityCoords(ped, position.x, position.y, spawnZ, false, false, false, false)
     PlaceObjectOnGroundProperly(ped)
-    SetEntityCoordsNoOffset(ped, position.x, position.y, spawnZ, false, false, false)
 
     SetEntityAsMissionEntity(ped, true, true)
     SetPedCanRagdoll(ped, false)
@@ -552,7 +556,7 @@ AddEventHandler("core:gofast:missionStarted", function(data)
             -- Recongeler le NPC et le retéléporter immédiatement à sa position
             ClearPedTasks(startNPC)
             local returnZ = ResolveGroundZ(startNPCPos.x, startNPCPos.y, startNPCPos.z)
-            SetEntityCoordsNoOffset(startNPC, startNPCPos.x, startNPCPos.y, returnZ, false, false, false)
+            SetEntityCoords(startNPC, startNPCPos.x, startNPCPos.y, returnZ, false, false, false, false)
             SetEntityHeading(startNPC, startNPCPos.heading or 0.0)
             FreezeEntityPosition(startNPC, true)
             SetBlockingOfNonTemporaryEvents(startNPC, true)
