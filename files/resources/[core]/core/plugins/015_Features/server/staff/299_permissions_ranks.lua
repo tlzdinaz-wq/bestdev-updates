@@ -13,6 +13,14 @@ local FACTION_GRADE_PERMS = {
 
 local CREW_RANK_LABELS = { "Chef", "Sous-chef", "Soldat", "Membre", "Recrue" }
 
+-- L echelle des grades de faction est la meme pour toutes les factions. Elle est exposee
+-- ici parce que les menus staff en ont besoin pour proposer un grade, et qu ils la
+-- demandent au module des factions (304), charge apres celui-ci.
+Staff29.CrewRanks = {}
+for i = 1, #CREW_RANK_LABELS do
+    Staff29.CrewRanks[i] = { grade = i, label = CREW_RANK_LABELS[i] }
+end
+
 local RANK_COLOR_HEX = {
     white = "#FFFFFF",
     red = "#E53935",
@@ -953,7 +961,14 @@ RegisterNetEvent("vfw:staff:setJob", function(charId, jobName, gradeLevel)
     end
 end)
 
-RegisterNetEvent("vfw:staff:setFaction", function(charId, factionName, rankLevel)
+--- Affecte un personnage a une faction, connecte ou non.
+---
+--- Le menu des joueurs hors ligne declenchait `vfw:staff:setFactionOffline`, qui n a
+--- jamais existe : changer la faction d un joueur deconnecte ne faisait rien. Ce
+--- gestionnaire sait deja traiter les deux cas — il va chercher l identifiant en base
+--- quand le joueur n est pas la — on lui donne donc les deux noms plutot que d en ecrire
+--- un second qui divergerait.
+local function setFactionHandler(charId, factionName, rankLevel)
     local source = source
     local xPlayer = Staff29.Require(source, "setjob2")
     if not xPlayer then return end
@@ -1020,7 +1035,10 @@ RegisterNetEvent("vfw:staff:setFaction", function(charId, factionName, rankLevel
             leaving and "Vous ne faites plus partie d'une faction."
                 or "Votre faction a été mise à jour.")
     end
-end)
+end
+
+RegisterNetEvent("vfw:staff:setFaction", setFactionHandler)
+RegisterNetEvent("vfw:staff:setFactionOffline", setFactionHandler)
 
 Staff29.Cb("vfw:staff:grades:getData", function(source, factionName)
     local xPlayer = requireFactionStaff(source)

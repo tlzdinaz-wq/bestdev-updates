@@ -251,27 +251,53 @@ function InterimServer.GetConfig(job)
     return DEFAULT_CONFIGS[job]
 end
 
-function InterimServer.SavePositions(job, data)
+--- Enregistre une ligne par metier, en remplacant la precedente.
+---
+--- Les deux tables sont declarees sans clef primaire dans le dump SQL, alors que le code
+--- s en remettait a ON DUPLICATE KEY UPDATE pour remplacer. Sans clef, la condition ne se
+--- declenche jamais : chaque enregistrement ajoutait une ligne de plus, et la relecture
+--- rendait celle que le hasard mettait en dernier. On efface puis on insere, ce qui donne
+--- le bon resultat avec ou sans clef, sans migration de schema sur une base en service.
+local function saveRow(table_, job, data)
     if type(job) ~= "string" or type(data) ~= "table" then return false end
-    MySQL.query.await(
-        "INSERT INTO interim_job_positions (`job`, `data`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `data` = VALUES(`data`)",
-        { job, json.encode(data) }
-    )
+
+    local encoded = json.encode(data)
+    MySQL.query.await(("DELETE FROM %s WHERE `job` = ?"):format(table_), { job })
+    MySQL.query.await(("INSERT INTO %s (`job`, `data`) VALUES (?, ?)"):format(table_), { job, encoded })
+    return true
+end
+
+function InterimServer.SavePositions(job, data)
+    if not saveRow("interim_job_positions", job, data) then return false end
     InterimServer.Positions[job] = data
     return true
 end
 
 function InterimServer.SaveConfig(job, data)
-    if type(job) ~= "string" or type(data) ~= "table" then return false end
-    MySQL.query.await(
-        "INSERT INTO interim_job_config (`job`, `data`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `data` = VALUES(`data`)",
-        { job, json.encode(data) }
-    )
+    if not saveRow("interim_job_config", job, data) then return false end
     InterimServer.Configs[job] = data
     return true
 end
 
+--- Cree les deux tables si elles manquent.
+---
+--- Elles ne vivent que dans le dump SQL importe a l installation, qui ne part jamais avec
+--- les mises a jour : une base plus ancienne ne les a pas, et les positions comme les
+--- montants disparaissaient a chaque redemarrage sans un mot.
+local function ensureTables()
+    for _, name in ipairs({ "interim_job_positions", "interim_job_config" }) do
+        MySQL.query.await(([[
+            CREATE TABLE IF NOT EXISTS `%s` (
+                `job`  VARCHAR(60) NOT NULL,
+                `data` LONGTEXT DEFAULT NULL,
+                PRIMARY KEY (`job`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ]]):format(name), {})
+    end
+end
+
 local function loadStore()
+    ensureTables()
     local positionRows = MySQL.query.await("SELECT `job`, `data` FROM interim_job_positions") or {}
     for i = 1, #positionRows do
         local row = positionRows[i]

@@ -1,24 +1,19 @@
 {
- "version": "1.12.66",
- "date": "2026-10-12T16:37:47.338Z",
- "notes": "Sirenes et gyrophares enfin fonctionnels, pharmacies et hopitaux visibles apres creation, cameras posables depuis le menu staff, activites legales entierement pilotables, PNJ go fast au bon niveau, tenues ajoutables aux vestiaires d entreprise.",
+ "version": "1.12.67",
+ "date": "2026-10-14T15:15:34.332Z",
+ "notes": "Sirenes et gyrophares enfin fonctionnels. Pharmacies, hopitaux, cameras, activites legales, economie interim, factions, tickets a gratter et vestiaires reparees. PNJ go fast au bon niveau. Menus en relief.",
  "added": [
-  "resources/[core]/core/plugins/000_framework/client/002_vehicle_state.lua",
-  "resources/[core]/core/plugins/015_Features/server/legal_activities/275_builder_endpoints.lua",
-  "resources/[core]/core/plugins/015_Features/server/vehicle/26_200_sirens.lua"
+  "resources/[core]/core/plugins/015_Features/fl_interim/server/276_admin_economy.lua",
+  "resources/[core]/core/plugins/015_Features/server/inventory/25_09_scratchcard_admin.lua"
  ],
  "changed": [
-  "resources/[core]/core/modules/lockers/client/_main.lua",
-  "resources/[core]/core/plugins/015_Features/fl_illegal/client/gofast/cl_gofast.lua",
-  "resources/[core]/core/plugins/015_Features/server/legal_activities/270_sellers_config.lua",
-  "resources/[core]/core/plugins/015_Features/server/legal_activities/272_fishing.lua",
-  "resources/[core]/core/plugins/015_Features/server/legal_activities/273_hunting.lua",
-  "resources/[core]/core/plugins/015_Features/server/legal_activities/274_sellers.lua",
-  "resources/[core]/core/plugins/015_Features/server/misc_b/34_13_police.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/290_permissions.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/298_sams_builders.lua"
+  "resources/[core]/core/plugins/015_Features/client/staff/menu/grades.lua",
+  "resources/[core]/core/plugins/015_Features/fl_interim/server/270_data.lua",
+  "resources/[core]/core/plugins/015_Features/server/staff/299_permissions_ranks.lua",
+  "resources/[core]/core/plugins/015_Features/server/staff/304_gestion_factions.lua",
+  "resources/[core]/VUI/web/dist/assets/skin.css"
  ],
  "removed": [],
- "total": 294953913,
- "fileCount": 3798
+ "total": 294974187,
+ "fileCount": 3800
 }

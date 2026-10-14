@@ -930,19 +930,32 @@ Staff29.Cb("gestionFactions:hubPanel", function(source, selectedName)
     return hubPanel(selectedName)
 end)
 
+-- Factions proposees aux menus staff.
+--
+-- Deux defauts rendaient impossible d affecter quelqu un a une faction, en ligne comme
+-- hors ligne. La liste partait en tableau indexe de 1 a n, alors que le menu des grades y
+-- cherche la faction par son nom : la recherche rendait nil et l ecran restait vide. Et
+-- aucune entree ne portait ses grades, que les deux menus parcourent pour proposer un
+-- rang. La liste est desormais indexee par nom et porte l echelle des grades.
 Staff29.Cb("core:staff:getOrganizations", function(source)
     if not staffOk(source) and not Staff29.Has(source, "setjob2") then return {} end
+
+    local ranks = Staff29.CrewRanks or {}
     local rows = Staff29.Query("SELECT name, label, color FROM crews ORDER BY label ASC", {})
     local out = {}
+
     for i = 1, #rows do
-        if rows[i].name ~= "nocrew" and rows[i].name ~= "nofaction" then
-            out[#out + 1] = {
-                name = rows[i].name,
-                label = rows[i].label or rows[i].name,
-                color = rows[i].color or "#FFFFFF",
+        local row = rows[i]
+        if row.name ~= "nocrew" and row.name ~= "nofaction" then
+            out[row.name] = {
+                name = row.name,
+                label = row.label or row.name,
+                color = row.color or "#FFFFFF",
+                grades = ranks,
             }
         end
     end
+
     return out
 end)
 

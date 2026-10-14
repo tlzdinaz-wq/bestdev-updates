@@ -27,7 +27,7 @@ function StaffMenu.BuildGradesJobsMenu()
             local k, v = item.key, item.data
             local isCurrentGrade = (currentJobName == StaffMenu.data.selecteJob) and (tonumber(v.grade) == currentGrade)
             local icon = isCurrentGrade and "check" or nil
-            local rightLabel = isCurrentGrade and "Grade actuel" or ("Niveau " .. v.grade)
+            local rightLabel = isCurrentGrade and "Grade actuel" or ("Rang " .. v.grade)
 
             StaffMenu.grades_jobs.Button(v.label, rightLabel, nil, icon, isCurrentGrade, function()
                 if not isCurrentGrade then
@@ -69,9 +69,10 @@ function StaffMenu.BuildGradesFactionsMenu()
             table.insert(sortedGrades, { key = k, data = v })
         end
 
-        -- Trier par grade décroissant (patron en haut)
+        -- Chez les factions, le rang 1 est le chef et le dernier la recrue : on trie donc
+        -- par grade croissant pour garder le patron en haut, à l'inverse des métiers.
         table.sort(sortedGrades, function(a, b)
-            return (tonumber(a.data.grade) or 0) > (tonumber(b.data.grade) or 0)
+            return (tonumber(a.data.grade) or 0) < (tonumber(b.data.grade) or 0)
         end)
 
         for _, item in ipairs(sortedGrades) do
