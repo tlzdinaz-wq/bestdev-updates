@@ -1,19 +1,15 @@
 {
- "version": "1.12.67",
- "date": "2026-10-14T15:15:34.332Z",
- "notes": "Sirenes et gyrophares enfin fonctionnels. Pharmacies, hopitaux, cameras, activites legales, economie interim, factions, tickets a gratter et vestiaires reparees. PNJ go fast au bon niveau. Menus en relief.",
+ "version": "1.12.68",
+ "date": "2026-10-15T16:41:54.308Z",
+ "notes": "Inventaire repris en relief : panneaux translucides qui laissent voir le jeu, cases vides creusees et cases pleines en saillie, jauge et champs enfonces. Deux reglages propres a chaque joueur (fond des panneaux, relief) sous l engrenage en bas a droite. Le personnage reste net : sa colonne n a ni fond ni contour.",
  "added": [
-  "resources/[core]/core/plugins/015_Features/fl_interim/server/276_admin_economy.lua",
-  "resources/[core]/core/plugins/015_Features/server/inventory/25_09_scratchcard_admin.lua"
+  "resources/[core]/core/interface/build/skin/inventory-options.js",
+  "resources/[core]/core/interface/build/skin/inventory.css"
  ],
  "changed": [
-  "resources/[core]/core/plugins/015_Features/client/staff/menu/grades.lua",
-  "resources/[core]/core/plugins/015_Features/fl_interim/server/270_data.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/299_permissions_ranks.lua",
-  "resources/[core]/core/plugins/015_Features/server/staff/304_gestion_factions.lua",
-  "resources/[core]/VUI/web/dist/assets/skin.css"
+  "resources/[core]/core/interface/build/index.html"
  ],
  "removed": [],
- "total": 294974187,
- "fileCount": 3800
+ "total": 294988040,
+ "fileCount": 3802
 }

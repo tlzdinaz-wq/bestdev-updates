@@ -1,4 +1,4 @@
-#version	1.12.67	2026-10-14T15:15:34.332Z
+#version	1.12.68	2026-10-15T16:41:54.308Z
 #protected	resources/[core]/core/config/**
 #protected	resources/[core]/core/plugins/015_Features/config/**
 #protected	resources/[core]/eve_bridge/config.lua
@@ -1630,12 +1630,14 @@ c416f68bb99ddbbf1c30b4815565a077d870094483941960eb0e84d79a80214b	140262	resource
 245c3c4b72dff6cafb795e68c65e7a8d761f66f4b46a90b05bdf110b9b0b7f35	174699	resources/[core]/core/interface/build/assets/vendor-react-BnE6Ax5j.js
 32eb418f830cb8b390b9540dd68052cd3ad4ec4cd9ec2c1c372a3290b75a2d45	11441	resources/[core]/core/interface/build/assets/ZonesPage-CqVix_gB.js
 8a337709681248cfcdddcf9ce7809e87537bf5ff32419d144ae6356f0d277796	11400	resources/[core]/core/interface/build/assets/ZonesPage-Szg65o-q.css
-1da0a50180ffc638425c981eaf624a39097875b0689cdef3b6778ec207f24fbc	56124	resources/[core]/core/interface/build/index.html
+c966dfd3662e849790ab55eb4862c7c7d2a9897d6b8e303fb5d22b18e5ec8d6c	56333	resources/[core]/core/interface/build/index.html
 acb95c9767b646fad5f2e4436fd38e8ef86d819925b4c702832b9fd3f71b1958	1294	resources/[core]/core/interface/build/skin/boss-panel-bridge.js
 f4e7a2b82d939435e3c71ddab11564ed81d1d0bddb667a0c395e0ac1e794f47e	29488	resources/[core]/core/interface/build/skin/boss-panel.css
 972d0e41f9743ed5fe61d80058c31100c02585649a536e99c911647beec1f7fa	27930	resources/[core]/core/interface/build/skin/char-creator.css
 89ec6827fcb54d9fc09a322e747465ce32cd489a43c87f3b90155656732ae99e	1049	resources/[core]/core/interface/build/skin/char-music.js
 e555a827fd47ef6f983df4917dfb181359f4b3354548be4722a05860c078427c	20985	resources/[core]/core/interface/build/skin/clothing-shop.css
+d044714fa18abcd3dbea9cd5786eb0c968f5119f2c8acf592cb57eecbce8559b	5051	resources/[core]/core/interface/build/skin/inventory-options.js
+4cdeda107eadf63efee6185c87ee985fc9fbd46948410f37be52b4cc4b979c56	8593	resources/[core]/core/interface/build/skin/inventory.css
 cacb0bffce019953255e94b801e3872d8833c2023b8a272fc37f982294e6b3e6	9521	resources/[core]/core/interface/build/skin/notifications.css
 846238a4c76d70987bbba6b26c7ae775d22b47eb3ccacf201d9162cd2449fb9b	9241	resources/[core]/core/interface/build/skin/nui-fallbacks.css
 9ee17fc4315311119ea3d7c5ff81529dadd5876dc90850a5aab2229c5d8548f1	738	resources/[core]/core/interface/build/skin/README.md
