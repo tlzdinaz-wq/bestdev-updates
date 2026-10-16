@@ -9,26 +9,8 @@ local zoneData = {
 
 local markerThread = nil
 local isMarkersActive = false
--- Rafraîchissement et navigation : horodatés, pas de simples drapeaux.
---
--- `menu.refresh()` ferme et rouvre le menu côté VUI, mais le gestionnaire de fermeture
--- appartient à `core` : il arrive après que le drapeau ait été remis à false juste après
--- l'appel. Il prenait donc chaque rafraîchissement pour une vraie fermeture et appelait
--- `resetZoneData()` — tout ce qui venait d'être saisi ou ajouté était effacé aussitôt, et
--- aucun bouton ne semblait avoir d'effet.
-local lastRefreshAt = 0
-local lastNavigationAt = 0
-local GUARD_MS = 750
-
----@return boolean
-local function isRefreshing()
-    return (GetGameTimer() - lastRefreshAt) < GUARD_MS
-end
-
----@return boolean
-local function isNavigating()
-    return (GetGameTimer() - lastNavigationAt) < GUARD_MS
-end
+local isRefreshing = false
+local isNavigating = false
 
 local controlDisabled <const> = {
     { label = "Sauter", control = 22},
@@ -115,8 +97,9 @@ local function stopMarkerThread()
 end
 
 local function safeRefresh(menu)
-    lastRefreshAt = GetGameTimer()
+    isRefreshing = true
     menu.refresh()
+    isRefreshing = false
 end
 
 local function startMarkerThread()
@@ -200,55 +183,70 @@ end
 
 function StaffMenu.BuildCreateZoneSafeMenu()
     StaffMenu.CreateZoneSafe.Button("NOM DE LA ZONE", zoneData.name or "Non défini", nil, zoneData.name and "check" or "chevron", false, function()
-        VFW.Nui.AskText("Entrer le nom de zone (identifiant unique)", zoneData.name, function(name)
-            zoneData.name = name
-            safeRefresh(StaffMenu.CreateZoneSafe)
-        end)
+        local name <const> = VFW.Nui.KeyboardInput(true, "Entrer le nom de zone (identifiant unique)")
+
+        if not name or name == "" then
+            return VFW.ShowNotification({
+                type = 'STAFF', variant = 'ERROR', subtitle = 'Zones Sécurisées',
+                message = "Ce nom n'est pas valide"
+          })
+        end
+
+        zoneData.name = name
+        safeRefresh(StaffMenu.CreateZoneSafe)
     end)
 
     StaffMenu.CreateZoneSafe.Button("LABEL DE LA ZONE", zoneData.label or "Non défini", nil, zoneData.label and "check" or "chevron", false, function()
-        VFW.Nui.AskText("Entrer le label de la zone (nom affiché)", zoneData.label, function(label)
-            zoneData.label = label
-            safeRefresh(StaffMenu.CreateZoneSafe)
-        end)
+        local label <const> = VFW.Nui.KeyboardInput(true, "Entrer le label de la zone (nom affiché)")
+
+        if not label or label == "" then
+            return VFW.ShowNotification({
+                type = 'STAFF', variant = 'ERROR', subtitle = 'Zones Sécurisées',
+                message = "Ce label n'est pas valide"
+          })
+        end
+
+        zoneData.label = label
+        safeRefresh(StaffMenu.CreateZoneSafe)
     end)
 
     StaffMenu.CreateZoneSafe.Separator("POINTS DU CONTOUR (" .. #zoneData.points .. "/3 min)")
 
     StaffMenu.CreateZoneSafe.Button(" ZONE CIRCULAIRE (RAYON)", "Crée un cercle autour de toi", nil, "chevron", false, function()
-        VFW.Nui.AskNumber("Entrer le rayon de la zone (ex: 10)", nil, function(radius)
-            if radius <= 0 then
-                return VFW.ShowNotification({
-                    type = 'STAFF', variant = 'ERROR', subtitle = 'Zones Sécurisées',
-                    message = "Ce rayon n'est pas valide"
-                })
-            end
+        local rangeInput <const> = VFW.Nui.KeyboardInput(true, "Entrer le rayon de la zone (ex: 10)")
+        local radius <const> = tonumber(rangeInput)
 
-            local playerCoords <const> = GetEntityCoords(PlayerPedId())
-            local numPoints <const> = 24
+        if not radius or radius <= 0 then
+            return VFW.ShowNotification({
+                type = 'STAFF', variant = 'ERROR', subtitle = 'Zones Sécurisées',
+                message = "Ce rayon n'est pas valide"
+          })
+        end
 
-            zoneData.points = {}
+        local playerCoords <const> = GetEntityCoords(PlayerPedId())
+        local numPoints <const> = 24
 
-            for i = 0, numPoints - 1 do
-                local angle <const> = (i / numPoints) * 2 * math.pi
-                zoneData.points[#zoneData.points + 1] = {
-                    x = playerCoords.x + math.cos(angle) * radius,
-                    y = playerCoords.y + math.sin(angle) * radius,
-                    z = playerCoords.z
-                }
-            end
+        zoneData.points = {}
 
-            VFW.ShowNotification({
-                type = 'STAFF', variant = 'SUCCESS', subtitle = 'Zones Sécurisées',
-                message = "Zone circulaire de " .. radius .. "m créée"
-            })
+        for i = 0, numPoints - 1 do
+            local angle <const> = (i / numPoints) * 2 * math.pi
+            zoneData.points[#zoneData.points + 1] = {
+                x = playerCoords.x + math.cos(angle) * radius,
+                y = playerCoords.y + math.sin(angle) * radius,
+                z = playerCoords.z
+            }
+        end
 
-            if not isMarkersActive then
-                startMarkerThread()
-            end
+        VFW.ShowNotification({
+            type = 'STAFF', variant = 'SUCCESS', subtitle = 'Zones Sécurisées',
+            message = "Zone circulaire de " .. radius .. "m créée"
+      })
 
-            safeRefresh(StaffMenu.CreateZoneSafe)
-        end)
+        if not isMarkersActive then
+            startMarkerThread()
+        end
+
+        safeRefresh(StaffMenu.CreateZoneSafe)
     end)
 
     StaffMenu.CreateZoneSafe.Button(":plus: AJOUTER UN POINT", "Mode custom - point par point", nil, "chevron", false, function()
@@ -304,31 +302,32 @@ function StaffMenu.BuildCreateZoneSafeMenu()
     StaffMenu.CreateZoneSafe.Separator("CONFIGURATION")
 
     StaffMenu.CreateZoneSafe.Button(":ruler: HAUTEUR", tostring(zoneData.height) .. "m", nil, "check", false, function()
-        VFW.Nui.AskNumber("Entrer la hauteur de la zone (ex: 10)", zoneData.height, function(height)
-            if height <= 0 then
-                return VFW.ShowNotification({
-                    type = 'STAFF', variant = 'ERROR', subtitle = 'Zones Sécurisées',
-                    message = "Cette hauteur n'est pas valide"
-                })
-            end
+        local heightInput <const> = VFW.Nui.KeyboardInput(true, "Entrer la hauteur de la zone (ex: 10)")
+        local height <const> = tonumber(heightInput)
 
-            zoneData.height = height
+        if not height or height <= 0 then
+            return VFW.ShowNotification({
+                type = 'STAFF', variant = 'ERROR', subtitle = 'Zones Sécurisées',
+                message = "Cette hauteur n'est pas valide"
+          })
+        end
 
-            VFW.ShowNotification({
-                type = 'STAFF', variant = 'SUCCESS', subtitle = 'Zones Sécurisées',
-                message = "Hauteur définie à " .. height .. "m"
-            })
+        zoneData.height = height
 
-            safeRefresh(StaffMenu.CreateZoneSafe)
-        end)
+        VFW.ShowNotification({
+            type = 'STAFF', variant = 'SUCCESS', subtitle = 'Zones Sécurisées',
+            message = "Hauteur définie à " .. height .. "m"
+      })
+
+        safeRefresh(StaffMenu.CreateZoneSafe)
     end)
 
     StaffMenu.CreateZoneSafe.Button("DÉSACTIVER DES ACTIONS", "Choisir les actions interdites dans cette zone (saut, sprint, bagarre...)", nil, zoneData.actionDisabled and #zoneData.actionDisabled > 0 and "check" or "chevron", false, function()
-        lastNavigationAt = GetGameTimer()
+        isNavigating = true
     end, StaffMenu.DisableActionsZoneSafe)
 
     StaffMenu.CreateZoneSafe.Button("JOBS BYPASS", "Définir les jobs autorisés à effectuer des actions malgré la zone safe", nil, zoneData.bypassJob and #zoneData.bypassJob > 0 and "check" or "chevron", false, function()
-        lastNavigationAt = GetGameTimer()
+        isNavigating = true
     end, StaffMenu.ByPassJobZoneSafe)
 
     StaffMenu.CreateZoneSafe.Separator(nil)
@@ -356,7 +355,7 @@ function StaffMenu.BuildCreateZoneSafeMenu()
                 type = 'STAFF', variant = 'SUCCESS', subtitle = 'Zones Sécurisées',
                 message = "Zone safe créée"
           })
-            lastNavigationAt = GetGameTimer()
+            isNavigating = true
             StaffMenu.CreateZoneSafe.close()
             StaffMenu.CreateZoneSafe.parent.open()
         end)
@@ -413,7 +412,7 @@ function StaffMenu.BuildListZoneSafeMenu()
         local pointsCount = safeZone.points and #safeZone.points or 0
 
         StaffMenu.ListZoneSafe.Button(safeZone.label, safeZone.name .. " | " .. pointsCount .. " points", nil, "chevron", false, function()
-            lastNavigationAt = GetGameTimer()
+            isNavigating = true
             zoneData = {
                 name = safeZone.name,
                 label = safeZone.label,
@@ -448,7 +447,7 @@ function StaffMenu.BuildManageZoneSafeMenu()
     end)
 
     StaffMenu.ManageZoneSafe.Button(":monitor: MODIFIER LA ZONE", "Éditer les paramètres, les points et les accès de cette zone safe", nil, "chevron", false, function()
-        lastNavigationAt = GetGameTimer()
+        isNavigating = true
         zoneData.oldName = zoneData.name
         zoneData.isUpdate = true
         startMarkerThread()
@@ -464,7 +463,7 @@ function StaffMenu.BuildManageZoneSafeMenu()
             message = "Zone safe supprimée"
       })
 
-        lastNavigationAt = GetGameTimer()
+        isNavigating = true
         StaffMenu.ManageZoneSafe.close()
         StaffMenu.ManageZoneSafe.parent.open()
     end)
@@ -514,27 +513,32 @@ local function autoSaveZone()
 end
 
 StaffMenu.CreateZoneSafe.OnClose(function()
-    if not isRefreshing() and not isNavigating() then
+    if not isRefreshing and not isNavigating then
         stopMarkerThread()
         resetZoneData()
     elseif zoneData.isUpdate then
         autoSaveZone()
     end
+    isNavigating = false
 end)
 
 StaffMenu.ManageZoneSafe.OnClose(function()
-    if not isRefreshing() and not isNavigating() then
+    if not isRefreshing and not isNavigating then
         autoSaveZone()
         stopMarkerThread()
         resetZoneData()
     end
+    isNavigating = false
 end)
 
 StaffMenu.DisableActionsZoneSafe.OnClose(function()
+    isNavigating = false
 end)
 
 StaffMenu.ByPassJobZoneSafe.OnClose(function()
+    isNavigating = false
 end)
 
 StaffMenu.ListZoneSafe.OnClose(function()
+    isNavigating = false
 end)

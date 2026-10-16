@@ -228,17 +228,11 @@ function Inv.BuildAllItemsList()
     return out
 end
 
--- Inventaire de tous les items et armes du serveur. Deux noms : /allitems existait déjà,
--- /item est le nom auquel tout le monde pense en premier.
-local function openAllItems(source)
+VFW.RegisterCommand("allitems", "give_item", function(source)
     TriggerClientEvent("vfw:openInfiniteItemsInventory", source, Inv.BuildAllItemsList())
-end
-
-for _, name in ipairs({ "allitems", "item" }) do
-    VFW.RegisterCommand(name, "give_item", openAllItems, {
-        help = "Ouvre l'inventaire de tous les items et armes du serveur (staff)",
-    })
-end
+end, {
+    help = "Ouvre l'inventaire de tous les items (staff)",
+})
 
 VFW.RegisterCommand("itempool", "give_item", function(source)
     TriggerClientEvent("vfw:itemPool:open", source, Inv.BuildAllItemsList())

@@ -1,16 +1,13 @@
 ---@meta _
 ---@diagnostic disable: duplicate-doc-field
 
-local function HasManagementPermission()
+local function Guard()
+    if not (StaffMenu.IsGestionHubOpen and StaffMenu.IsGestionHubOpen()) then return false end
     local perms = (VFW.PlayerGlobalData and VFW.PlayerGlobalData.permissions) or {}
     return perms["server_management"] == true
         or perms["dev"] == true
         or perms["staff"] == true
         or perms["admin"] == true
-end
-
-local function Guard()
-    return StaffMenu.IsGestionHubOpen and StaffMenu.IsGestionHubOpen() and HasManagementPermission()
 end
 
 RegisterNuiCallback("gestion:branding:open", function(_, cb)
@@ -27,9 +24,7 @@ RegisterNuiCallback("gestion:branding:open", function(_, cb)
 end)
 
 RegisterNuiCallback("gestion:branding:save", function(data, cb)
-    -- The UI flushes its pending autosave while closing. The hub can already
-    -- be closed here; permission checks remain enforced client- and server-side.
-    if not HasManagementPermission() then cb({ ok = false, error = "Permission refusée." }) return end
+    if not Guard() then cb({ ok = false, error = "Permission refusée." }) return end
     if type(data) == "string" then
         local ok, decoded = pcall(json.decode, data)
         data = ok and decoded or nil

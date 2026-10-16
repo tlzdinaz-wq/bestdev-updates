@@ -34,10 +34,7 @@ end
 local function safeRefresh(menu)
     isRefreshing = true
     menu.refresh()
-    -- Le gestionnaire de fermeture du menu est appelé dans un thread par VUI : il arrive
-    -- APRÈS cette ligne. Remis à false aussitôt, le drapeau ne le protégeait de rien et le
-    -- menu effaçait ce qui venait d'être saisi. On laisse la garde vivre le temps du cycle.
-    SetTimeout(750, function() isRefreshing = false end)
+    isRefreshing = false
 end
 
 local function stopMarkerThread()
