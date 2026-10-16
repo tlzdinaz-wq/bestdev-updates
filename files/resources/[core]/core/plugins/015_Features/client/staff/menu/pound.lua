@@ -1,17 +1,4 @@
--- Garde-fou de rafraîchissement.
---
--- `Menu.refresh()` ferme puis rouvre le menu dans la ressource VUI. Le OnClose, lui, est une
--- fonction de `core` appelée depuis VUI : elle ne s'exécute donc pas forcément avant que le
--- drapeau ne soit remis à false juste après l'appel. Quand elle arrivait en retard, elle
--- prenait le rafraîchissement pour une vraie fermeture et remettait la fiche en cours à zéro
--- — le label et la position saisis étaient perdus à chaque modification.
--- On mémorise donc l'instant du rafraîchissement au lieu d'un simple booléen.
-local lastRefreshAt = 0
-
----@return boolean
-local function fcIsRefreshing()
-    return (GetGameTimer() - lastRefreshAt) < 750
-end
+local bIsOpen = false
 local eCurrentVehicle = {}
 
 local function fcDeletePreview(iNumber)
@@ -36,8 +23,9 @@ local function fcSpawnPreview(sModel, tPos, iNumber)
 end
 
 local function fcRefresh(Menu)
-    lastRefreshAt = GetGameTimer()
+    bIsOpen = true
     Menu.refresh()
+    bIsOpen = false
 end
 
 local function fcGetIcon(args)
@@ -284,7 +272,7 @@ StaffMenu.createPoundData.OnOpen(function()
 end)
 
 StaffMenu.createPoundData.OnClose(function()
-    if fcIsRefreshing() then return end
+    if bIsOpen then return end
     fcCloseMenu()
     poundSelected = getPoundDefaultData()
     iCurrentCategory = 1
@@ -346,7 +334,7 @@ StaffMenu.modifyPound.OnOpen(function()
 end)
 
 StaffMenu.modifyPound.OnClose(function()
-    if fcIsRefreshing() then return end
+    if bIsOpen then return end
     fcCloseMenu()
     poundSelected = getPoundDefaultData()
     iCurrentCategory = 1

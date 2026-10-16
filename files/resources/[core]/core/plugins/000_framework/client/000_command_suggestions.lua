@@ -91,9 +91,7 @@ CreateThread(function()
 
         'staff_noclip', 'openStaffMenu', 'dismissReport', 'acceptReport',
 
-        -- 'dv' retiré de cette liste : la commande existe maintenant côté serveur
-        -- (plugins/015_Features/server/staff/301_vehicles.lua) et doit être proposée.
-        'dvbed1', 'dvperf1', 'add', 'addlb',
+        'dv', 'dvbed1', 'dvperf1', 'add', 'addlb',
     }
 
     for _, cmd in ipairs(commandsToRemove) do

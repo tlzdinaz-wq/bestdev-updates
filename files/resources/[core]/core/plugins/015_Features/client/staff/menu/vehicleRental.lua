@@ -1,18 +1,5 @@
 local VUI <const> = exports["VUI"]
--- Garde-fou de rafraîchissement.
---
--- `Menu.refresh()` ferme puis rouvre le menu dans la ressource VUI. Le OnClose, lui, est une
--- fonction de `core` appelée depuis VUI : elle ne s'exécute donc pas forcément avant que le
--- drapeau ne soit remis à false juste après l'appel. Quand elle arrivait en retard, elle
--- prenait le rafraîchissement pour une vraie fermeture et remettait la fiche en cours à zéro
--- — le label et la position saisis étaient perdus à chaque modification.
--- On mémorise donc l'instant du rafraîchissement au lieu d'un simple booléen.
-local lastRefreshAt = 0
-
----@return boolean
-local function fcIsRefreshing()
-    return (GetGameTimer() - lastRefreshAt) < 750
-end
+local bIsOpen = false
 
 local RentalBuilder = StaffMenu.CreateRental
 local RentalManager = StaffMenu.ManageRental
@@ -64,8 +51,9 @@ local function fcSpawnPreview(sType, sModel, tPos, iNumber)
 end
 
 local function fcRefresh(Menu)
-    lastRefreshAt = GetGameTimer()
+    bIsOpen = true
     Menu.refresh()
+    bIsOpen = false
 end
 
 local function fcGetIcon(args)
@@ -153,7 +141,7 @@ local function fcBuildRentalMenu(Menu)
 
             tData.sName = sInput
 
-            lastRefreshAt = GetGameTimer()
+            bIsOpen = true
             fcRefresh(Menu)
         end)
 
@@ -284,7 +272,7 @@ RentalBuilder.OnOpen(function()
 end)
 
 RentalBuilder.OnClose(function()
-    if fcIsRefreshing() then return end
+    if bIsOpen then return end
 
     fcCloseMenu()
 end)
@@ -368,7 +356,7 @@ RentalEditor.OnOpen(function()
 end)
 
 RentalEditor.OnClose(function()
-    if fcIsRefreshing() then return end
+    if bIsOpen then return end
     fcCloseMenu()
 end)
 
@@ -421,8 +409,9 @@ VehicleConfigType.OnOpen(function()
 
     VehicleConfigType.Separator("")
     VehicleConfigType.Button(":refresh: ACTUALISER", "Recharger la liste", nil, "chevron", false, function()
-        lastRefreshAt = GetGameTimer()
+        bIsOpen = true
         VehicleConfigType.refresh()
+        bIsOpen = false
     end)
 end)
 
@@ -438,8 +427,9 @@ VehicleConfigEditor.OnOpen(function()
         local sInput = VFW.Nui.KeyboardInput(true, "Nouveau label", tSelectedVehicle.label)
         if sInput and sInput ~= "" then
             tSelectedVehicle.label = sInput
-            lastRefreshAt = GetGameTimer()
+            bIsOpen = true
             VehicleConfigEditor.refresh()
+            bIsOpen = false
         end
     end)
 
@@ -447,8 +437,9 @@ VehicleConfigEditor.OnOpen(function()
         local sInput = VFW.Nui.KeyboardInput(true, "Nouveau prix", tostring(tSelectedVehicle.price))
         if sInput and tonumber(sInput) then
             tSelectedVehicle.price = tonumber(sInput)
-            lastRefreshAt = GetGameTimer()
+            bIsOpen = true
             VehicleConfigEditor.refresh()
+            bIsOpen = false
         end
     end)
 
@@ -497,8 +488,9 @@ VehicleConfigAdd.OnOpen(function()
 
     VehicleConfigAdd.List('TYPE', nil, false, {"Normal", "Bateau", "Cayo"}, tNewVehicle.iType, function(Index)
         tNewVehicle.iType = Index
-        lastRefreshAt = GetGameTimer()
+        bIsOpen = true
         VehicleConfigAdd.refresh()
+        bIsOpen = false
     end)
 
     VehicleConfigAdd.Button(":edit: MODEL", tNewVehicle.sName ~= "" and tNewVehicle.sName or "Non défini", nil, fcGetIcon(tNewVehicle.sName ~= ""), false, function()
@@ -508,8 +500,9 @@ VehicleConfigAdd.OnOpen(function()
             if tNewVehicle.sLabel == "" then
                 tNewVehicle.sLabel = sInput:sub(1,1):upper() .. sInput:sub(2)
             end
-            lastRefreshAt = GetGameTimer()
+            bIsOpen = true
             VehicleConfigAdd.refresh()
+            bIsOpen = false
         end
     end)
 
@@ -517,8 +510,9 @@ VehicleConfigAdd.OnOpen(function()
         local sInput = VFW.Nui.KeyboardInput(true, "Label affiché", tNewVehicle.sLabel)
         if sInput and sInput ~= "" then
             tNewVehicle.sLabel = sInput
-            lastRefreshAt = GetGameTimer()
+            bIsOpen = true
             VehicleConfigAdd.refresh()
+            bIsOpen = false
         end
     end)
 
@@ -526,8 +520,9 @@ VehicleConfigAdd.OnOpen(function()
         local sInput = VFW.Nui.KeyboardInput(true, "Prix de location", tostring(tNewVehicle.iPrice))
         if sInput and tonumber(sInput) then
             tNewVehicle.iPrice = tonumber(sInput)
-            lastRefreshAt = GetGameTimer()
+            bIsOpen = true
             VehicleConfigAdd.refresh()
+            bIsOpen = false
         end
     end)
 
@@ -556,7 +551,7 @@ VehicleConfigAdd.OnOpen(function()
 end)
 
 VehicleConfigAdd.OnClose(function()
-    if fcIsRefreshing() then return end
+    if bIsOpen then return end
     tNewVehicle = {
         iType = 1,
         sName = "",

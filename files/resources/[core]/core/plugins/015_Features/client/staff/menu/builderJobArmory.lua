@@ -203,7 +203,7 @@ function StaffMenu.BuildJobArmoryCreateMenu()
     StaffMenu.builderJobArmoryCreate.Button("NOM: " .. (currentBuild.name ~= "" and currentBuild.name or "NON DÉFINI"),
         "Définir le nom de l'armurerie", nil, "arrow", false,
         function()
-            VFW.Nui.AskText("Nom de l'armurerie", currentBuild.name, function(result)
+            local result = VFW.Nui.KeyboardInput(true, "Nom de l'armurerie", currentBuild.name)
             if result and result ~= "" then
                 currentBuild.name = result
                 validateBuild()
@@ -211,7 +211,6 @@ function StaffMenu.BuildJobArmoryCreateMenu()
                     StaffMenu.builderJobArmoryCreate.refresh()
                 end
             end
-            end)
         end)
 
     local jobCount = #currentBuild.jobs
@@ -264,14 +263,13 @@ function StaffMenu.BuildJobArmoryCreateMenu()
     StaffMenu.builderJobArmoryCreate.Button("MODÈLE NPC: " .. (currentBuild.npcModel or "s_m_y_armymech_01"),
         "Modèle du PED vendeur", nil, "arrow", false,
         function()
-            VFW.Nui.AskText("Modèle du PED (ex: s_m_y_armymech_01)", currentBuild.npcModel or "", function(result)
+            local result = VFW.Nui.KeyboardInput(true, "Modèle du PED (ex: s_m_y_armymech_01)", currentBuild.npcModel or "")
             if result and result ~= "" then
                 currentBuild.npcModel = result
                 if StaffMenu.builderJobArmoryCreate.refresh then
                     StaffMenu.builderJobArmoryCreate.refresh()
                 end
             end
-            end)
         end)
 
     StaffMenu.builderJobArmoryCreate.Button("BLIP: " .. (currentBuild.blipEnabled and "ACTIVÉ" or "DÉSACTIVÉ"),
@@ -426,7 +424,7 @@ function StaffMenu.BuildJobArmoryEditMenu()
     StaffMenu.builderJobArmoryEdit.Button("MODÈLE NPC: " .. (data.npcModel or "s_m_y_armymech_01"),
         "Modifier le modèle du PED vendeur", nil, "arrow", false,
         function()
-            VFW.Nui.AskText("Modèle du PED", data.npcModel or "s_m_y_armymech_01", function(result)
+            local result = VFW.Nui.KeyboardInput(true, "Modèle du PED", data.npcModel or "s_m_y_armymech_01")
             if result and result ~= "" then
                 TriggerServerEvent("core:jobArmory:update", id, "npcModel", result)
                 data.npcModel = result
@@ -434,7 +432,6 @@ function StaffMenu.BuildJobArmoryEditMenu()
                     StaffMenu.builderJobArmoryEdit.refresh()
                 end
             end
-            end)
         end)
 
     StaffMenu.builderJobArmoryEdit.Button("ACTIVÉ: " .. (data.active and "OUI" or "NON"),
@@ -593,14 +590,13 @@ function StaffMenu.BuildJobArmoryWeaponAddMenu()
     StaffMenu.builderJobArmoryWeaponAdd.Button("STOCK MAX: " .. currentWeaponBuild.max_stock,
         "Nombre maximum d'armes sorties simultanément", nil, "arrow", false,
         function()
-            VFW.Nui.AskText("Stock max", tostring(currentWeaponBuild.max_stock), function(result)
+            local result = VFW.Nui.KeyboardInput(true, "Stock max", tostring(currentWeaponBuild.max_stock))
             if result and result ~= "" then
                 currentWeaponBuild.max_stock = math.max(1, tonumber(result) or 1)
                 if StaffMenu.builderJobArmoryWeaponAdd.refresh then
                     StaffMenu.builderJobArmoryWeaponAdd.refresh()
                 end
             end
-            end)
         end)
 
     StaffMenu.builderJobArmoryWeaponAdd.Separator(nil)
@@ -687,14 +683,13 @@ function StaffMenu.BuildJobArmoryWeaponItemSelectMenu()
 
     Button("Rechercher une arme", weaponSearchText ~= "" and ("Recherche : " .. weaponSearchText) or nil,
         nil, "search", false, function()
-            VFW.Nui.AskText("Rechercher une arme", weaponSearchText, function(input)
+            local input = VFW.Nui.KeyboardInput(true, "Rechercher une arme", weaponSearchText)
             if input then
                 weaponSearchText = input
                 if StaffMenu.builderJobArmoryWeaponItemSelect.refresh then
                     StaffMenu.builderJobArmoryWeaponItemSelect.refresh()
                 end
             end
-            end)
         end)
 
     if weaponSearchText ~= "" then
@@ -774,7 +769,7 @@ function StaffMenu.BuildJobArmoryWeaponEditMenu()
     StaffMenu.builderJobArmoryWeaponEdit.Button("STOCK MAX: " .. w.max_stock,
         "Modifier le stock maximum", nil, "arrow", false,
         function()
-            VFW.Nui.AskText("Stock max", tostring(w.max_stock), function(result)
+            local result = VFW.Nui.KeyboardInput(true, "Stock max", tostring(w.max_stock))
             if result and result ~= "" then
                 local newStock = math.max(1, tonumber(result) or w.max_stock)
                 TriggerServerEvent("core:jobArmory:updateWeapon", weaponId, "max_stock", newStock)
@@ -783,7 +778,6 @@ function StaffMenu.BuildJobArmoryWeaponEditMenu()
                     StaffMenu.builderJobArmoryWeaponEdit.refresh()
                 end
             end
-            end)
         end)
 
     StaffMenu.builderJobArmoryWeaponEdit.Button("SORTIS: " .. w.current_out .. "/" .. w.max_stock,
@@ -956,40 +950,33 @@ function StaffMenu.BuildJobArmoryWeaponGradesMenu()
             allowed and "check" or "empty",
             false,
             function()
-                -- L'enregistrement est commun aux deux branches, mais la branche « grade
-                -- déjà autorisé » passe par une saisie clavier, qui ne rend sa valeur
-                -- qu'après coup : on le factorise pour le rejouer dans les deux cas.
-                local function saveGrades()
-                    if mode == "edit" then
-                        local w = StaffMenu.currentJobArmoryWeaponData
-                        if w then
-                            w.allowed_grades = allowedGrades
-                            TriggerServerEvent("core:jobArmory:updateWeapon", w.id, "allowed_grades", allowedGrades)
-                        end
-                    else
-                        currentWeaponBuild.allowed_grades = allowedGrades
-                    end
-
-                    if StaffMenu.builderJobArmoryWeaponGrades.refresh then
-                        StaffMenu.builderJobArmoryWeaponGrades.refresh()
-                    end
-                end
-
                 if allowed then
-                    VFW.Nui.AskText("Max par joueur (0 pour retirer)", tostring(currentMax), function(result)
+                    local result = VFW.Nui.KeyboardInput(true, "Max par joueur (0 pour retirer)", tostring(currentMax))
+                    if result then
                         local newMax = tonumber(result)
                         if not newMax or newMax <= 0 then
                             toggleGradeInList(allowedGrades, selectedJob, gradeInfo.grade)
                         else
                             setGradeMax(allowedGrades, selectedJob, gradeInfo.grade, newMax)
                         end
-                        saveGrades()
-                    end)
-                    return
+                    end
+                else
+                    toggleGradeInList(allowedGrades, selectedJob, gradeInfo.grade)
                 end
 
-                toggleGradeInList(allowedGrades, selectedJob, gradeInfo.grade)
-                saveGrades()
+                if mode == "edit" then
+                    local w = StaffMenu.currentJobArmoryWeaponData
+                    if w then
+                        w.allowed_grades = allowedGrades
+                        TriggerServerEvent("core:jobArmory:updateWeapon", w.id, "allowed_grades", allowedGrades)
+                    end
+                else
+                    currentWeaponBuild.allowed_grades = allowedGrades
+                end
+
+                if StaffMenu.builderJobArmoryWeaponGrades.refresh then
+                    StaffMenu.builderJobArmoryWeaponGrades.refresh()
+                end
             end
         )
     end
