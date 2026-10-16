@@ -741,13 +741,20 @@ end)
 local DENSITY_VAR = "world_density"
 local DENSITY_KEYS = { "peds", "vehicles", "parked", "scenarios" }
 
+-- Jamais réglé : on garde le comportement historique du serveur, donné par le convar
+-- `entity_disable_density` (true = monde vide, comme avant cet outil).
+local function DensityDefault()
+    return GetConvar("entity_disable_density", "true") == "true" and 0.0 or 1.0
+end
+
 local function DensityConfig()
     local stored = Var(DENSITY_VAR)
+    local fallback = DensityDefault()
     local cfg = {}
     for i = 1, #DENSITY_KEYS do
         local key = DENSITY_KEYS[i]
         local value = tonumber(stored[key])
-        if not value or value < 0.0 or value > 1.0 then value = 1.0 end
+        if not value or value < 0.0 or value > 1.0 then value = fallback end
         cfg[key] = value + 0.0
     end
     return cfg

@@ -215,3 +215,25 @@ AddEventHandler('onClientResourceStart', function(res)
         TriggerServerEvent('core:branding:request')
     end
 end)
+
+
+--- URL absolue du logo du serveur, tel que configuré dans Gestion (ou dans les ConVars de
+--- marque). Utilisée partout où une interface a besoin d'une image d'identité : le logo de
+--- notification s'il est défini, sinon le logo principal.
+---@return string|nil
+function VFW.BrandLogoUrl()
+    local logo = liveAssets.notificationLogo
+    if type(logo) ~= "string" or logo == "" then
+        logo = BRANDING and BRANDING.logo
+    end
+
+    if type(logo) ~= "string" or logo == "" then return nil end
+    if logo:match("^https?://") or logo:match("^data:") or logo:match("^nui://") then
+        return logo
+    end
+
+    local base = (BRANDING and BRANDING.cdnBase) or ""
+    if base == "" then return nil end
+
+    return base .. "/" .. logo:gsub("^/", "")
+end

@@ -804,7 +804,9 @@ end)
 -- Get default banner URL
 local defaultBanner = VFW.CDN.Get("banners/f5.png")
 
-local main = VUI:CreateMenu("Menu Personnel", defaultBanner, true)
+-- Le contenu racine est quasi statique : on le conserve entre deux ouvertures et on ne le
+-- reconstruit que si le métier ou la faction a changé.
+local main = VUI:CreateMenu("Menu Personnel", defaultBanner, false)
 local documentsMenu = VUI:CreateSubMenu(main, "Mes Documents", defaultBanner, true)
 local vehiclesMenu = VUI:CreateSubMenu(main, "Mes véhicules", defaultBanner, true)
 local giveSelectVehicleMenu = VUI:CreateSubMenu(vehiclesMenu, "Donner un véhicule", defaultBanner, true)
@@ -858,6 +860,7 @@ local currentHolsterStyle = GetResourceKvpString("holster_style_label") or "Par 
 --           MAIN MENU RENDERING
 -- ==========================================
 
+local mainMenuSignature = nil
 local function renderMainMenu()
     -- Pas de TriggerServerCallback ici : le retour arrière part d'un keybind VUI
     -- (autre ressource) et un yield cross-resource casse l'OnOpen.
@@ -867,6 +870,16 @@ local function renderMainMenu()
     }
     local faction = VFW.PlayerData and VFW.PlayerData.faction or nil
     local hasFaction = faction and faction.name and faction.name ~= "nocrew"
+    local signature = table.concat({
+        tostring(job.name or ""),
+        tostring(job.label or ""),
+        tostring(hasFaction and faction.name or ""),
+        tostring(hasFaction and faction.label or "")
+    }, "|")
+
+    if mainMenuSignature == signature and #main.items > 0 then return end
+    main.ClearItems()
+    mainMenuSignature = signature
 
     -- ========== MES INFORMATIONS ==========
     main.Separator("Mes informations")
@@ -3185,4 +3198,3 @@ AddEventHandler("vfw:playerLoaded", function()
         exports["fb_boussole"]:SetStreetNameEnabled(true)
     end
 end)
-

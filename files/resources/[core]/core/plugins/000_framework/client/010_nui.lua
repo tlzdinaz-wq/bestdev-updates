@@ -708,8 +708,23 @@ function VFW.Nui.KeyboardInput(visible, text, defaultValue, keepInput, options)
         })
     end
 
+    -- Attente de la réponse du joueur. Elle était infinie : si la fenêtre ne s'affichait pas
+    -- (concurrence avec un autre écran) ou si la page ne répondait jamais, le joueur restait
+    -- avec le curseur bloqué, sans aucun message, jusqu'à la reconnexion.
+    local waited = 0
     while kbd_input == nil do
         Wait(100)
+        waited = waited + 100
+
+        if waited >= 25000 then
+            console.warn("[clavier] aucune réponse après 25 s : saisie abandonnée.")
+            VFW.Nui.KeyboardInputVisible(false)
+            VFW.ShowNotification({
+                type = 'ROUGE',
+                content = "La fenêtre de saisie n'a pas répondu. Réessayez, et signalez-le au staff si cela se reproduit.",
+            })
+            return ""
+        end
     end
 
     if kbd_input == "KBD_CANCEL" then
@@ -717,6 +732,50 @@ function VFW.Nui.KeyboardInput(visible, text, defaultValue, keepInput, options)
     end
 
     return kbd_input
+end
+
+--- Demande une saisie au clavier NUI depuis un menu VUI, puis rappelle `onDone`.
+---
+--- `VFW.Nui.KeyboardInput` attend la réponse du joueur : l'appel rend la main pendant
+--- l'attente, et c'est permis ici. Un bouton VUI est déclenché par un callback NUI de la
+--- ressource VUI, qui invoque la fonction du menu : cette fonction appartient à `core` et
+--- peut donc attendre. C'est ce que font déjà, et depuis toujours, le builder des métiers
+--- (modules/society/client/builder.lua) et les autres builders — les seules saisies qui ne
+--- s'ouvraient pas étaient justement celles qui passaient par un thread séparé.
+---
+--- Ne pas réintroduire de `CreateThread` ici : la fenêtre ne s'affiche alors pas du tout.
+---
+--- Pas de garde `if type(onDone) ~= "function" then return end` non plus : une garde de ce
+--- genre sort en silence, et c'est exactement ce qui rendait la panne indiagnosticable — le
+--- joueur appuyait sur un champ, rien ne se passait, et aucune trace nulle part. Si un
+--- appelant se trompe d'argument, l'erreur doit s'afficher dans la console.
+---
+---@param title string texte affiché au-dessus du champ
+---@param defaultValue string|nil valeur pré-remplie
+---@param onDone fun(value: string) appelé uniquement si la saisie n'est pas vide
+---@param options table|nil { numberOnly?: boolean, maxValue?: number }
+function VFW.Nui.AskText(title, defaultValue, onDone, options)
+    local input = VFW.Nui.KeyboardInput(true, title, defaultValue or "", nil, options)
+
+    input = tostring(input or ""):match("^%s*(.-)%s*$") or ""
+    if input == "" then return end
+
+    onDone(input)
+end
+
+--- Variante numérique : `onDone` ne reçoit que des nombres valides.
+---@param title string
+---@param defaultValue any
+---@param onDone fun(value: number)
+function VFW.Nui.AskNumber(title, defaultValue, onDone)
+    VFW.Nui.AskText(title, defaultValue and tostring(defaultValue) or "", function(value)
+        local number = tonumber(value)
+        if not number then
+            VFW.ShowNotification({ type = 'ROUGE', content = "Cette valeur n'est pas un nombre." })
+            return
+        end
+        onDone(number)
+    end)
 end
 
 RegisterNUICallback('nui:keyboardinput:response', function(data, cb)

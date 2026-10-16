@@ -69,12 +69,6 @@ local function doHeal(source, xPlayer, targetArg)
 
     target.setMeta("health", 200)
     TriggerClientEvent("vfw:healPlayer", target.source)
-
-    -- Soigner quelqu'un en le laissant affamé et assoiffé n'a pas de sens : la faim et
-    -- la soif repartent à plein en même temps que la santé. SetStatus écrit les deux
-    -- métadonnées et pousse la mise à jour au HUD du joueur.
-    VFW.SetStatus(target.source, 100, 100)
-
     TriggerEvent("vfw:logs:staff", source, "heal", { target = target.source, name = target.name })
 
     if xPlayer then
@@ -83,11 +77,11 @@ local function doHeal(source, xPlayer, targetArg)
             variant = "SUCCESS",
             subtitle = "Gestion Joueur",
             message = source == target.source
-                and "Santé, faim et soif restaurées."
-                or ("%s a été soigné, nourri et désaltéré."):format(target.name or ("#" .. target.source)),
+                and "Santé restaurée."
+                or ("%s a été soigné."):format(target.name or ("#" .. target.source)),
         })
     else
-        print(("[heal] %s (#%s) soigné, nourri et désaltéré."):format(target.name or "?", target.source))
+        print(("[heal] %s (#%s) soigné."):format(target.name or "?", target.source))
     end
     return true
 end
@@ -110,7 +104,7 @@ end)
 VFW.RegisterCommand("heal", "", function(source, xPlayer, args)
     doHeal(source, xPlayer, args and args[1])
 end, {
-    help = "Soigner un joueur sans le ranimer (santé, faim et soif)",
+    help = "Soigner un joueur sans le ranimer",
     params = { { name = "id", help = "ID du joueur (vide = soi-même)" } },
     allowConsole = true,
 })

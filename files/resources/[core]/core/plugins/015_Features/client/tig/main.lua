@@ -280,6 +280,30 @@ RegisterNetEvent("vfw:tig:start", function(data)
     sessionToken = sessionToken + 1
     local mySession = sessionToken
 
+    -- Entrée en TIG : le joueur était laissé là où il se trouvait et n'était ramené qu'au
+    -- moment où il sortait du rayon — depuis n'importe où sur la carte. On le conduit
+    -- directement dans l'enceinte, avec la collision chargée pour ne pas tomber à travers.
+    CreateThread(function()
+        local ped = PlayerPedId()
+        local center = ALCATRAZ_ZONE.center
+
+        if #(GetEntityCoords(ped) - center) > ALCATRAZ_ZONE.radius then
+            DoScreenFadeOut(300)
+            Wait(350)
+
+            SetEntityCoords(ped, center.x, center.y, center.z, false, false, false, true)
+            RequestCollisionAtCoord(center.x, center.y, center.z)
+
+            local started = GetGameTimer()
+            while not HasCollisionLoadedAroundEntity(ped) and (GetGameTimer() - started) < 5000 do
+                Wait(50)
+            end
+
+            SetEntityCoords(ped, center.x, center.y, center.z, false, false, false, true)
+            DoScreenFadeIn(500)
+        end
+    end)
+
     NotifyOtherSystems(true)
     AssignRandomTask()
     HideAllBlips()

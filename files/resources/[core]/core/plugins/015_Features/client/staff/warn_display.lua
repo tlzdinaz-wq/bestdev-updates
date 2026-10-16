@@ -104,3 +104,27 @@ AddEventHandler("vfw:staff:sanction:chooseMode", function(callbackEvent, ...)
     if not choice then return end
     TriggerServerEvent(callbackEvent, choice == "visual", table.unpack(extraArgs))
 end)
+
+
+-- Avertissement en mode « message » : il s'affiche dans le chat et s'accompagne d'un son,
+-- pour ne pas passer inaperçu comme une simple notification.
+RegisterNetEvent("vfw:warn:chat", function(reason, by)
+    reason = tostring(reason or "")
+
+    TriggerEvent("chat:addMessage", {
+        color = { 255, 80, 80 },
+        multiline = true,
+        args = {
+            "AVERTISSEMENT",
+            ("^1Vous avez reçu un avertissement du staff%s.^r^0 Motif : ^*%s"):format(
+                by and (" de " .. tostring(by)) or "", reason),
+        },
+    })
+
+    CreateThread(function()
+        for _ = 1, 2 do
+            PlaySoundFrontend(-1, "Beep_Red", "DLC_HEIST_HACKING_SNAKE_SOUNDS", true)
+            Wait(260)
+        end
+    end)
+end)

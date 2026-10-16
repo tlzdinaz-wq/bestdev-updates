@@ -188,19 +188,35 @@ function BuildRolesMenu(playerId, playerName)
     StaffMenu.permissionRoles.Separator(":user: " .. playerName)
     StaffMenu.permissionRoles.Separator("RÔLES DISPONIBLES")
 
-    -- List predefined roles (permissions loaded from DB on assign)
-    local roles = {
-        {id = "user", name = "Utilisateur"},
-        {id = "animator", name = "Animateur"},
-        {id = "niveau_1", name = "Niveau 1"},
-        {id = "niveau_2", name = "Niveau 2"},
-        {id = "niveau_3", name = "Niveau 3"},
-        {id = "niveau_4", name = "Niveau 4"},
-        {id = "niveau_5", name = "Niveau 5"},
-    }
+    -- Les rôles réellement enregistrés sur le serveur (y compris ceux créés dans Gestion >
+    -- Permissions). La liste était écrite en dur ici : tout rôle personnalisé était absent du
+    -- menu, et il était donc impossible de l'attribuer. `availableRoles` est déjà récupéré à
+    -- l'ouverture (vfw:staff:getAvailableRoles), il n'était simplement pas utilisé.
+    local roles = {}
+    if type(availableRoles) == "table" then
+        for _, role in ipairs(availableRoles) do
+            if type(role) == "table" and type(role.id) == "string" then
+                roles[#roles + 1] = role
+            end
+        end
+    end
+
+    if #roles == 0 then
+        -- repli si le serveur n'a pas répondu
+        roles = {
+            {id = "user", name = "Utilisateur"},
+            {id = "animator", name = "Animateur"},
+            {id = "niveau_1", name = "Niveau 1"},
+            {id = "niveau_2", name = "Niveau 2"},
+            {id = "niveau_3", name = "Niveau 3"},
+            {id = "niveau_4", name = "Niveau 4"},
+            {id = "niveau_5", name = "Niveau 5"},
+        }
+    end
 
     for _, role in ipairs(roles) do
-        StaffMenu.permissionRoles.Button(role.name, "Rôle prédéfini", nil, "arrow", false, function()
+        local subtitle = role.level and ("Niveau " .. tostring(role.level)) or "Rôle prédéfini"
+        StaffMenu.permissionRoles.Button(role.name, subtitle, nil, "arrow", false, function()
             local confirm = VFW.Nui.ConfirmPopup("Confirmation", "Attribuer le rôle " .. role.name .. " à " .. playerName .. " ?\n\nCela remplacera ses permissions actuelles.")
             if confirm then
                 TriggerServerEvent("vfw:staff:assignFullRole", playerId, role.id)

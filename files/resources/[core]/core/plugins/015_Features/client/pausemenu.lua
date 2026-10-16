@@ -14,63 +14,6 @@ local tileImages = {
     support = "",
 }
 
--- Mugshot de la tuile « Personnage ».
---
--- La prise automatique du mugshot à la connexion était désactivée depuis toujours, un
--- TODO laissé dans 000_framework/client/005_events.lua : `characters.mugshot` restait
--- vide et la tuile retombait sur son image générique.
---
--- Rien à photographier ni à téléverser pour autant : le jeu sait produire un portrait du
--- ped, et FiveM sait exposer une texture de jeu à l'interface par `nui-img`. L'image est
--- donc fabriquée sur place, sans passer par le serveur ni par un hébergeur.
---
--- Elle ne vaut que pour ce joueur, sur sa machine : c'est exactement ce que demande le
--- menu pause. Un mugshot enregistré en base, lui, reste prioritaire — il est partagé,
--- celui-ci non.
-local headshot = { handle = nil, url = nil }
-
-local function releaseHeadshot()
-    if headshot.handle and IsPedheadshotValid(headshot.handle) then
-        UnregisterPedheadshot(headshot.handle)
-    end
-    headshot.handle, headshot.url = nil, nil
-end
-
---- Fabrique le portrait du ped courant.
----
---- Les portraits de ped sont une ressource rare du moteur : on relâche toujours le
---- précédent avant d'en demander un autre, sinon le pool s'épuise et plus personne n'en
---- obtient.
-local function refreshHeadshot()
-    local ped = PlayerPedId()
-    if not ped or ped == 0 or not DoesEntityExist(ped) then return end
-
-    releaseHeadshot()
-
-    local handle = RegisterPedheadshotTransparent(ped)
-    if not handle or handle == 0 then return end
-
-    local waited = 0
-    while not IsPedheadshotReady(handle) and waited < 300 do
-        Wait(10)
-        waited = waited + 1
-    end
-
-    if not IsPedheadshotReady(handle) then
-        if IsPedheadshotValid(handle) then UnregisterPedheadshot(handle) end
-        return
-    end
-
-    local txd = GetPedheadshotTxdString(handle)
-    if type(txd) ~= "string" or txd == "" then
-        UnregisterPedheadshot(handle)
-        return
-    end
-
-    headshot.handle = handle
-    headshot.url = ("https://nui-img/%s/%s"):format(txd, txd)
-end
-
 local function resolveUrl(path)
     if type(path) ~= "string" or path == "" then return "" end
     if VFW.CdnUrl then return VFW.CdnUrl(path) end
@@ -89,7 +32,6 @@ end
 
 local function payload()
     local pd = VFW.PlayerData or {}
-    local stored = resolveUrl(pd.mugshot or "")
     local colors = (BRANDING and BRANDING.colors) or {}
     local links = (BRANDING and BRANDING.links) or {}
     local discord = links.discord or (BRANDING and BRANDING.discord) or ""
@@ -101,9 +43,7 @@ local function payload()
     return {
         brand = VFW.BrandName and VFW.BrandName() or (BRANDING and BRANDING.name) or "",
         logo = resolveUrl((BRANDING and BRANDING.logo) or "logo/logo.svg"),
-        -- Le mugshot enregistré prime : il est partagé avec les autres joueurs. À défaut,
-        -- le portrait fabriqué à l'instant, qui ne vaut que sur cette machine.
-        mugshot = stored ~= "" and stored or (headshot.url or ""),
+        mugshot = resolveUrl(pd.mugshot or ""),
         firstName = pd.firstName or "",
         lastName = pd.lastName or "",
         discord = discord,
@@ -171,17 +111,6 @@ local function Open()
     menuOpen = true
     hideHud()
     SendNUIMessage({ action = "pausemenu:open", data = payload() })
-
-    -- Le portrait demande quelques images au moteur : on ouvre le menu tout de suite et
-    -- on renvoie la tuile dès qu'il est prêt, plutôt que de retarder l'ouverture.
-    if not headshot.url then
-        CreateThread(function()
-            refreshHeadshot()
-            if menuOpen and headshot.url then
-                SendNUIMessage({ action = "pausemenu:open", data = payload() })
-            end
-        end)
-    end
     if VFW.Nui and VFW.Nui.Focus then
         VFW.Nui.Focus(true)
     else
@@ -331,17 +260,4 @@ end)
 
 RegisterNetEvent("vfw:onPlayerLoaded", function()
     TriggerServerEvent("core:pausemenu:request")
-end)
-
--- Changement de personnage ou de tenue : le portrait précédent ne correspond plus. On le
--- relâche, le prochain menu en fabriquera un autre.
-for _, event in ipairs({
-    "vfw:onPlayerLogout", "vfw:playerLoaded",
-    "skinchanger:modelLoaded", "skinchanger:loadClothes",
-}) do
-    AddEventHandler(event, releaseHeadshot)
-end
-
-AddEventHandler("onResourceStop", function(resource)
-    if resource == GetCurrentResourceName() then releaseHeadshot() end
 end)

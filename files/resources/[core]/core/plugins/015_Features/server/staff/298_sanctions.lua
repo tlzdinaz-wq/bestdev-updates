@@ -311,6 +311,30 @@ local function activeSanctionOf(accountId, kind)
     return nil
 end
 
+--- Message affiché au joueur banni quand il tente de se connecter (motif + échéance).
+--- Renvoie nil si aucun bannissement actif n'est trouvé dans le registre.
+---@param accountId any
+---@return string|nil
+function VFW.GetActiveBanMessage(accountId)
+    local id, payload = activeSanctionOf(accountId, "ban")
+    if not id or type(payload) ~= "table" then return nil end
+
+    local reason = payload.reason
+    if type(reason) ~= "string" or reason == "" then reason = "non précisé" end
+
+    -- L'identifiant du bannissement est la ligne du registre. Sans lui, un joueur qui
+    -- conteste ne peut rien donner au staff, et le staff doit fouiller l'historique pour
+    -- retrouver la sanction. C'est aussi lui qu'attend /unban.
+    local expires = humanDate(payload.expiresAt)
+    if expires then
+        return ("Vous êtes banni de ce serveur jusqu'au %s.\nMotif : %s\nBan ID : %s")
+            :format(expires, reason, tostring(id))
+    end
+
+    return ("Vous êtes banni définitivement de ce serveur.\nMotif : %s\nBan ID : %s")
+        :format(reason, tostring(id))
+end
+
 local function hasAnticheatBan(accountId)
     if accountId == nil or tostring(accountId) == "" then return false end
     local identifier = Staff29.Scalar("SELECT identifier FROM users WHERE id = ?", { tostring(accountId) })
@@ -349,8 +373,11 @@ local function applyWarn(target, payload)
     if not target.source then return end
 
     if payload.displayMode == "chat" then
+        -- Mode « message » : une notification passait, mais rien dans le chat et aucun son —
+        -- un joueur qui regardait ailleurs ne voyait jamais son avertissement.
         notifyTarget(target, "ERROR", "Avertissement",
             ("Vous avez reçu un avertissement du staff. Motif : %s"):format(payload.reason))
+        TriggerClientEvent("vfw:warn:chat", target.source, payload.reason, payload.by)
         return
     end
 
@@ -421,6 +448,31 @@ local function commitSanction(staffSource, xStaff, target, payload)
         applyTigWeapon(target, payload)
     elseif payload.type == "tig" then
         applyTig(target, payload)
+    end
+
+    -- Tout le staff connecté est informé, dans son chat : qui a sanctionné qui, et pourquoi.
+    if VFW.StaffBroadcast then
+        local labels = {
+            warn = "a averti", kick = "a kick", ban = "a banni",
+            tig = "a mis en TIG", tigweapon = "a retiré les armes de",
+        }
+        local label = labels[payload.type] or ("a sanctionné (" .. payload.type .. ")")
+        local duration = ""
+
+        if payload.type == "ban" then
+            duration = payload.expiresAt
+                and (" (%d %s)"):format(payload.durationAmount or 0, payload.durationUnit or "")
+                or " (définitif)"
+        elseif payload.type == "tig" then
+            duration = (" (%d tâches)"):format(payload.tasks or 0)
+        end
+
+        local tone = (payload.type == "ban" and "red")
+            or (payload.type == "kick" and "orange")
+            or "yellow"
+
+        VFW.StaffBroadcast(("%s %s %s%s — %s"):format(
+            payload.by or "Staff", label, payload.targetName or "?", duration, payload.reason or ""), tone)
     end
 
     auditLog(staffSource, "staff_sanction_" .. payload.type, {
@@ -1290,10 +1342,17 @@ local function wipeCharacter(staffSource, xStaff, accountId, charId)
         DropPlayer(owner.source, "Ce personnage a été réinitialisé par le staff. Reconnectez-vous pour continuer.")
     end
 
+    local wipedName = trim(("%s %s"):format(row.firstname or "", row.lastname or ""))
+
+    if VFW.StaffBroadcast then
+        VFW.StaffBroadcast(("%s a wipe le personnage %s"):format(
+            displayName(xStaff), wipedName ~= "" and wipedName or ("#" .. tostring(id))), "red")
+    end
+
     auditLog(staffSource, "staff_wipe", {
         charId = id,
         target = accountId,
-        targetName = trim(("%s %s"):format(row.firstname or "", row.lastname or "")),
+        targetName = wipedName,
         by = displayName(xStaff),
     })
 
@@ -1615,6 +1674,7 @@ end
 local function removeReport(index)
     local entry = reports[index]
     if not entry then return end
+    Staff29.ResetRateLimit(entry.player.source, "report")
     table.remove(reports, index)
     broadcastReport("vfw:staff:deleteReport", entry.id)
     -- Toujours renvoyer la liste (y compris vide) : le HUD staff ne doit pas rester à 1.
@@ -1631,10 +1691,6 @@ end)
 --- Ouvre un signalement pour un joueur (commande /report et formulaire Support du pause menu).
 --- Retourne true, ou false + message d'erreur destiné au joueur.
 local function submitReport(source, xPlayer, rawMessage)
-    if not Staff29.RateLimit(source, "report", 30000) then
-        return false, "Vous venez déjà d'envoyer un signalement."
-    end
-
     local message = trim(Staff29.Clean(rawMessage, REPORT_MAX_LEN))
     if not message or #message < REPORT_MIN_LEN then
         return false, "Décrivez votre problème en quelques mots."
@@ -1648,6 +1704,10 @@ local function submitReport(source, xPlayer, rawMessage)
 
     if #reports >= REPORT_MAX then
         return false, "Le staff est saturé, réessayez dans un moment."
+    end
+
+    if not Staff29.RateLimit(source, "report", 30000) then
+        return false, "Vous venez déjà d'envoyer un signalement."
     end
 
     reportSeq = reportSeq + 1
@@ -1794,3 +1854,202 @@ CreateThread(function()
     while not VFW.Ready do Wait(250) end
     console.init("Sanctions", "sanctions, reports et wipes branchés sur logs_staff")
 end)
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- Commandes de modération
+--
+-- /kick et /ban n'existaient nulle part : seules leurs permissions étaient déclarées
+-- dans la configuration. Tout passait par le menu staff. Elles rejouent exactement le
+-- même chemin que le menu (ledger, antiban, annonce au staff, journal).
+-- ══════════════════════════════════════════════════════════════════════════
+
+--- Durée de bannissement écrite à la main : « perm », « 12h », « 7j ».
+---@param text string|nil
+---@return table|nil {unit, amount} ou nil si invalide
+local function parseBanDuration(text)
+    if type(text) ~= "string" then return nil end
+    text = text:lower()
+
+    if text == "perm" or text == "permanent" or text == "def" or text == "definitif" then
+        return { unit = "permanent" }
+    end
+
+    local amount, unit = text:match("^(%d+)%s*([hjd]?)$")
+    amount = tonumber(amount)
+    if not amount or amount < 1 then return nil end
+
+    if unit == "h" then
+        if amount > BAN_MAX_HOURS then return nil end
+        return { unit = "hours", amount = amount }
+    end
+
+    -- j (jours) ou rien : par défaut en jours
+    if amount > BAN_MAX_DAYS then return nil end
+    return { unit = "days", amount = amount }
+end
+
+VFW.RegisterCommand("kick", "kick", function(source, xPlayer, args)
+    local target = resolveBySession(args and args[1])
+    if not target then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Joueur introuvable.")
+        return
+    end
+
+    if not target.source then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Ce joueur n'est pas connecté.")
+        return
+    end
+
+    if VFW.IsAntiban and VFW.IsAntiban(target.accountId) then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Ce joueur est protégé (antiban).")
+        return
+    end
+
+    local reason = cleanReason(table.concat(args or {}, " ", math.min(2, #(args or {}) + 1)))
+    if not reason then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Motif manquant ou trop court.")
+        return
+    end
+
+    commitSanction(source, xPlayer, target, { type = "kick", reason = reason, active = false })
+end, {
+    help = "Expulser un joueur du serveur",
+    params = {
+        { name = "id", help = "ID du joueur" },
+        { name = "raison", help = "Motif communiqué au joueur" },
+    },
+})
+
+VFW.RegisterCommand("ban", "ban", function(source, xPlayer, args)
+    args = args or {}
+
+    local target = resolveBySession(args[1])
+    if not target then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Joueur introuvable.")
+        return
+    end
+
+    if VFW.IsAntiban and VFW.IsAntiban(target.accountId) then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Ce joueur est protégé (antiban).")
+        return
+    end
+
+    local duration = parseBanDuration(args[2])
+    if not duration then
+        Staff29.Notify(source, "ERROR", "Sanctions",
+            "Durée invalide. Exemples : perm, 12h, 7j.")
+        return
+    end
+
+    local reason = cleanReason(table.concat(args, " ", math.min(3, #args + 1)))
+    if not reason then
+        Staff29.Notify(source, "ERROR", "Sanctions", "Motif manquant ou trop court.")
+        return
+    end
+
+    local payload = { type = "ban", reason = reason, active = true }
+
+    if duration.unit == "hours" then
+        payload.durationUnit = "heures"
+        payload.durationAmount = duration.amount
+        payload.durationSeconds = duration.amount * 3600
+        payload.expiresAt = unixNow() + payload.durationSeconds
+    elseif duration.unit == "days" then
+        payload.durationUnit = "jours"
+        payload.durationAmount = duration.amount
+        payload.durationSeconds = duration.amount * 86400
+        payload.expiresAt = unixNow() + payload.durationSeconds
+    end
+
+    commitSanction(source, xPlayer, target, payload)
+end, {
+    help = "Bannir un joueur",
+    params = {
+        { name = "id", help = "ID du joueur" },
+        { name = "duree", help = "perm, 12h ou 7j" },
+        { name = "raison", help = "Motif du bannissement" },
+    },
+})
+
+--- Lever un bannissement par son identifiant.
+---
+--- Le menu staff le faisait deja (bouton UNBAN), mais il n'existait aucune commande : un
+--- staff sans acces au menu, ou la console du serveur, n'avait aucun moyen de debannir.
+--- L'identifiant demande est celui affiche au joueur banni et dans la liste ci-dessous.
+VFW.RegisterCommand("unban", "ban", function(source, xPlayer, args)
+    local banId = tonumber(args and args[1])
+
+    if not banId then
+        if source == 0 then
+            console.warn("Usage : unban <ban id>  (voir `banlist` pour les identifiants)")
+        else
+            Staff29.Notify(source, "ERROR", "Sanctions", "Indiquez l'identifiant du bannissement.")
+        end
+        return
+    end
+
+    -- Depuis la console, il n'y a pas de staff a qui attribuer la levee : on passe par le
+    -- meme chemin avec un auteur nul, le registre notera une levee console.
+    if revokeSanction(source, xPlayer, banId, { ban = true }, nil) then
+        if source == 0 then
+            console.info(("Bannissement #%d leve."):format(banId))
+        else
+            Staff29.Notify(source, "SUCCESS", "Sanctions", ("Bannissement #%d levé."):format(banId))
+        end
+        return
+    end
+
+    if source == 0 then
+        console.warn(("Bannissement #%d introuvable ou deja leve."):format(banId))
+    else
+        Staff29.Notify(source, "ERROR", "Sanctions", "Ce bannissement est introuvable ou déjà levé.")
+    end
+end, {
+    help = "Lever un bannissement par son identifiant",
+    params = { { name = "banid", help = "Identifiant affiche au joueur banni" } },
+    allowConsole = true,
+})
+
+--- Liste des bannissements actifs, avec leur identifiant.
+---
+--- Il n'y a pas de table `bans` a creer : une sanction est une ligne de `logs_staff`, et son
+--- `id` est l'identifiant du bannissement. Cette commande evite d'avoir a ecrire la requete.
+VFW.RegisterCommand("banlist", "ban", function(source)
+    local rows = Staff29.Query(([[
+        SELECT id, payload FROM logs_staff
+        WHERE action = ? AND payload LIKE '%%"active":true%%'
+        ORDER BY id DESC LIMIT %d
+    ]]):format(SCAN_LIMIT), { LEDGER.ban })
+
+    local lines, n = {}, 0
+    for i = 1, #rows do
+        local payload = Staff29.Decode(rows[i].payload, nil)
+        if type(payload) == "table" and payload.active and not isExpired(payload) then
+            n = n + 1
+            lines[n] = ("#%s  %s  %s  motif : %s"):format(
+                rows[i].id,
+                tostring(payload.targetName or payload.target or "?"),
+                humanDate(payload.expiresAt) or "definitif",
+                tostring(payload.reason or "non precise"))
+        end
+    end
+
+    if n == 0 then
+        if source == 0 then console.info("Aucun bannissement actif.")
+        else Staff29.Notify(source, "INFO", "Sanctions", "Aucun bannissement actif.") end
+        return
+    end
+
+    if source == 0 then
+        console.info(("%d bannissement(s) actif(s) :"):format(n))
+        for i = 1, n do print("  " .. lines[i]) end
+        return
+    end
+
+    Staff29.Notify(source, "INFO", "Sanctions", ("%d bannissement(s) actif(s) — detail en console."):format(n))
+    for i = 1, n do print("  " .. lines[i]) end
+end, {
+    help = "Lister les bannissements actifs et leur identifiant",
+    allowConsole = true,
+})

@@ -51,7 +51,7 @@ BarsDefaultItems = {
         { item = "biere_brune", section = "BOISSONS" },
         { item = "biere_ambree", section = "BOISSONS" },
         { item = "biere_blonde_generique", section = "BOISSONS" },
-        { item = "Auroramel", section = "BOISSONS" },
+        { item = "hydromel", section = "BOISSONS" },
         { item = "whisky_sec", section = "BOISSONS" },
         { item = "vodka", section = "BOISSONS" },
         { item = "cola", section = "BOISSONS" },

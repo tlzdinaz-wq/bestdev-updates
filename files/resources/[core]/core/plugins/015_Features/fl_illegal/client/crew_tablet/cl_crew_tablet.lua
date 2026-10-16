@@ -5,10 +5,15 @@ local isTabletOpen = false
 local currentFactionData = nil
 
 --- OpenFactionTablet - Opens the faction management tablet
+--- Appelée depuis les menus VUI (autre ressource) : tout le corps tourne dans un thread de
+--- core, sinon les TriggerServerCallback ci-dessous font échouer l'appel (yield inter-ressource)
+--- et la tablette ne s'ouvre jamais.
 function OpenFactionTablet()
     if isTabletOpen then
         return
     end
+
+    CreateThread(function()
 
     local faction = VFW.PlayerData.faction
     if not faction or faction.name == "nocrew" then
@@ -44,6 +49,7 @@ function OpenFactionTablet()
         VFW.ShowNotification({ type = "ILLEGAL", message = "Vous n'avez pas accès à la tablette faction" })
         CloseFactionTablet()
     end
+    end)
 end
 
 --- CloseFactionTablet - Closes the faction management tablet

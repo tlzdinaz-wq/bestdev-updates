@@ -9,13 +9,21 @@
 TIGConfig = {}
 
 -- Zone de confinement (spawn + anti-sortie)
+--
+-- Elle était posée en plein centre de Los Santos (238, -888 = Legion Square) alors que les
+-- points de sortie, eux, sont à la prison de Bolingbroke : un joueur mis en TIG restait donc
+-- en ville et se faisait renvoyer au centre-ville dès qu'il s'éloignait. La zone est
+-- maintenant la prison, et le joueur y est téléporté au début de sa peine.
+--
+-- Pour l'ajuster au mètre près : place-toi à l'endroit voulu en jeu, relève tes coordonnées
+-- et remplace `center` ci-dessous (le rayon couvre l'enceinte).
 TIGConfig.Zone = {
-    center = vector3(238.06, -888.70, 29.49),
-    radius = 65.0,
-    welcomeText = vector3(238.06, -888.70, 31.10),
+    center = vector3(1765.0, 2560.0, 45.2),
+    radius = 95.0,
+    welcomeText = vector3(1765.0, 2560.0, 46.8),
 }
 
--- Téléports de sortie
+-- Téléports de sortie (devant la prison, à l'extérieur de l'enceinte)
 TIGConfig.Release = {
     -- Fin des TIG (complétion)
     completed = vector3(1847.85, 2608.33, 44.59),
@@ -38,11 +46,11 @@ TIGConfig.Tasks = {
         },
         duration = 10000,
         positions = {
-            vector3(231.80, -887.10, 29.49),
-            vector3(242.10, -892.20, 29.49),
-            vector3(249.30, -884.60, 29.49),
-            vector3(235.20, -876.80, 29.49),
-            vector3(225.70, -896.40, 29.49),
+            vector3(1735.0, 2540.0, 45.2),
+            vector3(1760.0, 2520.0, 45.2),
+            vector3(1800.0, 2535.0, 45.2),
+            vector3(1730.0, 2575.0, 45.2),
+            vector3(1790.0, 2590.0, 45.2),
         },
     },
     {
@@ -58,8 +66,8 @@ TIGConfig.Tasks = {
         },
         duration = 8000,
         positions = {
-            vector3(251.20, -898.60, 29.49),
-            vector3(220.80, -883.30, 29.49),
+            vector3(1720.0, 2555.0, 45.2),
+            vector3(1745.0, 2600.0, 45.2),
         },
     },
     {
@@ -76,7 +84,7 @@ TIGConfig.Tasks = {
         duration = 12000,
         positions = {
             vector3(238.60, -904.80, 29.49),
-            vector3(256.40, -878.90, 29.49),
+            vector3(1810.0, 2565.0, 45.2),
         },
     },
     {
@@ -92,9 +100,9 @@ TIGConfig.Tasks = {
         },
         duration = 15000,
         positions = {
-            vector3(213.90, -890.70, 29.49),
-            vector3(245.60, -869.50, 29.49),
-            vector3(260.10, -894.20, 29.49),
+            vector3(1775.0, 2525.0, 45.2),
+            vector3(1700.0, 2590.0, 45.2),
+            vector3(1820.0, 2600.0, 45.2),
         },
     },
     {
@@ -110,9 +118,9 @@ TIGConfig.Tasks = {
         },
         duration = 11000,
         positions = {
-            vector3(227.30, -870.40, 29.49),
-            vector3(267.80, -884.70, 29.49),
-            vector3(240.70, -862.90, 29.49),
+            vector3(1750.0, 2570.0, 45.2),
+            vector3(1795.0, 2510.0, 45.2),
+            vector3(1715.0, 2520.0, 45.2),
         },
     },
 }

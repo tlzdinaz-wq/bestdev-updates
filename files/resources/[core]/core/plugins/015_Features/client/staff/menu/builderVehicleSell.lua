@@ -69,7 +69,10 @@ local function fcRefresh(Menu)
     end
     Menu.refresh()
     VUI_MenuStack = savedStack
-    isRefreshing = false
+    -- Le gestionnaire de fermeture du menu est appelé dans un thread par VUI : il arrive
+    -- APRÈS cette ligne. Remis à false aussitôt, le drapeau ne protégeait de rien et les
+    -- aperçus de véhicules étaient détruits à chaque rafraîchissement.
+    SetTimeout(750, function() isRefreshing = false end)
 end
 
 local function fcCoordsStr(c)

@@ -54,7 +54,10 @@ StaffMenu.builderGouvLogsActions.OnOpen(function()
       cachedActionsLogs = TriggerServerCallback("staff:getGouvLogs", { search = actionsLogsSearch, category = "actions" }) or {}
         isActionsLogsRefreshing = true
         StaffMenu.builderGouvLogsActions.refresh()
-        isActionsLogsRefreshing = false
+        -- Le gestionnaire de fermeture du menu est appelé dans un thread par VUI : il arrive
+        -- APRÈS cette ligne. Remis à false aussitôt, le drapeau ne le protégeait de rien et le
+        -- menu effaçait ce qui venait d'être saisi. On laisse la garde vivre le temps du cycle.
+        SetTimeout(750, function() isActionsLogsRefreshing = false end)
     end)
 
     if #cachedActionsLogs == 0 then
@@ -96,7 +99,10 @@ StaffMenu.builderGouvLogsMDT.OnOpen(function()
       cachedMDTLogs = TriggerServerCallback("staff:getGouvLogs", { search = mdtLogsSearch, category = "mdt" }) or {}
         isMDTLogsRefreshing = true
         StaffMenu.builderGouvLogsMDT.refresh()
-        isMDTLogsRefreshing = false
+        -- Le gestionnaire de fermeture du menu est appelé dans un thread par VUI : il arrive
+        -- APRÈS cette ligne. Remis à false aussitôt, le drapeau ne le protégeait de rien et le
+        -- menu effaçait ce qui venait d'être saisi. On laisse la garde vivre le temps du cycle.
+        SetTimeout(750, function() isMDTLogsRefreshing = false end)
     end)
 
     if #cachedMDTLogs == 0 then

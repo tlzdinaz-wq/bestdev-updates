@@ -79,6 +79,26 @@ function VFW.BrandAssetExists(rel)
     return exists
 end
 
+--- Chemin de l'image d'un objet, cherché par son nom dans `interface/brand/items/`.
+---
+--- Les packs d'icônes du commerce sont livrés en PNG ; seule l'extension `.webp` était
+--- essayée, et un pack posé dans le bon dossier avec les bons noms restait invisible.
+--- On essaie donc les formats que le navigateur sait afficher, dans l'ordre de préférence.
+---@param name string
+---@return string|nil chemin relatif à `interface/brand/`
+function VFW.ItemImageRelPath(name)
+    if type(name) ~= "string" or name == "" then return nil end
+
+    local extensions <const> = { "webp", "png", "jpg", "jpeg", "svg", "gif" }
+
+    for i = 1, #extensions do
+        local rel = ("items/%s.%s"):format(name, extensions[i])
+        if VFW.BrandAssetExists(rel) then return rel end
+    end
+
+    return nil
+end
+
 ---@return string
 function VFW.ItemPlaceholderUrl()
     return VFW.CdnUrl("items/placeholder.svg")
@@ -113,11 +133,9 @@ function VFW.ItemImageUrl(name, def)
             return VFW.CdnUrl(rel)
         end
     end
-    if type(name) == "string" and name ~= "" then
-        local byName = ("items/%s.webp"):format(name)
-        if VFW.BrandAssetExists(byName) then
-            return VFW.CdnUrl(byName)
-        end
+    local byName = VFW.ItemImageRelPath(name)
+    if byName then
+        return VFW.CdnUrl(byName)
     end
     return VFW.ItemPlaceholderUrl()
 end

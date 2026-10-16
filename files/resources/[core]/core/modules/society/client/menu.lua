@@ -1429,8 +1429,13 @@ end)
 local function renderJobMenu()
     local jobName = VFW.PlayerData.job.name
 
-    main.Checkbox("Prise de service", "", false, Society.data.service or false, function(checked)
-        Society.data.service = checked
+    -- Society.data peut être remplacé par ce que renvoie le serveur : si la société du métier
+    -- n'existe pas encore, une lecture directe fait planter tout le rendu et le menu s'ouvre
+    -- vide (fond assombri, aucune ligne).
+    local onService = (Society.data and Society.data.service) or VFW.PlayerData.job.onDuty or false
+
+    main.Checkbox("Prise de service", "", false, onService, function(checked)
+        if Society.data then Society.data.service = checked end
         VFW.ChangeDuty(checked)
         main.refresh()
     end)
@@ -1451,7 +1456,9 @@ local function renderJobMenu()
         if jobName == "sams_pib" or jobName == "sams_pab" then
             main.Button("Faire une Facture", "Ouvre le MDT Médical", nil, "chevron", false, function()
                 main.close()
-                SN_SAMS.OpenMDT()
+                -- Yield inter-ressource : l'ouverture (callbacks serveur) doit vivre dans un
+                -- thread de core, sinon FiveM refuse l'appel depuis le callback NUI de VUI.
+                CreateThread(function() SN_SAMS.OpenMDT() end)
                 SetTimeout(300, function()
                     SendNUIMessage({ action = "nui:sams:openInvoice", data = {} })
                 end)
@@ -1519,7 +1526,9 @@ local function renderJobMenu()
 
             main.Button("Ouvrir le MDT", "Gestion des alertes, rapports et dossiers", nil, "chevron", false, function()
                 main.close()
-                SN_SAMS.OpenMDT()
+                -- Yield inter-ressource : l'ouverture (callbacks serveur) doit vivre dans un
+                -- thread de core, sinon FiveM refuse l'appel depuis le callback NUI de VUI.
+                CreateThread(function() SN_SAMS.OpenMDT() end)
             end)
         end
 
@@ -1539,7 +1548,9 @@ local function renderJobMenu()
 
             if hasTabletPerm then
                 main.Button("Tablette Gouvernement", "Gestion Gouvernemental", nil, "chevron", false, function()
-                    OpenGouvernementPanel()
+                    -- Yield inter-ressource : l'ouverture (callbacks serveur) doit vivre dans un
+                    -- thread de core, sinon FiveM refuse l'appel depuis le callback NUI de VUI.
+                    CreateThread(function() OpenGouvernementPanel() end)
                     main.close()
                 end)
             end
@@ -1579,7 +1590,9 @@ local function renderJobMenu()
             end, policeToolsSubMenu)
 
             main.Button("Ouvrir le MDT", "Terminal de données police", nil, "chevron", false, function()
-                OpenPolicePanel()
+                -- Yield inter-ressource : l'ouverture (callbacks serveur) doit vivre dans un
+                -- thread de core, sinon FiveM refuse l'appel depuis le callback NUI de VUI.
+                CreateThread(function() OpenPolicePanel() end)
                 main.close()
             end)
         end
@@ -1589,7 +1602,9 @@ local function renderJobMenu()
             main.Separator("Milice Cayo")
 
             main.Button("Ouvrir le MDT", "Terminal de la Milice de Cayo", nil, "chevron", false, function()
-                OpenPolicePanel()
+                -- Yield inter-ressource : l'ouverture (callbacks serveur) doit vivre dans un
+                -- thread de core, sinon FiveM refuse l'appel depuis le callback NUI de VUI.
+                CreateThread(function() OpenPolicePanel() end)
                 main.close()
             end)
         end
@@ -1618,15 +1633,22 @@ local function renderJobMenu()
             end, usssToolsSubMenu)
 
             main.Button("Ouvrir le MDT", "Terminal de données USSS", nil, "chevron", false, function()
-                OpenUSSSPanel()
+                -- Yield inter-ressource : l'ouverture (callbacks serveur) doit vivre dans un
+                -- thread de core, sinon FiveM refuse l'appel depuis le callback NUI de VUI.
+                CreateThread(function() OpenUSSSPanel() end)
                 main.close()
             end)
         end
 
         -- Boss panel at the end
         main.Button("Accès à la tablette", "", nil, "chevron", false, function()
-            VFW.BossPanel.openBossPanel()
             main.close()
+            -- Le clic provient du callback NUI de la ressource VUI. L'ouverture de la tablette
+            -- attend plusieurs callbacks serveur : elle doit donc vivre dans un thread core,
+            -- sinon FiveM refuse le yield cross-resource (function reference failed).
+            CreateThread(function()
+                VFW.BossPanel.openBossPanel()
+            end)
         end) 
     end
 end

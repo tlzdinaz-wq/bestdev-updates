@@ -9,60 +9,41 @@ local function Keybind(key, command, name, callback)
     RegisterKeyMapping("+vui_" .. command, name, "keyboard", key)
 end
 
--- Single thread handling both up/down navigation (avoids two Wait(0) threads running simultaneously)
-CreateThread(function()
-    local timerUp = 0
-    local timerDown = 0
-    local holdUp = 0
-    local holdDown = 0
-    while true do
-        if not VUI_CurrentMenu or VUI_HubMode then
-            Wait(300)
-        else
-            Wait(0)
+-- Navigation événementielle : aucun polling Wait(0) tant qu'une touche n'est pas tenue.
+-- Cela retire un thread par-frame de tous les menus VUI ouverts.
+local navHeld = { up = false, down = false }
 
-            -- UP
-            if IsControlJustPressed(0, 172) or IsDisabledControlJustPressed(0, 172) then
-                SendNUIMessage({ action = "vui:menu:up" })
-            end
-            if IsControlPressed(0, 172) or IsDisabledControlPressed(0, 172) then
-                timerUp = timerUp + 1
-                if timerUp > 35 then
-                    holdUp = holdUp + 1
-                    SendNUIMessage({ action = "vui:menu:up" })
-                    local delay = 200
-                    if holdUp > 120 then
-                        delay = math.max(75, 200 - math.floor((holdUp - 120) / 30) * 25)
-                    end
-                    Wait(delay)
-                end
-            else
-                timerUp = 0
-                holdUp = 0
-            end
+local function RegisterNavigationKey(direction, key, label)
+    local pressCommand = "+vui_menu_" .. direction
+    local releaseCommand = "-vui_menu_" .. direction
 
-            -- DOWN
-            if IsControlJustPressed(0, 173) or IsDisabledControlJustPressed(0, 173) then
-                SendNUIMessage({ action = "vui:menu:down" })
+    RegisterCommand(pressCommand, function()
+        if not VUI_CurrentMenu or VUI_HubMode or navHeld[direction] then return end
+
+        navHeld[direction] = true
+        SendNUIMessage({ action = "vui:menu:" .. direction })
+
+        CreateThread(function()
+            Wait(350)
+            local repeatCount = 0
+            while navHeld[direction] and VUI_CurrentMenu and not VUI_HubMode do
+                SendNUIMessage({ action = "vui:menu:" .. direction })
+                repeatCount = repeatCount + 1
+                Wait(repeatCount > 12 and 75 or 125)
             end
-            if IsControlPressed(0, 173) or IsDisabledControlPressed(0, 173) then
-                timerDown = timerDown + 1
-                if timerDown > 35 then
-                    holdDown = holdDown + 1
-                    SendNUIMessage({ action = "vui:menu:down" })
-                    local delay = 200
-                    if holdDown > 120 then
-                        delay = math.max(75, 200 - math.floor((holdDown - 120) / 30) * 25)
-                    end
-                    Wait(delay)
-                end
-            else
-                timerDown = 0
-                holdDown = 0
-            end
-        end
-    end
-end)
+            navHeld[direction] = false
+        end)
+    end, false)
+
+    RegisterCommand(releaseCommand, function()
+        navHeld[direction] = false
+    end, false)
+
+    RegisterKeyMapping(pressCommand, label, "keyboard", key)
+end
+
+RegisterNavigationKey("up", "up", "Menu haut")
+RegisterNavigationKey("down", "down", "Menu bas")
 
 -- Flèche gauche → ◀ sur List/List2/Slider
 Keybind("left", "menu_left", "Menu gauche", function()

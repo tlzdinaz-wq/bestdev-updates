@@ -467,6 +467,36 @@ CreateThread(function()
         console.info(("[Jobs] %d metier(s) manquant(s) cree(s) en base."):format(created))
     end
 
+    -- Un métier ne vit pas que dans `jobs` : presque tout le reste de la base lit la table
+    -- `societies` — la liste « Modifier un métier » du builder, la reconnaissance
+    -- police / milice (Society.minifiedList, donc le dispatch et les alertes), le blip, la
+    -- position du Panneau Patron, le coffre et le compte entreprise. EnsureJob ne remplissait
+    -- que `jobs` et `job_grades` : les métiers existaient sans rien autour, d'où un serveur
+    -- « sans aucun métier configuré » alors que la table `jobs` en contenait vingt.
+    -- On rattrape aussi les installations existantes : tout métier sans société en reçoit une.
+    local linked = 0
+    if VFW.Society and VFW.Society.Ensure and VFW.Society.Get then
+        for name, definition in pairs(VFW.Jobs or {}) do
+            -- On ne se fie qu'aux entrées venant vraiment de la table `jobs` : un fichier
+            -- partagé occupe le même nom global (VFW.Jobs.ContextMenu / RadialMenu / Menu)
+            -- avant le chargement de la base, et il ne doit jamais devenir une société.
+            local isJobRow = type(definition) == "table" and definition.name == name and definition.grades ~= nil
+
+            if isJobRow and name ~= "" and name ~= "unemployed" and not VFW.Society.Get(name) then
+                local ok, err = pcall(VFW.Society.Ensure, name)
+                if ok then
+                    linked = linked + 1
+                else
+                    console.error(("[Jobs] société de '%s' non créée : %s"):format(name, tostring(err)))
+                end
+            end
+        end
+    end
+
+    if linked > 0 then
+        console.info(("[Jobs] %d societe(s) creee(s) pour des metiers qui n'en avaient pas."):format(linked))
+    end
+
     JC.JobsSeeded = true
 end)
 

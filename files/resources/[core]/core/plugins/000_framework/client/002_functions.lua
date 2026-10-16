@@ -361,6 +361,14 @@ end
 ---@param alert table
 ---@return nil
 function VFW.CreateAlert(content, image)
+    -- Sans image, le serveur envoyait une chaîne vide : l'interface construisait alors une
+    -- URL incomplète, l'image échouait, et le filet de sécurité affichait le visuel
+    -- « image manquante » à la place du logo. On met le logo du serveur (celui configuré
+    -- dans Gestion) dès qu'aucune image précise n'est demandée.
+    if type(image) ~= "string" or image == "" then
+        image = VFW.BrandLogoUrl and VFW.BrandLogoUrl() or nil
+    end
+
     SendNUIMessage({
         action = "nui:hud:create-alert",
         data = {
@@ -1031,7 +1039,7 @@ function VFW.Game.GetVehicleProperties(vehicle)
         modAPlate = GetVehicleMod(vehicle, 35),
         modSpeakers = GetVehicleMod(vehicle, 36),
         modTrunk = GetVehicleMod(vehicle, 37),
-        modAuroralic = GetVehicleMod(vehicle, 38),
+        modHydrolic = GetVehicleMod(vehicle, 38),
         modEngineBlock = GetVehicleMod(vehicle, 39),
         modAirFilter = GetVehicleMod(vehicle, 40),
         modStruts = GetVehicleMod(vehicle, 41),
@@ -1307,8 +1315,8 @@ function VFW.Game.SetVehicleProperties(vehicle, props)
         SetVehicleMod(vehicle, 37, props.modTrunk, false)
     end
 
-    if props.modAuroralic ~= nil then
-        SetVehicleMod(vehicle, 38, props.modAuroralic, false)
+    if props.modHydrolic ~= nil then
+        SetVehicleMod(vehicle, 38, props.modHydrolic, false)
     end
 
     if props.modEngineBlock ~= nil then

@@ -940,7 +940,7 @@ RegisterNetEvent("vfw:staff:menu:spawnVehicle", function(model)
     logStaff(source, "vehicle_spawn_menu", { model = cleaned, coords = coords })
 end)
 
-VFW.RegisterCommand("car", "spawn_veh", function(source, xPlayer, args)
+local function spawnCarCommand(source, xPlayer, args)
     if not rateOk(source, "staff:commandCar", 1000) then return end
 
     local cleaned = cleanModel(args and args[1])
@@ -984,12 +984,18 @@ VFW.RegisterCommand("car", "spawn_veh", function(source, xPlayer, args)
 
     notify(source, "SUCCESS", ("Véhicule %s apparu."):format(cleaned))
     logStaff(source, "vehicle_spawn_command", { model = cleaned, coords = coords })
-end, {
-    help = "Faire apparaître un véhicule staff",
-    params = {
-        { name = "modele", help = "Nom spawn du véhicule (ex: sultan)" },
-    },
-})
+end
+
+-- Même commande sous trois noms : le véhicule apparaît devant le staff et il est
+-- directement placé au volant.
+for _, name in ipairs({ "car", "veh", "spawncar" }) do
+    VFW.RegisterCommand(name, "spawn_veh", spawnCarCommand, {
+        help = "Faire apparaître un véhicule staff (vous montez dedans)",
+        params = {
+            { name = "modele", help = "Nom spawn du véhicule (ex: sultan)" },
+        },
+    })
+end
 
 RegisterNetEvent("vfw:animator:spawnVehicle", function(model)
     local source = source
@@ -1414,3 +1420,54 @@ CreateThread(function()
         Wait(100)
     end
 end)
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- /dv — supprime le véhicule le plus proche
+--
+-- La permission « dv » existait dans la configuration depuis le début, mais la commande
+-- n'avait jamais été écrite (et son nom était même retiré des suggestions du chat).
+-- ══════════════════════════════════════════════════════════════════════════
+
+VFW.RegisterCommand("dv", "dv", function(source, xPlayer, args)
+    if not rateOk(source, "staff:commandDv", 500) then return end
+
+    local radius = tonumber(args and args[1]) or 5.0
+    radius = math.max(1.0, math.min(100.0, radius))
+
+    local ped = GetPlayerPed(source)
+    if not ped or ped == 0 then return end
+
+    -- Dans un véhicule : c'est celui-là qu'on supprime, sans chercher plus loin.
+    local current = GetVehiclePedIsIn(ped)
+    if current and current ~= 0 and DoesEntityExist(current) then
+        DeleteEntity(current)
+        notify(source, "SUCCESS", "Véhicule supprimé.")
+        logStaff(source, "vehicle_delete", { mode = "current" })
+        return
+    end
+
+    local coords = GetEntityCoords(ped)
+    local closest, closestDistance = nil, radius + 1.0
+
+    for _, vehicle in ipairs(GetAllVehicles()) do
+        if DoesEntityExist(vehicle) then
+            local distance = #(coords - GetEntityCoords(vehicle))
+            if distance < closestDistance then
+                closest, closestDistance = vehicle, distance
+            end
+        end
+    end
+
+    if not closest then
+        notify(source, "ERROR", ("Aucun véhicule à moins de %d m."):format(math.floor(radius)))
+        return
+    end
+
+    DeleteEntity(closest)
+    notify(source, "SUCCESS", ("Véhicule supprimé (%.1f m)."):format(closestDistance))
+    logStaff(source, "vehicle_delete", { distance = closestDistance, radius = radius })
+end, {
+    help = "Supprimer le véhicule le plus proche",
+    params = { { name = "rayon", help = "Rayon de recherche en mètres (défaut 5)" } },
+})

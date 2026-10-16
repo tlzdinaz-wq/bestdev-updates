@@ -362,43 +362,31 @@ modifyJobBlip.OnOpen(function()
             end)
 
         modifyJobBlip.Button("Nom du blip", "", jobInModification.blip.name or "Non défini", nil, false, function()
-            local name <const> = VFW.Nui.KeyboardInput(true, "Entrez le nom du blip", "")
-            if name == "" then
-                return
-            end
-
-            jobInModification.blip.name = name
-            modifyJobBlip.refresh()
+            VFW.Nui.AskText("Entrez le nom du blip", jobInModification.blip.name, function(name)
+                jobInModification.blip.name = name
+                modifyJobBlip.refresh()
+            end)
         end)
 
         modifyJobBlip.Button("Sprite du blip", "", jobInModification.blip.sprite or "Non défini", nil, false, function()
-            local sprite <const> = tonumber(VFW.Nui.KeyboardInput(true, "Entrez le sprite du blip", ""))
-            if not sprite then
-                return
-            end
-
-            jobInModification.blip.sprite = sprite
-            modifyJobBlip.refresh()
+            VFW.Nui.AskNumber("Entrez le sprite du blip", jobInModification.blip.sprite, function(sprite)
+                jobInModification.blip.sprite = math.floor(sprite)
+                modifyJobBlip.refresh()
+            end)
         end)
 
         modifyJobBlip.Button("Couleur du blip", "", jobInModification.blip.color or "Non défini", nil, false, function()
-            local color <const> = tonumber(VFW.Nui.KeyboardInput(true, "Entrez la couleur du blip", ""))
-            if not color then
-                return
-            end
-
-            jobInModification.blip.color = color
-            modifyJobBlip.refresh()
+            VFW.Nui.AskNumber("Entrez la couleur du blip", jobInModification.blip.color, function(color)
+                jobInModification.blip.color = math.floor(color)
+                modifyJobBlip.refresh()
+            end)
         end)
 
         modifyJobBlip.Button("Taille du blip", "", jobInModification.blip.scale or "Non défini", nil, false, function()
-            local scale <const> = tonumber(VFW.Nui.KeyboardInput(true, "Entrez la taille du blip", ""))
-            if not scale then
-                return
-            end
-
-            jobInModification.blip.scale = scale
-            modifyJobBlip.refresh()
+            VFW.Nui.AskNumber("Entrez la taille du blip (ex: 0.8)", jobInModification.blip.scale, function(scale)
+                jobInModification.blip.scale = scale
+                modifyJobBlip.refresh()
+            end)
         end)
     end
 end)
@@ -1235,43 +1223,31 @@ createJobBlip.OnOpen(function()
             end)
 
         createJobBlip.Button("Nom du blip", "", jobInCreation.blip.name or "Non défini", nil, false, function()
-            local name <const> = VFW.Nui.KeyboardInput(true, "Entrez le nom du blip", "")
-            if name == "" then
-                return
-            end
-
-            jobInCreation.blip.name = name
-            createJobBlip.refresh()
+            VFW.Nui.AskText("Entrez le nom du blip", jobInCreation.blip.name, function(name)
+                jobInCreation.blip.name = name
+                createJobBlip.refresh()
+            end)
         end)
 
         createJobBlip.Button("Sprite du blip", "", jobInCreation.blip.sprite or "Non défini", nil, false, function()
-            local sprite <const> = tonumber(VFW.Nui.KeyboardInput(true, "Entrez le sprite du blip", ""))
-            if not sprite then
-                return
-            end
-
-            jobInCreation.blip.sprite = sprite
-            createJobBlip.refresh()
+            VFW.Nui.AskNumber("Entrez le sprite du blip", jobInCreation.blip.sprite, function(sprite)
+                jobInCreation.blip.sprite = math.floor(sprite)
+                createJobBlip.refresh()
+            end)
         end)
 
         createJobBlip.Button("Couleur du blip", "", jobInCreation.blip.color or "Non défini", nil, false, function()
-            local color <const> = tonumber(VFW.Nui.KeyboardInput(true, "Entrez la couleur du blip", ""))
-            if not color then
-                return
-            end
-
-            jobInCreation.blip.color = color
-            createJobBlip.refresh()
+            VFW.Nui.AskNumber("Entrez la couleur du blip", jobInCreation.blip.color, function(color)
+                jobInCreation.blip.color = math.floor(color)
+                createJobBlip.refresh()
+            end)
         end)
 
         createJobBlip.Button("Taille du blip", "", jobInCreation.blip.scale or "Non défini", nil, false, function()
-            local scale <const> = tonumber(VFW.Nui.KeyboardInput(true, "Entrez la taille du blip", ""))
-            if not scale then
-                return
-            end
-
-            jobInCreation.blip.scale = scale
-            createJobBlip.refresh()
+            VFW.Nui.AskNumber("Entrez la taille du blip (ex: 0.8)", jobInCreation.blip.scale, function(scale)
+                jobInCreation.blip.scale = scale
+                createJobBlip.refresh()
+            end)
         end)
     end
 end)

@@ -87,7 +87,10 @@ function Boss.HasBossPermission(xPlayer, jobName, permission)
         job = xPlayer.job2
     end
 
-    if job.grade_is_boss then return true end
+    if job.grade_is_boss == true or job.grade_is_boss == 1 or job.grade_is_boss == "1"
+        or job.isBoss == true or job.is_boss == true or job.is_boss == 1 or job.is_boss == "1" then
+        return true
+    end
     if not permission then return true end
 
     local matrix = Boss.GetPermMatrix(jobName)

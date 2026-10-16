@@ -1,6 +1,12 @@
 ---@meta _
 ---@diagnostic disable: duplicate-doc-field
 
+-- Les blips de ville (LSPD, LSFD, SAMS, USSS, LSSD, Gouvernement, DOJ, Garage Bateaux,
+-- HeliWave, Pawnshop) étaient créés ici, en dur : le staff ne pouvait ni les déplacer, ni les
+-- renommer, ni les retirer. Ils sont désormais repris une fois en base de données au premier
+-- démarrage (modules/blips/server/241_blips_manager.lua) et se gèrent comme n'importe quel
+-- autre blip, depuis Builders > BLIPS.
+
 --local interactionZones = {}
 --
 --CreateThread(function()

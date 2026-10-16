@@ -200,3 +200,68 @@ RegisterServerCallback("vfw:action:run", function(source, payload)
 
     return { ok = true, msg = message or "OK" }
 end)
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- Scope « player:identity »
+--
+-- Les sous-menus « Mes informations » et « Infos » du menu contextuel (ALT) lisent leurs
+-- valeurs dans ce scope. Aucun fournisseur n'avait jamais été enregistré : toutes les
+-- lignes affichaient « N/A », sur soi comme sur les autres joueurs.
+-- ══════════════════════════════════════════════════════════════════════════
+
+local function playtimeOf(target)
+    local playtime = 0
+    if target.globalData then
+        playtime = tonumber(target.globalData.playtime) or 0
+    end
+    if target.sessionStart then
+        playtime = playtime + math.max(0, os.time() - target.sessionStart)
+    end
+    return playtime
+end
+
+local function playtimeLabel(seconds)
+    seconds = math.max(0, math.floor(tonumber(seconds) or 0))
+    local hours = math.floor(seconds / 3600)
+    local minutes = math.floor((seconds % 3600) / 60)
+    if hours > 0 then
+        return ("%dh%02d"):format(hours, minutes)
+    end
+    return ("%d min"):format(minutes)
+end
+
+local function moneyLabel(amount)
+    return ("%d $"):format(math.floor(tonumber(amount) or 0))
+end
+
+VFW.ContextMenu.RegisterScope("player:identity", function(source, ent, xPlayer)
+    -- Sur un autre joueur, il faut la permission ; sur soi-même, non.
+    local targetSource = ent and ent.targetSource or source
+    local target = (targetSource == source) and xPlayer or VFW.GetPlayerFromId(targetSource)
+
+    if not target then return false end
+
+    if target.source ~= source then
+        if not xPlayer.hasPermission("contextmenu") and not xPlayer.hasPermission("staff_menu") then
+            return false
+        end
+    end
+
+    local bank = target.getAccount and target.getAccount("bank")
+    local dirty = target.getAccount and target.getAccount("black_money")
+
+    return {
+        targetSource = target.source,
+        firstName = target.firstName or "",
+        lastName = target.lastName or "",
+        date_of_birth = target.dateofbirth or "",
+        height = target.height and (tostring(target.height) .. " cm") or "",
+        job_label = target.job and (target.job.label or target.job.name) or "Sans emploi",
+        job2_label = target.job2 and (target.job2.label or target.job2.name) or "Aucun",
+        money = moneyLabel(target.getMoney and target.getMoney() or 0),
+        bank = moneyLabel(bank and bank.money or 0),
+        black_money = moneyLabel(dirty and dirty.money or 0),
+        total_playtime = playtimeLabel(playtimeOf(target)),
+    }
+end)
