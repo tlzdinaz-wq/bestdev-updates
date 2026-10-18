@@ -61,18 +61,17 @@ end
 -- items.submenu = clé StaffMenu ; items.action = action Lua locale ; items.perm = permission extra.
 local directCategories = {
     {
-        id = "permissions", label = "PERMISSIONS", icon = "lock", perm = "gestion_perm",
+        id = "permissions", label = "PERMISSIONS", icon = "key", perm = "gestion_perm",
         items = {
             { label = "Rôles staff", desc = "Créer, modifier et attribuer les rôles et permissions", icon = "lock", action = "roles_panel", opens = "roles" },
         },
     },
     {
-        id = "serveur", label = "SERVEUR", icon = "settings", perm = { "server_management", "dev" },
+        id = "serveur", label = "SERVEUR", icon = "wrench", perm = { "server_management", "dev" },
         items = {
             { label = "Configuration serveur", desc = "Nom, Discord, et une couleur qui change toute la charte", icon = "palette", opens = "branding" },
             { label = "Loading screen", desc = "Vidéo ou image de fond, musique d’attente — visible à la connexion", icon = "film", opens = "loadingscreen" },
             { label = "Création de personnage", desc = "Musique de l’écran, nombre de slots, slot VIP, suppression", icon = "users", opens = "charcreator" },
-            { label = "Positions des interfaces", desc = "Déplacer HUD, menus et minimap pour tous les joueurs (comme F5)", icon = "settings", action = "hud_layout_server" },
             { label = "Tablette météo", desc = "Zones météo autour de toi ou sur la carte", icon = "globe", perm = "server_management", action = "weather_tablet", opens = "weather" },
             { label = "Météo, heure et stats", desc = "Heure, gel du temps, statistiques serveur", icon = "clock", perm = "server_management", action = "server_panel", opens = "server" },
             { label = "Nettoyer la zone", desc = "Supprimer véhicules, peds et objets autour de vous", icon = "trash", perm = "clean_zone", action = "clear_zone" },
@@ -91,7 +90,7 @@ local directCategories = {
         },
     },
     {
-        id = "videos", label = "VIDÉOS", icon = "film", perm = "video_management",
+        id = "videos", label = "VIDÉOS", icon = "play", perm = "video_management",
         items = {
             { label = "Gestion des vidéos", desc = "Lien YouTube, cible, plein écran, lancer / arrêter", icon = "film", action = "videos_panel", opens = "videos", intent = "manage" },
             { label = "Diffuser à tous", desc = "Lancer une vidéo YouTube pour tout le serveur", icon = "monitor", action = "videos_panel", opens = "videos", intent = "broadcast" },
@@ -99,7 +98,7 @@ local directCategories = {
         },
     },
     {
-        id = "inventaire", label = "INVENTAIRE", icon = "box", perm = { "dev", "gestion_items" },
+        id = "inventaire", label = "INVENTAIRE", icon = "bag", perm = { "dev", "gestion_items" },
         items = {
             { label = "Items", desc = "Créer, modifier et supprimer les items", icon = "box", perm = "gestion_items", opens = "dev", dev = "items" },
             { label = "Poids des joueurs", desc = "Poids max personnalisé par joueur", icon = "scales", opens = "dev", dev = "weight" },
@@ -125,7 +124,7 @@ local directCategories = {
         },
     },
     {
-        id = "events", label = "EVENTS SPÉCIAUX", icon = "sparkles", perm = "events",
+        id = "events", label = "EVENTS SPÉCIAUX", icon = "rocket", perm = "events",
         items = {
             { label = "Blackout", desc = "Couper ou rétablir les éclairages de la ville", icon = "bolt", action = "blackout" },
             { label = "Incendie", desc = "Créer et gérer des incendies", icon = "fire", submenu = "fireMenu" },
@@ -270,8 +269,17 @@ function StaffMenu.CloseGestionHub()
     TriggerEvent("gestion:hub:closed")
     -- Coupe un éventuel menu VUI encore rendu dans le hub
     exports["VUI"]:CloseAll()
+    -- Force la fermeture complète de l'overlay NUI et désactiver le curseur.
+    -- nui:visible false cachait tout le HUD (faim, vie, compteur, staff) et le
+    -- callback plantait ensuite, donc rien ne le réaffichait.
+    SetNuiFocus(false, false)
+    SetNuiFocusKeepInput(false)
     SendNUIMessage({ action = "gestion:close" })
     VFW.Nui.Focus(false)
+    VFW.Nui.Visible(true)
+    if VFW.Nui.HudVisible then
+        VFW.Nui.HudVisible(true)
+    end
 end
 
 function StaffMenu.IsGestionHubOpen()
@@ -349,7 +357,6 @@ AddEventHandler("vui:hub:focus", function()
     StaffMenu.RestoreGestionHubFocus()
 end)
 
-local hubBlackout = false
 local OpenFromHub
 
 --- Actions locales (clavier, tablettes, toggles) — pas de menu VUI.
@@ -419,20 +426,7 @@ local function RunHubAction(action)
             VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Gestion Vidéos', message = "Action annulée." })
         end
     elseif action == "blackout" then
-        hubBlackout = not hubBlackout
-        TriggerServerEvent("vfw:staff:setBlackout", hubBlackout)
-        VFW.ShowNotification({
-            type = 'STAFF', variant = 'SUCCESS', subtitle = 'Events',
-            message = hubBlackout and "Blackout activé." or "Blackout désactivé.",
-        })
-    elseif action == "hud_layout_server" then
-        StaffMenu.CloseGestionHub()
-        CreateThread(function()
-            Wait(80)
-            if VFW.HudLayout and VFW.HudLayout.StartEditor then
-                VFW.HudLayout.StartEditor("server")
-            end
-        end)
+        TriggerServerEvent("vfw:staff:setBlackout", GlobalState.blackout ~= true)
     elseif action == "periodic_notif" then
         OpenPeriodicNotificationsPanel()
     elseif action == "image_manager" then

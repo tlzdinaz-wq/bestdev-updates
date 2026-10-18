@@ -1,0 +1,204 @@
+/* ═══════════════════════════════════════════════════════════════
+   Gestion — l'intérieur de la tablette.
+
+   `theme.css` habille la tablette et son écran d'accueil. Cette feuille ne
+   s'occupe que de ce qu'on voit APRÈS l'accueil : la liste des outils d'une
+   catégorie, et les pages des outils eux-mêmes.
+
+   Elle est chargée après `theme.css` et n'y touche pas : tout se fait en
+   ajoutant des règles, pour que les deux puissent évoluer séparément.
+
+   ── Spécificité ────────────────────────────────────────────────
+   `theme.css` pose sa matière avec `.gh-tile:not(.gh-tile--cat)`, qui vaut
+   deux classes : le `:not()` compte son argument. Une règle écrite
+   `.gh-tile--tool` n'en vaut qu'une et perd, `!important` ou pas — entre deux
+   `!important`, c'est la spécificité qui tranche, pas l'ordre des fichiers.
+
+   D'où le préfixe `.gh-frame` sur tout ce qui suit : il remet les deux à
+   égalité au minimum, et l'ordre de chargement fait le reste.
+
+   Pas de backdrop-filter nulle part : le CEF de FiveM le rend en rectangle
+   noir opaque.
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  --gp-plate: linear-gradient(180deg, rgba(26, 31, 43, .78), rgba(12, 15, 22, .86));
+  --gp-plate-hover: linear-gradient(180deg, rgba(36, 44, 61, .9), rgba(18, 22, 32, .92));
+  --gp-lit: rgba(255, 255, 255, .18);
+  --gp-ease: cubic-bezier(.2, .9, .25, 1);
+}
+
+/* ── Le fond d'écran ────────────────────────────────────────────
+   Il était retiré dès qu'on quittait l'accueil : `theme.css` force
+   `background-image: none !important` sur toute page qui n'est pas la grille
+   des catégories. On entrait dans une catégorie et le fond choisi
+   disparaissait au profit d'un noir plat.
+
+   On le remet, sous un voile dégradé : sans lui, le texte blanc passerait mal
+   sur une photo claire. Le voile s'épaissit vers le bas, là où se trouve le
+   gros du contenu. Quand aucun fond n'est réglé, `--gh-bg` vaut `none` et il
+   ne reste que le voile sur le noir d'origine — l'affichage est inchangé. */
+
+.gh-frame:not(:has(.gh-grid--cats)) {
+  background-color: #07080c !important;
+  background-image:
+    linear-gradient(180deg, rgba(7, 8, 12, .62), rgba(7, 8, 12, .86)),
+    var(--gh-bg) !important;
+  background-size: cover, cover !important;
+  background-position: center, center !important;
+}
+
+/* ── Les cartes ─────────────────────────────────────────────────
+   C'étaient des rectangles opaques à coins presque droits (4 px), tous
+   identiques. Elles deviennent des plaques translucides posées sur le fond :
+   arête éclairée en haut, ombre portée, vrais coins arrondis — la même
+   matière que l'inventaire et les menus.
+
+   La liste couvre toutes les familles de cartes de l'intérieur, pas seulement
+   celles d'une catégorie : les pages d'outil en utilisent d'autres. Les
+   pastilles de couleur (`gh-brand-swatch`, `gh-brand-chip`) en sont exclues —
+   leur fond EST l'information. */
+
+.gh-frame .gh-tile:not(.gh-tile--cat),
+.gh-frame .gh-tile--tool,
+.gh-frame .gh-tile--flat,
+.gh-frame .gh-dev-card,
+.gh-frame .gh-side-card,
+.gh-frame .gh-img-card,
+.gh-frame .gh-anims-item,
+.gh-frame .gh-vnote,
+.gh-frame .gh-cc-slot,
+.gh-frame .gh-stat,
+.gh-frame .gh-perm,
+.gh-frame .ul-card {
+  border-radius: 14px !important;
+  border: 1px solid rgba(255, 255, 255, .08) !important;
+  border-top-color: var(--gp-lit) !important;
+  background: var(--gp-plate) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, .07) inset,
+    0 10px 24px -14px rgba(0, 0, 0, .95) !important;
+  transition:
+    transform .15s var(--gp-ease),
+    box-shadow .15s,
+    border-color .15s,
+    background .15s !important;
+}
+
+/* Seules les cartes cliquables réagissent : une statistique ne se survole pas. */
+.gh-frame .gh-tile:not(.gh-tile--cat):is(:hover, :focus-visible, .is-active, .is-on),
+.gh-frame .gh-tile--tool:is(:hover, :focus-visible, .is-active, .is-on),
+.gh-frame .gh-tile--flat:is(:hover, :focus-visible, .is-active, .is-on),
+.gh-frame .gh-img-card:is(:hover, .is-on),
+.gh-frame .gh-anims-item:is(:hover, .is-on),
+.gh-frame .gh-cc-slot:is(:hover, .is-on),
+.gh-frame .gh-perm:is(:hover, .is-on) {
+  transform: translateY(-2px) !important;
+  border-color: rgba(var(--brand-primary-rgb), .5) !important;
+  border-top-color: rgba(var(--brand-primary-rgb), .8) !important;
+  background: var(--gp-plate-hover) !important;
+  box-shadow: 0 18px 34px -16px rgba(0, 0, 0, .95) !important;
+}
+
+.gh-frame .gh-tile:not(.gh-tile--cat):active,
+.gh-frame .gh-tile--tool:active,
+.gh-frame .gh-tile--flat:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 4px 12px -8px rgba(0, 0, 0, .95) !important;
+}
+
+/* L'icône sort du plan, et prend la couleur du serveur au survol. */
+.gh-frame .gh-tile:not(.gh-tile--cat) .gh-tile-icon {
+  border-radius: 11px !important;
+  border: 1px solid rgba(255, 255, 255, .09) !important;
+  border-top-color: rgba(255, 255, 255, .2) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .02)) !important;
+  box-shadow: 0 3px 8px -3px rgba(0, 0, 0, .85) !important;
+  transition: background .15s, border-color .15s !important;
+}
+
+.gh-frame .gh-tile:not(.gh-tile--cat):is(:hover, :focus-visible) .gh-tile-icon {
+  border-color: rgba(var(--brand-primary-rgb), .55) !important;
+  background: linear-gradient(180deg,
+    rgba(var(--brand-primary-rgb), .5),
+    rgba(var(--brand-primary-rgb), .2)) !important;
+}
+
+/* Le chevron n'indiquait rien tant qu'on ne cliquait pas : il avance. */
+.gh-frame .gh-tile:not(.gh-tile--cat) .gh-tile-go {
+  opacity: .45 !important;
+  transition: transform .15s var(--gp-ease), opacity .15s !important;
+}
+
+.gh-frame .gh-tile:not(.gh-tile--cat):is(:hover, :focus-visible) .gh-tile-go {
+  transform: translateX(3px) !important;
+  opacity: 1 !important;
+}
+
+/* ── Les boutons ────────────────────────────────────────────────
+   Même matière, à l'échelle d'un bouton. */
+
+.gh-frame .gh-btn:not(.gh-btn--primary) {
+  border-radius: 10px !important;
+  border: 1px solid rgba(255, 255, 255, .1) !important;
+  border-top-color: rgba(255, 255, 255, .2) !important;
+  background: var(--gp-plate) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .06) inset !important;
+  transition: transform .14s var(--gp-ease), border-color .14s, background .14s !important;
+}
+
+.gh-frame .gh-btn:not(.gh-btn--primary):hover {
+  transform: translateY(-1px) !important;
+  border-color: rgba(var(--brand-primary-rgb), .45) !important;
+  background: var(--gp-plate-hover) !important;
+}
+
+/* ── L'accueil ──────────────────────────────────────────────────
+   Les libellés des catégories étaient des pastilles blanches opaques à texte
+   sombre, posées sur le fond d'écran : lisibles, mais en rupture complète avec
+   le reste de la tablette, et d'autant plus voyantes que le fond est clair.
+
+   Ils reçoivent la matière de l'intérieur — plaque sombre translucide, arête
+   éclairée, texte clair. Le fond d'écran continue de passer derrière.
+
+   Les icônes gardent leurs couleurs : c'est par elles qu'on reconnaît une
+   catégorie. On leur ajoute seulement une ombre portée, pour qu'elles se
+   détachent d'un fond clair au lieu d'y flotter. */
+
+.gh-frame .gh-tile--cat .gh-tile-label {
+  padding: .2rem .5rem !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, .1) !important;
+  border-top-color: rgba(255, 255, 255, .2) !important;
+  color: rgba(255, 255, 255, .95) !important;
+  background: linear-gradient(180deg, rgba(26, 31, 43, .82), rgba(10, 13, 20, .88)) !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, .07) inset,
+    0 4px 12px -6px rgba(0, 0, 0, .9) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .5) !important;
+  transition: background .15s, border-color .15s !important;
+}
+
+.gh-frame .gh-tile.gh-tile--cat:is(:hover, :focus-visible) .gh-tile-label {
+  color: #fff !important;
+  border-color: rgba(var(--brand-primary-rgb), .5) !important;
+  border-top-color: rgba(var(--brand-primary-rgb), .8) !important;
+  background: linear-gradient(180deg, rgba(36, 44, 61, .92), rgba(16, 20, 30, .94)) !important;
+}
+
+.gh-frame .gh-tile--cat .gh-tile-icon {
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, .85) !important;
+  transition: transform .15s var(--gp-ease), box-shadow .15s !important;
+}
+
+.gh-frame .gh-tile.gh-tile--cat:is(:hover, :focus-visible) .gh-tile-icon {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 14px 26px -10px rgba(0, 0, 0, .9) !important;
+}
+
+/* ── Le bouton d'apparence ──────────────────────────────────────
+   Deux scripts posent un bouton en tete de la barre d'actions, chacun quand il
+   s'execute : leur ordre, et donc leur position, varie d'une ouverture a l'autre.
+   On fixe celle du bouton d'apparence pour pouvoir dire ou il se trouve. */
+
+.gh-topbar-actions .gh-skinbtn { order: -1; }

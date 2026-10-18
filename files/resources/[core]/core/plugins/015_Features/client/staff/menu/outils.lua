@@ -1132,11 +1132,15 @@ AddEventHandler("vfw:clearZone", function(zoneCoords, radius)
                     end
                 end
                 if not occupied then
+                    if ConcessForgetShowcase and ConcessForgetShowcase(veh) then
+                        goto continue_veh
+                    end
                     if NetworkGetEntityIsNetworked(veh) then
                         TriggerServerEvent("vfw:deleteEntity", { VehToNet(veh) })
                     end
                     SetEntityAsMissionEntity(veh, true, true)
                     DeleteEntity(veh)
+                    ::continue_veh::
                 end
             end
         end

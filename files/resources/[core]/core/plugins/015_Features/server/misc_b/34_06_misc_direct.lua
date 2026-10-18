@@ -1,18 +1,5 @@
-local TV_MODELS = {
-    { model = "prop_tv_flat_01" },
-    { model = "prop_tv_flat_01b" },
-    { model = "prop_tv_flat_02" },
-    { model = "prop_tv_flat_03" },
-    { model = "prop_tv_03" },
-    { model = "prop_tv_06" },
-    { model = "prop_tv_07" },
-    { model = "v_res_tre_tv" },
-    { model = "v_res_mtv" },
-}
-
-MiscB.Cb("television:getModels", function(source)
-    return TV_MODELS
-end)
+-- Les modeles de television vivent desormais dans 34_06_television_models.lua :
+-- ils sont configurables depuis le builder au lieu d etre ecrits ici en dur.
 
 local chairSlots = {}
 

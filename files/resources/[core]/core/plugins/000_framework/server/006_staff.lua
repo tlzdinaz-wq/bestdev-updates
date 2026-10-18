@@ -652,6 +652,24 @@ local function gamerTagCrew(target)
     return "NoCrew"
 end
 
+local function gamerTagRankColor(target)
+    local roleId = target.globalData and target.globalData.role
+    if type(roleId) ~= "string" or roleId == "" or roleId == "user" then
+        return nil
+    end
+    if not Staff299 or not Staff299.Roles or type(Staff299.Roles.Load) ~= "function" then
+        return nil
+    end
+
+    local ok, roles = pcall(Staff299.Roles.Load)
+    if not ok or type(roles) ~= "table" then return nil end
+
+    local role = roles[roleId]
+    if type(role) ~= "table" or type(role.color) ~= "string" then return nil end
+    if not role.color:match("^#?%x%x%x%x%x%x$") then return nil end
+    return role.color
+end
+
 local function gamerTagPayload(target)
     if not target then return nil end
 
@@ -674,11 +692,40 @@ local function gamerTagPayload(target)
         NEW = gamerTagPlaytime(target) <= 3600,
         NEW_REMAINING = math.max(0, 3601 - gamerTagPlaytime(target)),
         PREMIUM = vipTier > 0,
+        COLOR = gamerTagRankColor(target),
         STAFF_DUTY = staffMode[source] == true,
         ANIMATOR_DUTY = animatorMode[source] == true,
         IS_GAMERTAG = true,
     }
 end
+
+local function pushGamerTag(targetSource)
+    targetSource = tonumber(targetSource)
+    if not targetSource or hiddenGamerTags[targetSource] then return end
+
+    local target = VFW.GetPlayerFromId(targetSource)
+    if not target then return end
+
+    local payload = gamerTagPayload(target)
+    if not payload then return end
+
+    for _, viewer in pairs(VFW.GetExtendedPlayers()) do
+        if canUseGamerTags(viewer) then
+            TriggerClientEvent("Admin:updateValue", viewer.source, targetSource, payload)
+        end
+    end
+end
+
+AddEventHandler("vfw:gamerTag:refresh", function(targetSource)
+    pushGamerTag(targetSource)
+end)
+
+AddEventHandler("vfw:gamerTag:refreshAll", function()
+    local players = VFW.GetPlayers and VFW.GetPlayers() or {}
+    for i = 1, #players do
+        pushGamerTag(players[i])
+    end
+end)
 
 -- Un ID serveur peut être réutilisé : envoyer les nouvelles données aux staff
 -- réinitialise aussi le cache client qui masquait l'ancien joueur déconnecté.

@@ -18,10 +18,18 @@ local function toPoint(value)
     return JC.Vec(value)
 end
 
+-- Un refus de metier ne disait rien : le joueur voyait l animation et la barre de
+-- progression aller au bout, puis plus rien : ni la raison, ni meme qu il y avait eu
+-- un refus. On le lui dit.
 local function actor(source, societyName)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer then return nil end
-    if not JC.HasJob(xPlayer, societyName, false) then return nil end
+
+    if not JC.HasJob(xPlayer, societyName, false) then
+        JC.Notify(source, "Vous n'exercez pas ce metier.", true)
+        return nil
+    end
+
     return xPlayer
 end
 
@@ -55,6 +63,9 @@ local function giveHarvest(source, xPlayer, societyName, itemName)
         JC.Notify(source, "Vous ne pouvez pas en porter davantage.", true)
         return
     end
+
+    -- Sans retour, une recolte qui marche est indiscernable d une recolte qui echoue.
+    JC.Notify(source, ("Vous avez recolte 1 %s."):format(JC.ItemLabel(itemName)), false)
     Farm.Log(xPlayer, societyName, "harvest", itemName, 1, 0)
 end
 
@@ -87,12 +98,18 @@ local function doProcess(source, xPlayer, societyName, inputItem)
         return
     end
 
-    if not JC.Remove(xPlayer, fromItem, cost) then return end
-    if not JC.Add(xPlayer, recipe.output, 1) then
-        JC.Add(xPlayer, fromItem, cost)
+    if not JC.Remove(xPlayer, fromItem, cost) then
+        JC.Notify(source, "La transformation a echoue.", true)
         return
     end
 
+    if not JC.Add(xPlayer, recipe.output, 1) then
+        JC.Add(xPlayer, fromItem, cost)
+        JC.Notify(source, "La transformation a echoue : rien n'a ete consomme.", true)
+        return
+    end
+
+    JC.Notify(source, ("Vous avez fabrique 1 %s."):format(JC.ItemLabel(recipe.output)), false)
     Farm.Log(xPlayer, societyName, "process", recipe.output, 1, 0)
 end
 

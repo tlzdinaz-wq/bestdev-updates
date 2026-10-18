@@ -9,7 +9,6 @@ local zoneData = {
 
 local markerThread = nil
 local isMarkersActive = false
-local isRefreshing = false
 local isNavigating = false
 
 local controlDisabled <const> = {
@@ -96,10 +95,31 @@ local function stopMarkerThread()
     end
 end
 
+-- VUI exécute les callbacks OnClose dans un thread à part : ils ne se sont pas encore
+-- produits quand refresh() rend la main. Un drapeau levé puis baissé dans la foulée est
+-- donc déjà retombé lorsque OnClose le consulte : rafraîchir le menu passait pour une
+-- vraie sortie, et la zone en cours de création était effacée. C'est pour ça qu'on ne
+-- pouvait ni poser un nom ni un label — chaque saisie était annulée par le
+-- rafraîchissement qui la suivait.
+--
+-- On compte donc les fermetures attendues, menu par menu : un refresh en produit
+-- exactement une, que le OnClose consomme à son tour.
+local pendingRefresh = {}
+
 local function safeRefresh(menu)
-    isRefreshing = true
+    pendingRefresh[menu] = (pendingRefresh[menu] or 0) + 1
     menu.refresh()
-    isRefreshing = false
+end
+
+--- Vrai si cette fermeture vient d'un rafraîchissement, et non d'une vraie sortie.
+---@param menu table
+---@return boolean
+local function isRefreshClose(menu)
+    local pending = pendingRefresh[menu]
+    if not pending or pending <= 0 then return false end
+
+    pendingRefresh[menu] = pending - 1
+    return true
 end
 
 local function startMarkerThread()
@@ -513,7 +533,7 @@ local function autoSaveZone()
 end
 
 StaffMenu.CreateZoneSafe.OnClose(function()
-    if not isRefreshing and not isNavigating then
+    if not isRefreshClose(StaffMenu.CreateZoneSafe) and not isNavigating then
         stopMarkerThread()
         resetZoneData()
     elseif zoneData.isUpdate then
@@ -523,7 +543,7 @@ StaffMenu.CreateZoneSafe.OnClose(function()
 end)
 
 StaffMenu.ManageZoneSafe.OnClose(function()
-    if not isRefreshing and not isNavigating then
+    if not isRefreshClose(StaffMenu.ManageZoneSafe) and not isNavigating then
         autoSaveZone()
         stopMarkerThread()
         resetZoneData()

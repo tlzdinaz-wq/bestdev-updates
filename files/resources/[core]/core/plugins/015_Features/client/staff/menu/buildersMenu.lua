@@ -24,14 +24,14 @@ local noop = function() end
 -- Separator entries: { separator = "text" }
 local builderEntries = {
     -- CONSTRUCTION & PROPS
-    { separator = ":building: CONSTRUCTION & PROPS" },
+    { separator = ":hammer: CONSTRUCTION & PROPS" },
     { label = ":building: PROPS", desc = "Gérer les props du serveur", submenu = "builderProps", perm = "props_builder" },
     { label = ":sparkles: FREEZE OBJETS", desc = "Figer des props par modèle ou par position", submenu = "builderObjectFreeze", perm = "freeze_objects" },
     { label = ":box: CHAISES ASSISES", desc = "Configurer animations et Z des chaises", submenu = "builderChairs", perm = "manage_chairs" },
     { label = ":users: SPAWN PNJ", desc = "Lignes de spawn PNJ sur les trottoirs, utilisées par les vendeurs de drogue notamment", submenu = "builderPNJ", perm = "pnj_builder" },
 
     -- BÂTIMENTS & ACCÈS
-    { separator = ":building: BÂTIMENTS & ACCÈS" },
+    { separator = ":door: BÂTIMENTS & ACCÈS" },
     { label = ":building: ASCENSEURS", desc = "Gérer les ascenseurs, les étages et les accès", submenu = "builder_elevators", perm = "builder_elevator" },
     { label = ":compass: TÉLÉPORTATIONS", desc = "Créer des points de téléportation (entrée/sortie, instance)", submenu = "builderTeleport", perm = "teleport_builder" },
     { label = ":lock: DOORLOCK", desc = "Gérer les doorlock", submenu = "builderDoorlock", perm = "doorlock_builder" },
@@ -115,12 +115,16 @@ local builderEntries = {
     { label = ":hospital: HÔPITAUX", desc = "Créer et gérer les hôpitaux", submenu = "builderHospital", perm = "hospital_builder" },
 
     -- POLICE & JUSTICE
-    { separator = ":shield: POLICE & JUSTICE" },
+    { separator = ":siren: POLICE & JUSTICE" },
     { label = ":scales: DOJ PERMISSIONS", desc = "Gérer les permissions du Department of Justice", submenu = "builderDOJ", perm = "manage_doj", opens = "doj" },
     { label = ":money: AMENDES POLICE", desc = "Gérer les types d'amendes et tarifs", submenu = "builderFines", perm = "builder_fines", opens = "fines" },
     { label = ":map: ZONES ALERTES POLICE", desc = "Configurer les zones d'alertes par job police", perm = "manage_police_zones", opens = "policeAlerts" },
     { label = ":music: RADIO 911", desc = "Gérer les jobs autorisés à utiliser la radio 911", submenu = "builderRadio911", perm = "builder_radio911", opens = "radio911" },
     { label = ":film: CAMÉRAS POLICE", desc = "Gérer les caméras de vidéosurveillance", submenu = "builderCameras", perm = "builder_cameras" },
+
+    -- BLIPS (icône seule sur l'accueil)
+    { separator = ":pin: BLIPS", perm = "manage_blips" },
+    { label = ":pin: CRÉER UN BLIP", desc = "Ajouter un blip visible sur la carte", submenu = "builderBlips", perm = "manage_blips" },
 
     -- AMBIANCE & MÉDIAS
     { separator = ":music: AMBIANCE & MÉDIAS" },
@@ -129,17 +133,16 @@ local builderEntries = {
     { label = ":bell: RESTRICTION VOCALE", desc = "Zones ou certains modes de voix sont interdits", submenu = "builderVoiceRestriction", perm = "voice_restriction_builder" },
     { label = ":music: STUDIOS D'ENREGISTREMENT", desc = "Créer et gérer les studios d'enregistrement", submenu = "builderStudio", perm = "builder_studio" },
     { label = ":monitor: TELEVISION", desc = "Gérer les modèles TV (ptelevision)", submenu = "builderTelevision", perm = "builder_television" },
-    { label = ":map: BLIPS", desc = "Gérer les blips de la carte", submenu = "builderBlips", perm = "manage_blips" },
     { label = ":document: GESTION JOURNALISTE", desc = "Gérer les annonces LifeInvader et Weazel", submenu = "journalisteSelect", perm = "builder_journaliste" },
 
     -- CRAFT & ACTIVITÉS
-    { separator = ":building: CRAFT & ACTIVITÉS" },
+    { separator = ":pickaxe: CRAFT & ACTIVITÉS" },
     { label = ":building: STATIONS DE CRAFT", desc = "Stations de craft avec restriction job", submenu = "builderLegal", perm = "builder_legal_craft" },
     { label = ":leaf: ACTIVITÉS LÉGALES", desc = "Positions vendeurs et prix (pêche, chasse, plongée)", submenu = "builderLegalActivities", perm = "legal_activities_builder" },
     { label = ":gamepad: TICKETS À GRATTER", desc = "Configurer les probabilités de gain", submenu = "builderScratchCard", perm = "builder_scratch_card" },
 
     -- BRAQUAGES
-    { separator = ":money: CATÉGORIE BRAQUAGES" },
+    { separator = ":mask: CATÉGORIE BRAQUAGES" },
     { label = ":money: ATM", desc = "Gestion des braquages ATM", submenu = "builderATM", perm = "builder_atm" },
     { label = ":building: SUPERETTE", desc = "Gestion des supérettes (braquages)", submenu = "builderSupermarket", perm = "builder_supermarket", opens = "supermarket" },
     { label = ":building: BANQUES FLEECA", desc = "Gestion des banques Fleeca", submenu = "builderFleeca", perm = "builder_fleeca" },
@@ -152,7 +155,7 @@ local builderEntries = {
     { label = ":flask: LABORATOIRES", desc = "Gerer les laboratoires de faction", submenu = "builderLabo", perm = "labo_builder" },
 
     -- ILLÉGAL
-    { separator = ":dot-red: CATÉGORIE ILLÉGAL" },
+    { separator = ":warning: CATÉGORIE ILLÉGAL" },
     { label = ":car: GO FAST", desc = "Système de go fast", submenu = "builderGoFast", perm = "builder_gofast", opens = "gofast" },
     { label = ":flask: DROGUES (PIPELINE)", desc = "Créer et gérer les drogues (récolte, transformation, vente)", submenu = "builderDrug", perm = "builder_drug_pipeline", opens = "drugPipeline" },
     { label = ":flask: VENTE DE DROGUE", desc = "Gestion des zones de vente", submenu = "builderDrugDealing", perm = "builder_drug_dealing", opens = "drugDealing" },
@@ -162,7 +165,7 @@ local builderEntries = {
     { label = ":flask: POCHON SHOP", desc = "Configurer la boutique de pochons vides", submenu = "builderPochonShop", perm = "pochon_shop_builder", opens = "pochonShop" },
 
     -- FACTIONS
-    { separator = ":flag: FACTIONS" },
+    { separator = ":users: FACTIONS" },
     { label = ":flag: GESTION FACTIONS", desc = "Créer et gérer les factions/gangs", submenu = "factionMenu", perm = "gestion_faction", opens = "factions" },
     { label = ":building: CRÉATION DE GARAGE FACTION", desc = "Créer et gérer les garages de faction", submenu = "createGarageFaction", perm = "gestion_faction", opens = "factionGarages" },
     { label = ":wrench: GARAGE ILLÉGAL (PLAQUES)", desc = "Points de changement de plaque pour les factions illégales", submenu = "createGarageIllegal", perm = "gestion_faction", opens = "illegalGarages" },
@@ -174,7 +177,7 @@ local builderEntries = {
     { label = ":skull: ZONES ZOMBIE", desc = "Creer et gerer les zones de spawn zombie", submenu = "builderZombie", perm = "builder_zombie" },
 
     -- BOUTIQUE
-    { separator = ":money: BOUTIQUE", perm = "boutique" },
+    { separator = ":diamond: BOUTIQUE", perm = "boutique" },
     { label = ":cart: BOUTIQUE PAYANTE", desc = "Administration des items et Coins", submenu = "builderPaidShop", perm = "boutique", opens = "paidshop" },
     { label = ":star: GESTION VIP", desc = "Gérer les véhicules du mois VIP", submenu = "builderVIP", perm = "boutique", opens = "vip" },
     { label = ":gift: BOUTIQUE AFK", desc = "Gérer les caisses et lots de la boutique AFK", submenu = "builderAFKShop", perm = "boutique", opens = "afk" },

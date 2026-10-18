@@ -15,6 +15,8 @@ local DEFAULTS = {
     logo    = { x = 86.0, y = 1.2,  w = 12.0, h = 10.0 },
     vui     = { x = 2.0,  y = 2.2,  w = 26.0, h = 42.0 },
     notif   = { x = 1.2,  y = 28.0, w = 22.0, h = 28.0 },
+    staffhud = { x = 93.6, y = 33.0, w = 5.6, h = 34.0 },
+    eco = { x = 31.0, y = 1.2, w = 38.0, h = 7.0 },
 }
 
 -- Fiche joueur staff : positionnée seulement dans Gestion, jamais dans le F5.
@@ -75,6 +77,20 @@ local function defaultPreviewBox(vui)
     end
     return { x = x, y = y, w = w, h = h }
 end
+
+local function staffHudOf(data)
+    if type(data) ~= "table" then return nil end
+    local box = data.staffhud
+    if type(box) ~= "table" or not tonumber(box.x) or not tonumber(box.y) then return nil end
+    return {
+        x = tonumber(box.x),
+        y = tonumber(box.y),
+        w = tonumber(box.w) or DEFAULTS.staffhud.w,
+        h = tonumber(box.h) or DEFAULTS.staffhud.h,
+    }
+end
+
+local withKeptStaffHud
 
 local function mergeDefaults(data)
     local out = copy(DEFAULTS)
@@ -155,6 +171,9 @@ end
 local function rememberPersonal(data)
     if not hasBoxes(data) then return nil end
     personalLayout = stripServerOnly(mergeDefaults(data))
+    if withKeptStaffHud then
+        personalLayout = withKeptStaffHud(personalLayout, data)
+    end
     personalLayout.custom = true
     writeKvp(personalLayout)
     return personalLayout
@@ -202,6 +221,15 @@ local function readPersonalKvp()
     return readKvpKey(("%s_%s"):format(KVP, tostring(id)))
 end
 
+withKeptStaffHud = function(merged, raw)
+    if staffHudOf(raw) or type(merged) ~= "table" then return merged end
+    local kept = staffHudOf(readPersonalKvp())
+    if kept then
+        merged.staffhud = kept
+    end
+    return merged
+end
+
 local function readServerCache()
     return readAnyBoxes(SERVER_KVP)
 end
@@ -212,6 +240,8 @@ local function loadLayout()
     end
     local fromMeta = metadataLayout()
     if fromMeta then
+        local raw = VFW.PlayerData and VFW.PlayerData.metadata and VFW.PlayerData.metadata.hudLayout
+        fromMeta = withKeptStaffHud(fromMeta, raw)
         personalLayout = copy(fromMeta)
         writeKvp(personalLayout)
         return copy(personalLayout)
@@ -307,10 +337,18 @@ local function applyMinimap(box, refresh)
 end
 
 local function applyNui(data)
+    data = data or layout or DEFAULTS
     SendNUIMessage({
         action = "nui:hudlayout:apply",
-        data = data or layout or DEFAULTS,
+        data = data,
     })
+    local box = data and data.staffhud
+    if type(box) == "table" then
+        SendNUIMessage({
+            action = "staffHud:place",
+            data = { x = box.x, y = box.y },
+        })
+    end
 end
 
 local function pushStatusAnchor()
@@ -450,6 +488,16 @@ local function closePreviewMenu()
 end
 
 VFW.HudLayout = {}
+
+function VFW.HudLayout.PushStaffPlace()
+    layout = layout or loadLayout()
+    local box = layout and layout.staffhud
+    if type(box) ~= "table" or not tonumber(box.x) or not tonumber(box.y) then return end
+    SendNUIMessage({
+        action = "staffHud:place",
+        data = { x = box.x, y = box.y },
+    })
+end
 
 function VFW.HudLayout.GetAnchor()
     layout = layout or loadLayout()

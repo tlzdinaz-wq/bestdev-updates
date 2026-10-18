@@ -8,8 +8,28 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="./assets/index.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/style.css">
+  <link rel="stylesheet" href="./assets/style.css">
+  <link rel="stylesheet" href="./assets/uilayout.css">
+  <link id="gh-theme-css" rel="stylesheet" href="./assets/theme.css?v=4">
+  <link id="gh-pages-css" rel="stylesheet" href="./assets/pages.css?v=4">
+  <script>
+    // Choix d'apparence applique avant le premier rendu : en differe, on verrait
+    // la tablette apparaitre puis disparaitre. Le bouton vit dans theme-switch.js.
+    (function () {
+      try {
+        if (localStorage.getItem('gestion-apparence') !== 'classique') return
+        document.getElementById('gh-theme-css').disabled = true
+        document.getElementById('gh-pages-css').disabled = true
+        document.documentElement.classList.add('gh-classique')
+      } catch (e) {
+        // Stockage indisponible : on garde la tablette.
+      }
+    })()
+  </script>
+  <script type="module" src="./assets/index.js"></script>
+  <script src="./assets/uilayout.js"></script>
+  <script src="./assets/chrome.js"></script>
+  <script src="./assets/theme-switch.js?v=1" defer></script>
 </head>
 <body>
     <div id="root"></div>

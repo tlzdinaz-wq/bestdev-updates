@@ -8,7 +8,7 @@ VFW.UiLayout = VFW.UiLayout or {}
 
 local JSON_FILE = "config/ui_layout.json"
 local KEYS = { "hud", "menu", "notif" }
-local POS_KEYS = { "minimap", "status", "health", "speedo", "logo", "vui", "notif", "preview" }
+local POS_KEYS = { "minimap", "status", "health", "speedo", "logo", "vui", "notif", "preview", "staffhud", "eco" }
 local PERSONAL_SKIP = { preview = true }
 local cache = nil
 
@@ -19,11 +19,26 @@ local function norm(value, fallback)
     return fallback or "vertical"
 end
 
+local function cleanBg(value)
+    if type(value) ~= "string" then return "" end
+    local out = value:gsub("^%s+", ""):gsub("%s+$", "")
+    if out == "" then return "" end
+    local lower = out:lower()
+    if lower:sub(1, 8) ~= "https://" and lower:sub(1, 7) ~= "http://" then
+        return ""
+    end
+    if #out > 1024 then
+        out = out:sub(1, 1024)
+    end
+    return out
+end
+
 local function defaults()
     return {
         hud = "vertical",
         menu = "vertical",
         notif = "vertical",
+        gestionBg = "",
     }
 end
 
@@ -79,6 +94,7 @@ local function sanitize(data)
         local key = KEYS[i]
         out[key] = norm(data[key], out[key])
     end
+    out.gestionBg = cleanBg(data.gestionBg)
     out.positions = sanitizePositions(data.positions)
     return out
 end
@@ -124,6 +140,9 @@ function VFW.UiLayout.Set(data)
     end
     if data.positions == nil then
         data.positions = current.positions
+    end
+    if data.gestionBg == nil then
+        data.gestionBg = current.gestionBg
     end
     if not saveFile(data) then
         return false, "Impossible d'écrire config/ui_layout.json."

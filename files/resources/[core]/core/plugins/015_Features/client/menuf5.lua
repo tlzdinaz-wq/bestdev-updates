@@ -33,6 +33,8 @@ local _compassKvp = GetResourceKvpString("compass_enabled")
 local compassEnabled = (_compassKvp == "1")
 local _doorlockDetailKvp = GetResourceKvpString("doorlock_detail_enabled")
 local doorlockDetailEnabled = (_doorlockDetailKvp == nil or _doorlockDetailKvp == "1")
+local _hideOxygenKvp = GetResourceKvpString("hide_oxygen")
+local hideOxygen = (_hideOxygenKvp == "1")
 local radioEmotesClearTimeout = nil
 
 -- Variables de prévisualisation des emotes d'armes
@@ -215,6 +217,14 @@ local function toggleIGInfo(enabled)
     hideIGInfo = enabled
     SetResourceKvp("hide_ig_info", enabled and "1" or "0")
     SendNUIMessage({ action = "nui:igInfo:visible", data = not enabled })
+end
+
+local function toggleOxygen(hidden)
+    hideOxygen = hidden
+    SetResourceKvp("hide_oxygen", hidden and "1" or "0")
+    if VFW.SetOxygenBarHidden then
+        VFW.SetOxygenBarHidden(hidden)
+    end
 end
 
 local function toggleCompass(enabled)
@@ -1430,25 +1440,16 @@ local function renderVisualOptionsMenu()
         toggleCinemaMode(checked)
     end)
 
-    visualOptionsMenu.Button("Déplacer les interfaces", "Tes positions perso. Tant que tu n'as pas validé, tu suis le layout serveur", nil, "chevron", false, function()
-        CreateThread(function()
-            Wait(40)
-            pcall(function()
-                exports["VUI"]:CloseAll()
-            end)
-            Wait(80)
-            if VFW.HudLayout and VFW.HudLayout.StartEditor then
-                VFW.HudLayout.StartEditor()
-            end
-        end)
-    end)
-
     visualOptionsMenu.Checkbox("Masquer Minimap", "Cache la minimap (carte)", false, hideMinimap, function(checked)
         toggleMinimap(checked)
     end)
 
     visualOptionsMenu.Checkbox("Masquer HUD", "Soif, faim, vie et infos", false, hideHUD, function(checked)
         toggleHUD(checked)
+    end)
+
+    visualOptionsMenu.Checkbox("Masquer Oxygène", "Cache la barre d'oxygène", false, hideOxygen, function(checked)
+        toggleOxygen(checked)
     end)
 
     visualOptionsMenu.Checkbox("Masquer Logo Serveur", "Cache le logo " .. VFW.BrandName() .. " en haut", false, hideLogo, function(checked)
@@ -1462,6 +1463,26 @@ local function renderVisualOptionsMenu()
     visualOptionsMenu.Checkbox("Masquer Chat Vocal", "Cache l'indicateur de voix", false, hideVoiceChat, function(checked)
         toggleVoiceChat(checked)
     end)
+
+    visualOptionsMenu.Checkbox("Masquer Job et argent", "Cache métier, gang, liquide et banque", false, GetResourceKvpString("hide_player_eco") == "1", function(checked)
+        if TogglePlayerEcoHud then
+            TogglePlayerEcoHud(checked)
+        else
+            SetResourceKvp("hide_player_eco", checked and "1" or "0")
+        end
+    end)
+
+    if EcoHudStyleList and EcoHudStyleId and ApplyEcoHudStyle then
+        local _, ecoStyleIndex = EcoHudStyleId()
+        visualOptionsMenu.List("Style Job et argent", "Classique, verre, néon, ruban, orbes, ligne, colonnes, tickets, hexagones, pile, jetons ou reçu", false, EcoHudStyleList(), ecoStyleIndex, function(index)
+            local labels = EcoHudStyleList()
+            ApplyEcoHudStyle(EcoHudStyleAt(index))
+            VFW.ShowNotification({
+                type = "VERT",
+                content = "Style job : " .. (labels[index] or "Classique"),
+            })
+        end)
+    end
 
     visualOptionsMenu.Checkbox("Boussole", "Afficher une boussole en haut de l'écran", false, compassEnabled, function(checked)
         toggleCompass(checked)

@@ -1,5 +1,24 @@
 local VUI <const> = exports["VUI"]
-local bIsOpen = false
+-- VUI execute les callbacks OnClose dans un thread a part : ils se produisent
+-- APRES le retour de refresh(). Un drapeau leve puis baisse dans la foulee est
+-- donc deja retombe quand OnClose le consulte, et le formulaire etait vide a
+-- chaque reglage pose — modele et label restaient « Non defini ».
+--
+-- On compte les fermetures attendues, menu par menu. `softRefresh` ne ferme pas
+-- le menu et n'en produit aucune : seul un refresh() en dur est compte.
+local pendingRefresh = {}
+
+--- Vrai si cette fermeture vient d'un rafraichissement, et non d'une vraie sortie.
+---@param Menu table
+---@return boolean
+local function fcIsRefreshClose(Menu)
+    local iPending = pendingRefresh[Menu]
+    if not iPending or iPending <= 0 then return false end
+
+    pendingRefresh[Menu] = iPending - 1
+    return true
+end
+local rentalSavePending = false
 
 local RentalBuilder = StaffMenu.CreateRental
 local RentalManager = StaffMenu.ManageRental
@@ -51,9 +70,13 @@ local function fcSpawnPreview(sType, sModel, tPos, iNumber)
 end
 
 local function fcRefresh(Menu)
-    bIsOpen = true
+    if Menu.softRefresh then
+        Menu.softRefresh()
+        return
+    end
+
+    pendingRefresh[Menu] = (pendingRefresh[Menu] or 0) + 1
     Menu.refresh()
-    bIsOpen = false
 end
 
 local function fcGetIcon(args)
@@ -141,7 +164,6 @@ local function fcBuildRentalMenu(Menu)
 
             tData.sName = sInput
 
-            bIsOpen = true
             fcRefresh(Menu)
         end)
 
@@ -249,7 +271,8 @@ RentalBuilder.OnOpen(function()
 
     local sIcon = tData.bIsValid and "check" or "lock"
 
-  RentalBuilder.Button(":check: Créer la location", sStatusMessage, nil, sIcon, false, function()
+  RentalBuilder.Button(":check: Créer la location", rentalSavePending and "Enregistrement…" or sStatusMessage, nil, sIcon, rentalSavePending, function()
+        if rentalSavePending then return end
         if not tData.bIsValid then
             if sStatusMessage == "Position du spawn 1 manquante" then
                 iCurrentCategory = 2
@@ -262,17 +285,28 @@ RentalBuilder.OnOpen(function()
             return
         end
 
-        TriggerServerEvent("core:createVehicleRental", tData)
-        RentalBuilder.close()
-
-        StaffMenu.builderCarRental.open()
+        local payload = json.decode(json.encode(tData))
+        rentalSavePending = true
+        CreateThread(function()
+            local ok, result = pcall(TriggerServerCallback, "core:createVehicleRental", payload)
+            rentalSavePending = false
+            if not ok or type(result) ~= "table" or not result.success then
+                VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Location Véhicules',
+                    message = (ok and type(result) == "table" and result.error) or "Aucune confirmation du serveur. La location n'a pas pu etre validee." })
+                fcRefresh(RentalBuilder)
+                return
+            end
+            VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Location Véhicules', message = "Point de location cree." })
+            RentalBuilder.close()
+            StaffMenu.builderCarRental.open()
+        end)
     end)
 
 
 end)
 
 RentalBuilder.OnClose(function()
-    if bIsOpen then return end
+    if fcIsRefreshClose(RentalBuilder) then return end
 
     fcCloseMenu()
 end)
@@ -356,7 +390,7 @@ RentalEditor.OnOpen(function()
 end)
 
 RentalEditor.OnClose(function()
-    if bIsOpen then return end
+    if fcIsRefreshClose(RentalEditor) then return end
     fcCloseMenu()
 end)
 
@@ -409,9 +443,7 @@ VehicleConfigType.OnOpen(function()
 
     VehicleConfigType.Separator("")
     VehicleConfigType.Button(":refresh: ACTUALISER", "Recharger la liste", nil, "chevron", false, function()
-        bIsOpen = true
-        VehicleConfigType.refresh()
-        bIsOpen = false
+        fcRefresh(VehicleConfigType)
     end)
 end)
 
@@ -427,9 +459,7 @@ VehicleConfigEditor.OnOpen(function()
         local sInput = VFW.Nui.KeyboardInput(true, "Nouveau label", tSelectedVehicle.label)
         if sInput and sInput ~= "" then
             tSelectedVehicle.label = sInput
-            bIsOpen = true
-            VehicleConfigEditor.refresh()
-            bIsOpen = false
+            fcRefresh(VehicleConfigEditor)
         end
     end)
 
@@ -437,9 +467,7 @@ VehicleConfigEditor.OnOpen(function()
         local sInput = VFW.Nui.KeyboardInput(true, "Nouveau prix", tostring(tSelectedVehicle.price))
         if sInput and tonumber(sInput) then
             tSelectedVehicle.price = tonumber(sInput)
-            bIsOpen = true
-            VehicleConfigEditor.refresh()
-            bIsOpen = false
+            fcRefresh(VehicleConfigEditor)
         end
     end)
 
@@ -488,9 +516,7 @@ VehicleConfigAdd.OnOpen(function()
 
     VehicleConfigAdd.List('TYPE', nil, false, {"Normal", "Bateau", "Cayo"}, tNewVehicle.iType, function(Index)
         tNewVehicle.iType = Index
-        bIsOpen = true
-        VehicleConfigAdd.refresh()
-        bIsOpen = false
+        fcRefresh(VehicleConfigAdd)
     end)
 
     VehicleConfigAdd.Button(":edit: MODEL", tNewVehicle.sName ~= "" and tNewVehicle.sName or "Non défini", nil, fcGetIcon(tNewVehicle.sName ~= ""), false, function()
@@ -500,9 +526,7 @@ VehicleConfigAdd.OnOpen(function()
             if tNewVehicle.sLabel == "" then
                 tNewVehicle.sLabel = sInput:sub(1,1):upper() .. sInput:sub(2)
             end
-            bIsOpen = true
-            VehicleConfigAdd.refresh()
-            bIsOpen = false
+            fcRefresh(VehicleConfigAdd)
         end
     end)
 
@@ -510,9 +534,7 @@ VehicleConfigAdd.OnOpen(function()
         local sInput = VFW.Nui.KeyboardInput(true, "Label affiché", tNewVehicle.sLabel)
         if sInput and sInput ~= "" then
             tNewVehicle.sLabel = sInput
-            bIsOpen = true
-            VehicleConfigAdd.refresh()
-            bIsOpen = false
+            fcRefresh(VehicleConfigAdd)
         end
     end)
 
@@ -520,9 +542,7 @@ VehicleConfigAdd.OnOpen(function()
         local sInput = VFW.Nui.KeyboardInput(true, "Prix de location", tostring(tNewVehicle.iPrice))
         if sInput and tonumber(sInput) then
             tNewVehicle.iPrice = tonumber(sInput)
-            bIsOpen = true
-            VehicleConfigAdd.refresh()
-            bIsOpen = false
+            fcRefresh(VehicleConfigAdd)
         end
     end)
 
@@ -551,7 +571,7 @@ VehicleConfigAdd.OnOpen(function()
 end)
 
 VehicleConfigAdd.OnClose(function()
-    if bIsOpen then return end
+    if fcIsRefreshClose(VehicleConfigAdd) then return end
     tNewVehicle = {
         iType = 1,
         sName = "",

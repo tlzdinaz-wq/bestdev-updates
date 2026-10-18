@@ -431,6 +431,10 @@ end, function(_, worldPosition)
     end
 
     if closestVehicle then
+        if ConcessForgetShowcase and ConcessForgetShowcase(closestVehicle) then
+            VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Menu Monde', message = "Voiture d'exposition retirée." })
+            return
+        end
         local plate = VFW.Math.Trim(GetVehicleNumberPlateText(closestVehicle))
         local netId = NetworkGetNetworkIdFromEntity(closestVehicle)
         if netId then

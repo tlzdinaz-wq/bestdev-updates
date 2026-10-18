@@ -2,6 +2,27 @@ VFW.Commands = {}
 
 local registered = {}
 
+--- Une commande peut accepter plusieurs permissions : il suffit d en avoir une.
+---
+--- Certaines commandes existent en double dans la configuration — une entree pour
+--- la commande, une autre pour le menu equivalent — et n en declaraient qu une.
+--- Cocher la mauvaise ne donnait alors rien du tout.
+---@param permission string|string[]|nil
+---@param xPlayer table
+---@return boolean
+local function allowed(permission, xPlayer)
+    if not permission or permission == "" then return true end
+
+    if type(permission) == "table" then
+        for i = 1, #permission do
+            if xPlayer.hasPermission(permission[i]) then return true end
+        end
+        return false
+    end
+
+    return xPlayer.hasPermission(permission) == true
+end
+
 function VFW.RegisterCommand(name, permission, handler, options)
     options = options or {}
 
@@ -27,7 +48,7 @@ function VFW.RegisterCommand(name, permission, handler, options)
         local xPlayer = VFW.GetPlayerFromId(source)
         if not xPlayer then return end
 
-        if permission and permission ~= "" and not xPlayer.hasPermission(permission) then
+        if not allowed(permission, xPlayer) then
             xPlayer.showNotification({
                 type = "STAFF",
                 variant = "ERROR",
@@ -48,7 +69,7 @@ end
 local function buildSuggestionsFor(xPlayer)
     local out, n = {}, 0
     for _, cmd in pairs(registered) do
-        if not cmd.permission or cmd.permission == "" or xPlayer.hasPermission(cmd.permission) then
+        if allowed(cmd.permission, xPlayer) then
             n = n + 1
             out[n] = { name = cmd.name, help = cmd.help, params = cmd.params }
         end

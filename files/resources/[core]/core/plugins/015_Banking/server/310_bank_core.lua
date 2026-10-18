@@ -196,7 +196,18 @@ function Bank.AddTransaction(iban, accountType, label, status, value, positive, 
 
     if not VALID_STATUS[status] then status = "purchase" end
 
-    local amount = (positive and "~g~+" or "~r~-") .. tostring(value)
+    -- `amount` est une colonne numerique (bigint). On y ecrivait une chaine
+    -- d affichage coloree — "~g~+100" — et MySQL refusait la ligne :
+    --
+    --   Incorrect integer value: '~g~+100' for column `bank_transactions`.`amount`
+    --
+    -- Aucune transaction ne s enregistrait, pour personne : ni les paies, ni les
+    -- achats, ni les virements. L historique du telephone restait vide.
+    --
+    -- Les codes couleur de GTA ne servaient a rien de toute facon : la page du
+    -- telephone est une interface web, elle les aurait affiches en toutes lettres.
+    -- On enregistre donc le montant signe, et la lecture refait le texte.
+    local signed = positive and value or -value
     local query = [[
         INSERT INTO bank_transactions (iban, account_type, label, `status`, amount, `value`, positive, `date`)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -206,7 +217,7 @@ function Bank.AddTransaction(iban, accountType, label, status, value, positive, 
         tonumber(accountType) == 2 and 2 or 1,
         tostring(label or ""):sub(1, 160),
         status,
-        amount,
+        signed,
         value,
         positive and 1 or 0,
         Bank.Now(),
@@ -236,7 +247,9 @@ function Bank.GetTransactions(iban, limit)
         out[i] = {
             label = tostring(row.label or ""),
             status = VALID_STATUS[row.status] and row.status or "purchase",
-            amount = tostring(row.amount or "0"),
+            -- Le signe explicite, sans code couleur : la page le colore elle-meme
+            -- a partir de `positive`.
+            amount = ("%+d"):format(math.floor(tonumber(row.amount) or 0)),
             date = tostring(row.date or Bank.Now()),
             positive = tonumber(row.positive) == 1,
         }

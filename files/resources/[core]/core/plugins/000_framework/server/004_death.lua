@@ -170,6 +170,7 @@ RegisterNetEvent("core:staff:treatZone", function(reviveList, healList)
             local target = VFW.GetPlayerFromId(id)
             if target then
                 target.setMeta("health", 200)
+                VFW.SetStatus(id, 100, 100)
                 TriggerClientEvent("core:jobs:client:HealthPlayer", id, 200)
             end
         end

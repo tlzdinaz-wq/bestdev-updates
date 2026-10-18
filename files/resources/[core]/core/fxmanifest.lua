@@ -75,7 +75,9 @@ server_scripts {
     'testserver/server/permissions.lua',
     "endernative/server/*.lua",
     "modules/**/server/*.lua",
-    "modules/**/server/submodules/*.lua",
+    -- Pas de "modules/**/server/submodules/*.lua" : aucun module n a de sous-module
+    -- serveur, et le motif faisait avertir le serveur a chaque demarrage. Le pendant
+    -- client, lui, correspond bien a des fichiers (voir client_scripts).
     "plugins/000_framework/server/001_command_sync.lua",
     "plugins/**/server/**",
     "jobs/**/server/**",
@@ -83,7 +85,8 @@ server_scripts {
 
 client_scripts {
     "nui_gate.lua",
-    "endernative/client/*.lua",
+    -- endernative n a pas de partie client : le dossier n existe pas, le motif ne
+    -- servait qu a produire un avertissement au demarrage.
     "modules/**/client/*.lua",
     "modules/**/client/submodules/*.lua",
     "plugins/**/client/**",

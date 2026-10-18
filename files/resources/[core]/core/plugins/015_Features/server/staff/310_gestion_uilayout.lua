@@ -28,6 +28,7 @@ local function panel()
         hud = layout.hud,
         menu = layout.menu,
         notif = layout.notif,
+        gestionBg = layout.gestionBg or "",
     }
 end
 

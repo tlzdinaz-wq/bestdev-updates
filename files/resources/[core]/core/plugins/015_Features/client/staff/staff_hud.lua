@@ -6,6 +6,66 @@ local onlineStaffs = 0
 local staffsInService = 0
 local hudInitialized = false
 
+local HUD_STYLES = {
+    { id = "classic", label = "Classique" },
+    { id = "glass", label = "Verre" },
+    { id = "neon", label = "Néon" },
+    { id = "ribbon", label = "Ruban" },
+    { id = "orbs", label = "Orbes" },
+    { id = "line", label = "Ligne" },
+}
+
+local HUD_STYLE_LEGACY = {
+    compact = "glass",
+    bar = "ribbon",
+    minimal = "line",
+    pills = "orbs",
+}
+
+function StaffHudStyleList()
+    local labels = {}
+    for i = 1, #HUD_STYLES do
+        labels[i] = HUD_STYLES[i].label
+    end
+    return labels
+end
+
+function StaffHudStyleAt(index)
+    local entry = HUD_STYLES[tonumber(index) or 0]
+    return entry and entry.id or "classic"
+end
+
+function StaffHudStyleId()
+    local style = GetResourceKvpString("staff_hud_style") or "classic"
+    style = HUD_STYLE_LEGACY[style] or style
+    for i = 1, #HUD_STYLES do
+        if HUD_STYLES[i].id == style then
+            return style, i
+        end
+    end
+    return "classic", 1
+end
+
+function ApplyStaffHudStyle(style)
+    local found = false
+    for i = 1, #HUD_STYLES do
+        if HUD_STYLES[i].id == style then
+            found = true
+            break
+        end
+    end
+    if not found then style = "classic" end
+    SetResourceKvp("staff_hud_style", style)
+    SendNUIMessage({ action = "staffHud:style", data = style })
+    if VFW.HudLayout and VFW.HudLayout.PushStaffPlace then
+        VFW.HudLayout.PushStaffPlace()
+    end
+end
+
+local function pushStaffHudStyle()
+    SendNUIMessage({ action = "staffHud:style", data = select(1, StaffHudStyleId()) })
+end
+
 local function reportCount()
     if VFW and type(VFW.Reports) == "table" then
         return #VFW.Reports
@@ -27,6 +87,7 @@ local function UpdateStaffHudNUI()
             staffsInService = staffsInService > 0 and staffsInService or 1
         }
     })
+    pushStaffHudStyle()
 end
 
 -- Même source que le menu Reports (VFW.Reports), pour ne pas rester à 1 après fermeture.
@@ -45,13 +106,20 @@ _G.IsStaffHUDVisible = function()
     return staffHudVisible
 end
 
+local function staffModeOn()
+    return StaffMenu and StaffMenu.adminChecked == true
+end
+
 _G.ToggleStaffHUD = function(state)
-    staffHudVisible = state
+    if state and not staffModeOn() then
+        state = false
+    end
+    staffHudVisible = state == true
     SendNUIMessage({
         action = "staffHud:toggle",
-        data = state
+        data = staffHudVisible
     })
-    if state then
+    if staffHudVisible then
         UpdateStaffHudNUI()
     end
 end
@@ -103,44 +171,54 @@ end)
 
 -- Auto-enable HUD when staff mode is activated
 RegisterNetEvent("vfw:staff:modeChanged", function(enabled)
-    if enabled then
-        ToggleStaffHUD(true)
-        initStaffHud()
-        -- Request current reports from server when entering staff mode
+    if enabled and staffModeOn() then
+        local hideHud = GetResourceKvpString("staff_hide_web_hud") == "true"
+        if not hideHud then
+            ToggleStaffHUD(true)
+            initStaffHud()
+        end
         TriggerServerEvent("vfw:staff:requestReports")
     else
         ToggleStaffHUD(false)
     end
 end)
 
--- Apply the "keep HUD visible while off-duty" preference. Called when staff
--- mode is toggled off and at resource start so report counts keep updating
--- for staffs who opted in.
+-- Le panneau ne reste jamais affiché hors mode staff, y compris au spawn.
 _G.ApplyHudOffDutyPreference = function()
-    if StaffMenu and StaffMenu.adminChecked then return end
-    local enabled = GetResourceKvpString("staff_hud_offduty") == "true"
-  local hideHud = GetResourceKvpString("staff_hide_web_hud") == "true"
-  if enabled and not hideHud then
-        TriggerServerEvent("vfw:staff:setHudOffDuty", true)
-        initStaffHud()
-        ToggleStaffHUD(true)
-    else
-        TriggerServerEvent("vfw:staff:setHudOffDuty", false)
+    TriggerServerEvent("vfw:staff:setHudOffDuty", false)
+    if not staffModeOn() then
         ToggleStaffHUD(false)
     end
 end
 
--- Initialize HUD on resource start if already in staff mode
-CreateThread(function()
-    Wait(1000)
-    if StaffMenu and StaffMenu.adminChecked then
+local function syncStaffHud()
+    if staffModeOn() and GetResourceKvpString("staff_hide_web_hud") ~= "true" then
         ToggleStaffHUD(true)
         initStaffHud()
-        -- Request current reports if already in staff mode
         TriggerServerEvent("vfw:staff:requestReports")
-    else
-        ApplyHudOffDutyPreference()
+        return
     end
+    ToggleStaffHUD(false)
+end
+
+CreateThread(function()
+    ToggleStaffHUD(false)
+    Wait(1000)
+    syncStaffHud()
+end)
+
+RegisterNetEvent("vfw:playerLoaded", function()
+    CreateThread(function()
+        Wait(500)
+        syncStaffHud()
+    end)
+end)
+
+RegisterNetEvent("vfw:characterLoaded", function()
+    CreateThread(function()
+        Wait(500)
+        syncStaffHud()
+    end)
 end)
 
 -- Commands

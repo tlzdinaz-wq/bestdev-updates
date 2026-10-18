@@ -4,6 +4,7 @@
 
 RegisterNetEvent("vfw:itemPool:open")
 AddEventHandler("vfw:itemPool:open", function(allItems)
+    VFW.SetInfiniteItemsList(allItems)
     VFW.OpenInventory({
         inventory = allItems,
         name = "Tous les Items",

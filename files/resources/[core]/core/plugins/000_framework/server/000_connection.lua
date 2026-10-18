@@ -88,7 +88,17 @@ AddEventHandler("playerConnecting", function(name, setKickReason, deferrals)
 
     if not ok or not account then
         console.error(("[connexion] échec du chargement du compte %s : %s"):format(identifier, tostring(account)))
-        deferrals.done("Erreur lors du chargement de votre compte. Contactez le staff.")
+
+        -- La raison figurait uniquement dans la console du serveur. Un joueur qui
+        -- n'entre pas ne peut rien en dire d'autre que « ça ne marche pas », et
+        -- l'hébergeur n'a pas toujours accès au journal. On la lui montre : il peut
+        -- alors la transmettre telle quelle.
+        local reason = tostring(account or "raison inconnue")
+        reason = reason:gsub("^.-:%d+:%s*", ""):gsub("%s+", " ")
+        if #reason > 160 then reason = reason:sub(1, 157) .. "..." end
+
+        deferrals.done(("Erreur lors du chargement de votre compte. Contactez le staff.\n\nDétail : %s")
+            :format(reason))
         return
     end
 

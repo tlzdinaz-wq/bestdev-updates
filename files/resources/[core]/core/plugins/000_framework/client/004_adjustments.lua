@@ -124,8 +124,6 @@ function Adjustments:NPCScenarios()
         "WORLD_VEHICLE_BUSINESSMEN", "WORLD_VEHICLE_HELI_LIFEGUARD",
         "WORLD_VEHICLE_CLUCKIN_BELL_TRAILER", "WORLD_VEHICLE_CONSTRUCTION_SOLO",
         "WORLD_VEHICLE_CONSTRUCTION_PASSENGERS",
-        "WORLD_VEHICLE_DRIVE_PASSENGERS",
-        "WORLD_VEHICLE_DRIVE_PASSENGERS_LIMITED", "WORLD_VEHICLE_DRIVE_SOLO",
         "WORLD_VEHICLE_FIRE_TRUCK", "WORLD_VEHICLE_EMPTY",
         "WORLD_VEHICLE_MARIACHI", "WORLD_VEHICLE_MECHANIC",
         "WORLD_VEHICLE_MILITARY_PLANES_BIG",
@@ -144,6 +142,18 @@ function Adjustments:NPCScenarios()
 
     for i = 1, #scenarios do
         SetScenarioTypeEnabled(scenarios[i], false)
+    end
+
+    local driving = {
+        "WORLD_VEHICLE_DRIVE_SOLO",
+        "WORLD_VEHICLE_DRIVE_PASSENGERS",
+        "WORLD_VEHICLE_DRIVE_PASSENGERS_LIMITED",
+        "WORLD_VEHICLE_BUSINESSMEN",
+        "WORLD_VEHICLE_PARK_PARALLEL",
+        "WORLD_VEHICLE_PARK_PERPENDICULAR_NOSE_IN",
+    }
+    for i = 1, #driving do
+        SetScenarioTypeEnabled(driving[i], true)
     end
 end
 
@@ -587,6 +597,5 @@ function Adjustments:Load()
     self:Authers()
     self:NoCarJack()
     self:RemoveCops()
-    self:RemoveNPC()
     self:RemoveStrafe()
 end

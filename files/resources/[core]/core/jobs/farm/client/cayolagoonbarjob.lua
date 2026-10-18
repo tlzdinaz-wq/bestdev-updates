@@ -85,7 +85,13 @@ Citizen.CreateThread(function()
         local hasGoodJob = VFW.PlayerData and VFW.PlayerData.job and VFW.PlayerData.job.name == "cayo_lagoon"
         local isInVehicle = IsPedInAnyVehicle(ped, false)
 
-        local harvestPoints = dynamicHarvestPoints or CayoLagoonBarConfig.harvest
+        -- Une liste synchronisee vide reste un tableau, donc vraie : sans ce test, le
+        -- point de recolte par defaut n'etait plus consulte et aucune invite
+        -- n'apparaissait. Le bloc de transformation plus bas fait deja ce controle.
+        local harvestPoints = dynamicHarvestPoints
+        if not harvestPoints or #harvestPoints == 0 then
+            harvestPoints = CayoLagoonBarConfig.harvest
+        end
         local nearestDist = math.huge
         for _, pt in ipairs(harvestPoints) do
             local d = #(pCoords - vector3(pt.x, pt.y, pt.z))

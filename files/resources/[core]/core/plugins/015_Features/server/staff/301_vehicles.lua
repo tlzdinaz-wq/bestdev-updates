@@ -940,7 +940,10 @@ RegisterNetEvent("vfw:staff:menu:spawnVehicle", function(model)
     logStaff(source, "vehicle_spawn_menu", { model = cleaned, coords = coords })
 end)
 
-VFW.RegisterCommand("car", "spawn_veh", function(source, xPlayer, args)
+-- Deux permissions valent pour /car : `spawn_vehicle`, decrite dans la configuration
+-- comme « Commande /car », et `spawn_veh`, celle du menu staff. Seule la seconde
+-- etait exigee : cocher la premiere ne donnait acces a rien.
+VFW.RegisterCommand("car", { "spawn_veh", "spawn_vehicle" }, function(source, xPlayer, args)
     if not rateOk(source, "staff:commandCar", 1000) then return end
 
     local cleaned = cleanModel(args and args[1])

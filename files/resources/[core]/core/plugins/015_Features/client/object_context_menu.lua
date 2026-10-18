@@ -89,13 +89,26 @@ end, {})
 
 local TV_Models = {}
 
-CreateThread(function()
-    local models = TriggerServerCallback("television:getModels")
-    if models then
-        for _, m in ipairs(models) do
+local function setTvModels(models)
+    TV_Models = {}
+    if type(models) ~= "table" then return end
+
+    for _, m in ipairs(models) do
+        if type(m) == "table" and type(m.model) == "string" then
             TV_Models[joaat(m.model)] = true
         end
     end
+end
+
+CreateThread(function()
+    setTvModels(TriggerServerCallback("television:getModels"))
+end)
+
+-- Le builder vient de modifier la liste : on la reprend entiere, pour que les
+-- suppressions arrivent aussi — `ptelevision:syncModels`, plus bas, ne sait
+-- qu'ajouter.
+RegisterNetEvent("core:television:modelsUpdated", function(models)
+    setTvModels(models)
 end)
 
 RegisterNetEvent("ptelevision:syncModels", function(models)

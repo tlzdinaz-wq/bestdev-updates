@@ -375,24 +375,81 @@ local function ensureSequentialPlayerUuid(account)
     return account
 end
 
+--- Un identifiant utilisable, ou nil.
+---
+--- Zero n'est pas un identifiant : c'est ce que rend MySQL quand la colonne n'est
+--- pas en auto-increment, ou quand l'insertion n'a rien produit.
+---@param value any
+---@return number|nil
+local function usableId(value)
+    local id = tonumber(value)
+    if not id or id < 1 or id % 1 ~= 0 then return nil end
+    return math.floor(id)
+end
+
+--- Attribue un identifiant de compte quand `users.id` n'est pas en auto-increment.
+---
+--- La table de sequence est creee en AUTO_INCREMENT, mais `CREATE TABLE IF NOT
+--- EXISTS` ne corrige pas une table deja presente sans lui. Sur ces bases, l'insertion
+--- rendait 0, la relecture rendait 0, et la generation de l'UUID levait une erreur :
+--- la connexion etait refusee avec « Identifiant de compte invalide pour generer
+--- l'UUID : 0 ». Plus personne ne pouvait creer de compte.
+---
+--- On attribue donc l'identifiant nous-memes quand la sequence ne le fait pas.
+---@param identifier string
+---@return string
 local function nextLegacyAccountId(identifier)
-    local existing = MySQL.scalar.await(
+    local existing = usableId(MySQL.scalar.await(
         "SELECT id FROM player_uuid_sequence WHERE identifier = ? LIMIT 1",
         { identifier }
-    )
+    ))
     if existing then return playerUuidFromAccountId(existing) end
 
-    local id = MySQL.insert.await([[
+    local id = usableId(MySQL.insert.await([[
         INSERT INTO player_uuid_sequence (identifier)
         VALUES (?)
         ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)
-    ]], { identifier })
+    ]], { identifier }))
 
-    if not id or tonumber(id) == 0 then
-        id = MySQL.scalar.await(
+    if not id then
+        id = usableId(MySQL.scalar.await(
             "SELECT id FROM player_uuid_sequence WHERE identifier = ? LIMIT 1",
             { identifier }
-        )
+        ))
+    end
+
+    -- La sequence ne numerote pas : on prend le relais. La ligne a peut-etre ete
+    -- creee avec l'identifiant 0, on la remplace par une ligne correctement numerotee.
+    if not id then
+        console.warn(("[comptes] la table player_uuid_sequence ne numerote pas "
+            .. "(colonne `id` sans AUTO_INCREMENT) : attribution manuelle pour %s")
+            :format(identifier))
+
+        MySQL.query.await("DELETE FROM player_uuid_sequence WHERE identifier = ? AND id < 1",
+            { identifier })
+
+        local nextId = usableId(MySQL.scalar.await(
+            "SELECT COALESCE(MAX(id), 0) + 1 FROM player_uuid_sequence"))
+        if not nextId then nextId = 1 end
+
+        local ok = pcall(MySQL.insert.await,
+            "INSERT INTO player_uuid_sequence (id, identifier) VALUES (?, ?)",
+            { nextId, identifier })
+
+        if ok then
+            id = nextId
+        else
+            -- Course entre deux connexions simultanees : la ligne existe desormais.
+            id = usableId(MySQL.scalar.await(
+                "SELECT id FROM player_uuid_sequence WHERE identifier = ? LIMIT 1",
+                { identifier }
+            ))
+        end
+    end
+
+    if not id then
+        error("Impossible d'attribuer un identifiant de compte : verifiez que la colonne "
+            .. "`id` de `users` est en AUTO_INCREMENT")
     end
 
     return playerUuidFromAccountId(id)
@@ -428,6 +485,26 @@ function VFW.DB.EnsureSequentialPlayerUuids()
                 UNIQUE KEY uk_player_uuid_sequence_identifier (identifier)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ]])
+
+        -- `CREATE TABLE IF NOT EXISTS` ne corrige pas une table deja presente. Sur une
+        -- base ou `player_uuid_sequence` existait sans AUTO_INCREMENT, l'insertion
+        -- rendait 0 et plus aucun compte ne pouvait etre cree. On repare la table :
+        -- elle nous appartient, personne d'autre ne s'en sert.
+        local sequenceNumbers = MySQL.scalar.await([[
+            SELECT COUNT(*)
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'player_uuid_sequence'
+              AND COLUMN_NAME = 'id'
+              AND EXTRA LIKE '%auto_increment%'
+        ]])
+
+        if (tonumber(sequenceNumbers) or 0) == 0 then
+            console.warn("[comptes] player_uuid_sequence sans AUTO_INCREMENT : reparation")
+            MySQL.query.await("DELETE FROM player_uuid_sequence WHERE id < 1")
+            pcall(MySQL.query.await,
+                "ALTER TABLE player_uuid_sequence MODIFY `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT")
+        end
 
         MySQL.query.await([[
             INSERT IGNORE INTO player_uuid_sequence (id, identifier)

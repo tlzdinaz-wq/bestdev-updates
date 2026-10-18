@@ -514,7 +514,7 @@ RegisterNetEvent("vfw:staff:setBlackout", function(state)
     local xPlayer = allowEvent(source)
     if not xPlayer then return end
 
-    local enabled = state and true or false
+    local enabled = state == true or state == 1 or state == "true" or state == "1"
     GlobalState.blackout = enabled
     TriggerClientEvent("vfw:staff:setBlackout", -1, enabled)
 

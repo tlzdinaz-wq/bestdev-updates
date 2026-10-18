@@ -139,7 +139,13 @@ Citizen.CreateThread(function()
         local isInVehicle = IsPedInAnyVehicle(ped, false)
 
         -- 1. LOGIQUE DE RECOLTE (Points)
-        local harvestPoints = dynamicHarvestPoints or YellowJackBarConfig.harvest
+        -- Une liste synchronisee vide reste un tableau, donc vraie : sans ce test, le
+        -- point de recolte par defaut n'etait plus consulte et aucune invite
+        -- n'apparaissait. Le bloc de transformation plus bas fait deja ce controle.
+        local harvestPoints = dynamicHarvestPoints
+        if not harvestPoints or #harvestPoints == 0 then
+            harvestPoints = YellowJackBarConfig.harvest
+        end
         local nearestDist = math.huge
         for _, pt in ipairs(harvestPoints) do
             local d = #(pCoords - vector3(pt.x, pt.y, pt.z))

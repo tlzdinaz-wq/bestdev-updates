@@ -45,6 +45,7 @@ local tNewVehicle = {
     sCategory = "",
     iPrice = 0
 }
+local vehicleSavePending = false
 
 -- Jobs / catégories en cache : OnOpen / softRefresh ne doit JAMAIS yield (sinon UI bloquée).
 local societiesCache = nil
@@ -651,13 +652,16 @@ ConcessVehicleAdd.OnOpen(function()
     ConcessVehicleAdd.Separator(":plus: NOUVEAU VÉHICULE")
 
     local iCatIndex = 1
+    local categoryFound = false
     for i, sCat in ipairs(tCategories) do
-        if sCat == tNewVehicle.sCategory then iCatIndex = i break end
+        if sCat == tNewVehicle.sCategory then iCatIndex = i categoryFound = true break end
     end
+    if not categoryFound then tNewVehicle.sCategory = tCategories[1] or "" end
 
     if #tCategories > 0 then
         ConcessVehicleAdd.List(":folder: CATÉGORIE", nil, false, tCategories, iCatIndex, function(index)
-            tNewVehicle.sCategory = tCategories[index]
+            tNewVehicle.sCategory = tCategories[index] or ""
+            fcRefresh(ConcessVehicleAdd)
         end)
     else
         ConcessVehicleAdd.Button(":folder: CATÉGORIE", categoriesCache and "Aucune catégorie" or "Chargement…", nil, "lock", true, function() end)
@@ -691,12 +695,22 @@ ConcessVehicleAdd.OnOpen(function()
 
     local bCanCreate = tNewVehicle.sModel ~= "" and tNewVehicle.sName ~= "" and tNewVehicle.sCategory ~= ""
 
-    ConcessVehicleAdd.Button(":check: CRÉER", bCanCreate and "Prêt" or "Model, Nom et Catégorie requis", nil, bCanCreate and "check" or "lock", not bCanCreate, function()
-        if not bCanCreate then return end
-        TriggerServerEvent("core:concess:addVehicle", tNewVehicle.sModel, tNewVehicle.sName, tNewVehicle.sCategory, tNewVehicle.iPrice)
-        VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Véhicule ajouté." })
-        tNewVehicle = { sModel = "", sName = "", sCategory = tNewVehicle.sCategory, iPrice = 0 }
-        ConcessVehicleAdd.close()
-        SetTimeout(300, function() ConcessVehicles.open() end)
+    ConcessVehicleAdd.Button(":check: CRÉER", vehicleSavePending and "Enregistrement…" or (bCanCreate and "Prêt" or "Model, Nom et Catégorie requis"), nil, bCanCreate and "check" or "lock", not bCanCreate or vehicleSavePending, function()
+        if not bCanCreate or vehicleSavePending then return end
+        vehicleSavePending = true
+        local model, name, category, price = tNewVehicle.sModel, tNewVehicle.sName, tNewVehicle.sCategory, tNewVehicle.iPrice
+        CreateThread(function()
+            local ok, result = pcall(TriggerServerCallback, "core:concess:addVehicle", model, name, category, price)
+            vehicleSavePending = false
+            if not ok or type(result) ~= "table" or not result.success then
+                VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Concessionnaires', message = (ok and type(result) == "table" and result.error) or "Ajout impossible : aucune confirmation du serveur." })
+                fcRefresh(ConcessVehicleAdd)
+                return
+            end
+            VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Véhicule ajouté au catalogue." })
+            tNewVehicle = { sModel = "", sName = "", sCategory = category, iPrice = 0 }
+            ConcessVehicleAdd.close()
+            ConcessVehicles.open()
+        end)
     end)
 end)

@@ -2,7 +2,7 @@ fx_version 'cerulean'
 game 'gta5'
 lua54 'yes'
 
-name 'chat'
+name'chat_custom'
 description 'Chat du serveur (T) : messages, commandes avec complétion, même API que la ressource chat de cfx'
 version '1.0.0'
 

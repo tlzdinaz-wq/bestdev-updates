@@ -169,22 +169,32 @@ RegisterNetEvent("core:vehicleRental:return", function(iOpenType)
     Rental.EndRental(entry.sPlate, source)
 end)
 
-RegisterNetEvent("core:createVehicleRental", function(payload)
-    local source = source
+local function createVehicleRental(source, payload)
     local xPlayer = VFW.GetPlayerFromId(source)
-    if not canManage(xPlayer) then return end
+    if not canManage(xPlayer) then return { success = false, error = "Permission manage_vehicleRental requise." } end
 
     local data = Rental.SanitizePoint(payload)
     if not data then
-        Vehicles.Notify(source, "ROUGE", "Location", "Ces données de location ne sont pas valides.")
-        return
+        return { success = false, error = "Position du ped et au moins un emplacement de vehicule valides requis." }
+    end
+    data.sName = data.sName:match("^%s*(.-)%s*$")
+    if data.sName == "" then return { success = false, error = "Nom de location requis." } end
+
+    local ok, iId = pcall(Rental.InsertPoint, data)
+    if not ok or not tonumber(iId) or tonumber(iId) <= 0 then
+        console.error("[location] creation : " .. tostring(iId))
+        return { success = false, error = "Sauvegarde SQL impossible. Consultez la console serveur." }
     end
 
-    local iId = Rental.InsertPoint(data)
-    if not iId then return end
-
     TriggerClientEvent("core:vehicleRental:Create", -1, Rental.Serialize(data), iId)
-    Vehicles.Notify(source, "VERT", "Location", "Point de location créé.")
+    return { success = true, id = iId }
+end
+
+RegisterServerCallback("core:createVehicleRental", createVehicleRental)
+
+RegisterNetEvent("core:createVehicleRental", function(payload)
+    local result = createVehicleRental(source, payload)
+    Vehicles.Notify(source, result.success and "VERT" or "ROUGE", "Location", result.success and "Point de location cree." or result.error)
 end)
 
 RegisterNetEvent("core:editVehicleRental", function(payload)

@@ -358,3 +358,160 @@ lib.addCommand('doorlock', {
 }, function(source, args)
 	TriggerClientEvent('ox_doorlock:triggeredCommand', source, args.closest)
 end)
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- Menu staff « Gérer les accès des portes » (core)
+--
+-- Le menu builder du core — plugins/015_Features/client/staff/menu/builders.lua —
+-- appelle quatre points d'entrée qui n'avaient jamais été écrits ici : ouvrir
+-- l'éditeur, lister les portes, enregistrer les accès par métier ou faction,
+-- enregistrer les accès par UUID. La liste échouait sur « callback
+-- 'ox_doorlock:getAllDoorsForBuilder' does not exist » et le menu restait vide ;
+-- les deux enregistrements partaient dans le vide sans rien dire.
+--
+-- Le menu raisonne en accès { name, grade, type } ; ox_doorlock ne connaît que
+-- door.groups, une table { [nom] = grade }. La conversion se fait ici.
+-- ══════════════════════════════════════════════════════════════════════════
+
+local BUILDER_PERMISSIONS <const> = { 'doorlock_builder', 'doorlock', 'dev', 'admin' }
+
+---Le principal ace de la commande reste valable, mais le staff du serveur est
+---reconnu par ses permissions : il n'est pas forcément dans group.admin.
+---@param playerId number
+---@return boolean
+local function isBuilder(playerId)
+	if IsPlayerAceAllowed(playerId, 'command.doorlock') then return true end
+
+	local player = GetPlayer and GetPlayer(playerId)
+	if not player or not player.hasPermission then return false end
+
+	for i = 1, #BUILDER_PERMISSIONS do
+		if player.hasPermission(BUILDER_PERMISSIONS[i]) then return true end
+	end
+
+	return false
+end
+
+-- door.groups ne retient que le nom et le grade, jamais la nature du groupe. Le menu,
+-- lui, sépare métiers et factions. On retrouve la nature au nom : ce qui figure dans
+-- la table des métiers est un métier, le reste est une faction.
+local jobNames
+
+---@param name string
+---@return boolean
+local function isJobName(name)
+	if not jobNames then
+		jobNames = {}
+
+		local rows = MySQL.query.await('SELECT `name` FROM `jobs`') or {}
+		for i = 1, #rows do jobNames[rows[i].name] = true end
+	end
+
+	return jobNames[name] == true
+end
+
+---@param groups table|nil
+---@return { name: string, grade: number, type: string }[]
+local function groupsToAccess(groups)
+	local access = {}
+	if type(groups) ~= 'table' then return access end
+
+	-- ox_doorlock accepte aussi une simple liste de noms, sans grade.
+	if table.type(groups) == 'array' then
+		for i = 1, #groups do
+			local name = groups[i]
+			access[#access + 1] = { name = name, grade = 0, type = isJobName(name) and 'job' or 'faction' }
+		end
+
+		return access
+	end
+
+	for name, grade in pairs(groups) do
+		access[#access + 1] = {
+			name = name,
+			grade = tonumber(grade) or 0,
+			type = isJobName(name) and 'job' or 'faction',
+		}
+	end
+
+	return access
+end
+
+---@param access table|nil
+---@return table|nil groups  nil quand la porte redevient publique.
+local function accessToGroups(access)
+	if type(access) ~= 'table' then return nil end
+
+	local groups = {}
+	for i = 1, #access do
+		local entry = access[i]
+		if type(entry) == 'table' and type(entry.name) == 'string' and entry.name ~= '' then
+			groups[entry.name] = math.floor(tonumber(entry.grade) or 0)
+		end
+	end
+
+	return next(groups) and groups or nil
+end
+
+---Enregistre la porte et la pousse à tous les clients, comme le fait l'éditeur.
+---@param door table
+local function saveDoor(door)
+	MySQL.update('UPDATE ox_doorlock SET data = ? WHERE id = ?', { encodeData(door), door.id })
+	TriggerClientEvent('ox_doorlock:editDoorlock', -1, door.id, door)
+end
+
+lib.callback.register('ox_doorlock:getAllDoorsForBuilder', function(source)
+	if not isBuilder(source) then return {} end
+
+	local list = {}
+
+	for _, door in pairs(doors) do
+		list[#list + 1] = {
+			id = door.id,
+			name = door.name,
+			state = door.state,
+			coords = door.coords,
+			characters = door.characters or {},
+			vfw_access = groupsToAccess(door.groups),
+		}
+	end
+
+	return list
+end)
+
+RegisterNetEvent('ox_doorlock:openEditor', function(closest)
+	local source = source
+	if not isBuilder(source) then return end
+
+	TriggerClientEvent('ox_doorlock:triggeredCommand', source, closest == true or nil)
+end)
+
+RegisterNetEvent('ox_doorlock:updateVfwAccess', function(id, access)
+	local source = source
+	if not isBuilder(source) then return end
+
+	local door = doors[tonumber(id) or 0]
+	if not door then return end
+
+	door.groups = accessToGroups(access)
+	saveDoor(door)
+end)
+
+RegisterNetEvent('ox_doorlock:updateCharacters', function(id, characters)
+	local source = source
+	if not isBuilder(source) then return end
+
+	local door = doors[tonumber(id) or 0]
+	if not door then return end
+
+	local list = {}
+	if type(characters) == 'table' then
+		for i = 1, #characters do
+			local uuid = tonumber(characters[i])
+			if uuid then list[#list + 1] = uuid end
+		end
+	end
+
+	door.characters = next(list) and list or nil
+	saveDoor(door)
+end)

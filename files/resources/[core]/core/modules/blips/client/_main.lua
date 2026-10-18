@@ -11,16 +11,24 @@ function Blips.create(blipData)
     end
 
     local position = blipData.position
-    local blip = AddBlipForCoord(position.x, position.y, position.z)
+    local x, y, z = tonumber(position.x), tonumber(position.y), tonumber(position.z)
+    if not x or not y or not z then
+        return nil
+    end
+
+    local blip = AddBlipForCoord(x + 0.0, y + 0.0, z + 0.0)
 
     if not DoesBlipExist(blip) then
         return nil
     end
 
-    SetBlipSprite(blip, blipData.sprite or 1)
-    SetBlipColour(blip, blipData.color or 0)
-    SetBlipScale(blip, (blipData.scale or 0.5) + 0.0)
-    SetBlipAsShortRange(blip, true)
+    SetBlipSprite(blip, math.floor(tonumber(blipData.sprite) or 1))
+    SetBlipDisplay(blip, 4)
+    SetBlipColour(blip, math.floor(tonumber(blipData.color) or 0))
+    SetBlipScale(blip, (tonumber(blipData.scale) or 0.8) + 0.0)
+    SetBlipAsShortRange(blip, false)
+    SetBlipHighDetail(blip, true)
+    SetBlipPriority(blip, 10)
 
     BeginTextCommandSetBlipName("STRING")
     AddTextComponentString(blipData.label)
@@ -104,6 +112,10 @@ RegisterNetEvent("blips:retrieve:list", function(blipsList)
 end)
 
 RegisterNetEvent("blips:add:list", function(blipId, blipData)
+    blipId = tostring(blipId)
+    if Blips.list[blipId] and Blips.list[blipId].blip then
+        Blips.remove(blipId)
+    end
     Blips.list[blipId] = blipData
     local blip <const> = Blips.create(blipData)
 
@@ -118,4 +130,9 @@ end)
 
 RegisterNetEvent("blips:remove:list", function(blipId)
     Blips.remove(blipId)
+end)
+
+CreateThread(function()
+    Wait(2500)
+    TriggerServerEvent("blips:request:list")
 end)

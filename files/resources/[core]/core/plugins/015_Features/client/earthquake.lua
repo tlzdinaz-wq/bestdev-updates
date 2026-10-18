@@ -140,13 +140,13 @@ local function StartEarthquake(force, frequency, direction, seed, duration, weat
 
             -- Light flickering
             if progress > 0.2 and progress < 0.7 then
-                SetArtificialLightsState(math.random(1, 3) == 1)
+                SetArtificialLightsState(GlobalState.blackout == true or math.random(1, 3) == 1)
             end
 
             Wait(math.random(1000, 3000))
         end
 
-        SetArtificialLightsState(false)
+        SetArtificialLightsState(GlobalState.blackout == true)
     end)
 
     -- Vehicle alarm effects
@@ -195,7 +195,7 @@ function StopEarthquake()
 
 
     -- Clear effects
-    SetArtificialLightsState(false)
+    SetArtificialLightsState(GlobalState.blackout == true)
     ClearTimecycleModifier()
 
     TriggerEvent("vfw:seisme:announcement:end", "FIN DE SÉISME",

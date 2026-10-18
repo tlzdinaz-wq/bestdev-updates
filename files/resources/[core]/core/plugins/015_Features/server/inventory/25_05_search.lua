@@ -172,8 +172,12 @@ Inv.RegisterCallback("vfw:infiniteItems:take-item", function(source, itemName, q
     if count <= 0 then count = 1 end
     if count > 1000 then count = 1000 end
 
-    Inv.AddToList(Inv.PlayerList(xPlayer), itemName, count, nil, Inv.PlayerMaxSlots)
-    TriggerClientEvent("vfw:showItemNotification", source, itemName, count, 1)
+    local added = Inv.AddToList(Inv.PlayerList(xPlayer), itemName, count, nil, Inv.PlayerMaxSlots)
+    if added > 0 then
+        TriggerClientEvent("vfw:showItemNotification", source, itemName, added, 1)
+    else
+        Inv.Toast(source, "Pas de place disponible dans votre inventaire.")
+    end
 
     return Inv.Payload(xPlayer)
 end)
@@ -198,8 +202,12 @@ Inv.RegisterCallback("vfw:itemPool:take-item", function(source, info)
             local count = request.quantity
             if count <= 0 then count = 1 end
             if count > 1000 then count = 1000 end
-            Inv.AddToList(list, request.name, count, Inv.SanitizeMeta(request.meta), Inv.PlayerMaxSlots, request.targetSlot)
-            TriggerClientEvent("vfw:showItemNotification", source, request.name, count, 1)
+            local added = Inv.AddToList(list, request.name, count, Inv.SanitizeMeta(request.meta), Inv.PlayerMaxSlots, request.targetSlot)
+            if added > 0 then
+                TriggerClientEvent("vfw:showItemNotification", source, request.name, added, 1)
+            else
+                Inv.Toast(source, "Pas de place disponible dans votre inventaire.")
+            end
         end
     end
 
@@ -228,14 +236,36 @@ function Inv.BuildAllItemsList()
     return out
 end
 
+--- La liste de tous les items, ou nil si le catalogue est vide.
+---
+--- `VFW.Items` est rempli au demarrage depuis la table `items`. Si cette lecture
+--- a echoue, ou si la table est vide, la liste repartait vide : la commande
+--- envoyait un inventaire sans aucune case et il ne se passait rien a l'ecran,
+--- sans le moindre message. On le dit.
+---@param source number
+---@return table|nil
+local function itemCatalog(source)
+    local list = Inv.BuildAllItemsList()
+    if #list > 0 then return list end
+
+    Inv.Toast(source, "Aucun item n'est charge : la table `items` est vide ou n'a pas pu etre lue.")
+    return nil
+end
+
 VFW.RegisterCommand("allitems", "give_item", function(source)
-    TriggerClientEvent("vfw:openInfiniteItemsInventory", source, Inv.BuildAllItemsList())
+    local list = itemCatalog(source)
+    if not list then return end
+
+    TriggerClientEvent("vfw:openInfiniteItemsInventory", source, list)
 end, {
     help = "Ouvre l'inventaire de tous les items (staff)",
 })
 
 VFW.RegisterCommand("itempool", "give_item", function(source)
-    TriggerClientEvent("vfw:itemPool:open", source, Inv.BuildAllItemsList())
+    local list = itemCatalog(source)
+    if not list then return end
+
+    TriggerClientEvent("vfw:itemPool:open", source, list)
 end, {
     help = "Ouvre le pool d'items (staff)",
 })

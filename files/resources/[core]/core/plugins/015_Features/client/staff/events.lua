@@ -580,31 +580,34 @@ CreateThread(function()
     end
 end)
 
+local function ApplyBlackoutLighting(state)
+    local enabled = state == true or state == 1 or state == "true" or state == "1"
+    SetArtificialLightsState(enabled)
+    SetArtificialLightsStateAffectsVehicles(not enabled)
+    return enabled
+end
+
+AddStateBagChangeHandler("blackout", "global", function(_, _, value)
+    ApplyBlackoutLighting(value)
+end)
+
+CreateThread(function()
+    ApplyBlackoutLighting(GlobalState.blackout)
+end)
+
 RegisterNetEvent("vfw:staff:setBlackout", function(state)
-    SetBlackout(state)
-
-    local xSound = exports.xsound
-
-    if state then
-        SetArtificialLightsState(true)
-        SetArtificialLightsStateAffectsVehicles(false)
-
-        xSound:PlayUrl('blackout_sound', 'nui://xsound/html/sounds/no_power.mp3', 0.5)
-
-        VFW.ShowNotification({
-            type = 'STAFF', variant = 'INFO', subtitle = 'Gestion Events',
-            message = "Blackout activé - Coupure électrique générale."
-      })
-    else
-        SetArtificialLightsState(false)
-
-        xSound:PlayUrl('blackout_restore_sound', 'nui://xsound/html/sounds/restored_power.mp3', 0.5)
-
-        VFW.ShowNotification({
-            type = 'STAFF', variant = 'SUCCESS', subtitle = 'Gestion Events',
-            message = "Blackout désactivé - Électricité rétablie."
-      })
+    local enabled = ApplyBlackoutLighting(state)
+    -- Un export audio manquant ne doit jamais interrompre le retour de l'electricite.
+    if GetResourceState("xsound") == "started" then
+        pcall(function()
+            exports.xsound:PlayUrl(enabled and "blackout_sound" or "blackout_restore_sound",
+                enabled and "nui://xsound/html/sounds/no_power.mp3" or "nui://xsound/html/sounds/restored_power.mp3", 0.5)
+        end)
     end
+    VFW.ShowNotification({
+        type = 'STAFF', variant = enabled and 'INFO' or 'SUCCESS', subtitle = 'Gestion Events',
+        message = enabled and "Blackout activé - Coupure électrique générale." or "Blackout désactivé - Électricité rétablie.",
+    })
 end)
 
 RegisterNetEvent("vfw:staff:fireNotification", function()

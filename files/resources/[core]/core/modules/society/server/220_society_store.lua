@@ -247,13 +247,37 @@ function VFW.Society.GetDoorbell(jobName, id)
     return nil
 end
 
+--- Allonge `image` et `banner` si elles sont encore trop courtes.
+---
+--- Les deux ALTER partaient a chaque demarrage, qu'ils soient necessaires ou non.
+--- MariaDB reconstruit la table a chaque fois : sur une base un peu garnie, cela
+--- represente plusieurs secondes de demarrage perdues a refaire une modification
+--- deja faite — 1,8 s et 1,1 s sur un serveur en production. Une lecture du schema
+--- coute une requete triviale et evite les deux reconstructions.
+local function ensureUrlColumns()
+    local rows = sqlQuery([[
+        SELECT COLUMN_NAME AS name, CHARACTER_MAXIMUM_LENGTH AS len
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+          AND COLUMN_NAME IN (?, ?)
+    ]], { "societies", "image", "banner" }) or {}
+
+    local longueur = {}
+    for i = 1, #rows do
+        longueur[tostring(rows[i].name)] = tonumber(rows[i].len) or 0
+    end
+
+    for _, column in ipairs({ "image", "banner" }) do
+        -- Colonne absente : la table est geree ailleurs, ce n est pas a nous de la creer.
+        if longueur[column] and longueur[column] < 512 then
+            sqlQuery(("ALTER TABLE societies MODIFY COLUMN `%s` VARCHAR(512) DEFAULT NULL")
+                :format(column))
+        end
+    end
+end
+
 function VFW.Society.LoadSocieties()
-    pcall(function()
-        sqlQuery("ALTER TABLE societies MODIFY COLUMN `image` VARCHAR(512) DEFAULT NULL")
-    end)
-    pcall(function()
-        sqlQuery("ALTER TABLE societies MODIFY COLUMN `banner` VARCHAR(512) DEFAULT NULL")
-    end)
+    ensureUrlColumns()
 
     local rows = sqlQuery("SELECT * FROM societies") or {}
     local out = {}

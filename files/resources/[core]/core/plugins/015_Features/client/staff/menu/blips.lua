@@ -26,6 +26,35 @@ end
 
 local selectedBlip = getBlipDefaultData()
 
+local function refreshMenu(menu)
+    if menu and menu.softRefresh then
+        menu.softRefresh()
+        return
+    end
+    if menu and menu.refresh then
+        menu.refresh()
+    end
+end
+
+local function askText(title, current)
+    local value = current == nil and "" or tostring(current)
+    if StaffMenu.HubTextInput then
+        return StaffMenu.HubTextInput(title, value)
+    end
+    return VFW.Nui.KeyboardInput(true, title, value)
+end
+
+local function capturePosition()
+    local coords = GetEntityCoords(PlayerPedId())
+    selectedBlip.position = { x = coords.x + 0.0, y = coords.y + 0.0, z = coords.z + 0.0 }
+end
+
+local function positionLabel()
+    local pos = selectedBlip.position
+    if not pos then return "Non définie" end
+    return ("%.1f, %.1f, %.1f"):format(pos.x, pos.y, pos.z)
+end
+
 local function isValueInList(list, value)
     for _, v in ipairs(list) do
         if v == value then return true end
@@ -84,7 +113,7 @@ local function buildBlipWlSection(menu, jobsSubmenu, factionsSubmenu)
         if Index == 1 then
             selectedBlip.whitelistValues = {}
         end
-        menu.refresh()
+        refreshMenu(menu)
     end)
 
     if wlTypeIndex == 2 then
@@ -106,37 +135,37 @@ end
 
 local function buildBlipFieldsSection(menu)
     menu.Button("Nom du blip", "", selectedBlip.label or "Non défini", "chevron", false, function()
-        local value = VFW.Nui.ColorTextEditor(true, "Nom du blip", selectedBlip.label or "")
+        local value = askText("Nom du blip", selectedBlip.label or "")
         if value == "" then
             return
         end
 
         selectedBlip.label = value
-        menu.refresh()
+        refreshMenu(menu)
     end)
 
     menu.Button("Sprite du blip", "", selectedBlip.sprite or "Non défini", "chevron", false, function()
-        local sprite = tonumber(VFW.Nui.KeyboardInput(true, "Entrez le sprite du blip", ""))
+        local sprite = tonumber(askText("Sprite du blip", selectedBlip.sprite or ""))
         if not sprite then
             return
         end
 
         selectedBlip.sprite = sprite
-        menu.refresh()
+        refreshMenu(menu)
     end)
 
     menu.Button("Couleur du blip", "", selectedBlip.color or "Non défini", "chevron", false, function()
-        local color = tonumber(VFW.Nui.KeyboardInput(true, "Entrez la couleur du blip", ""))
+        local color = tonumber(askText("Couleur du blip", selectedBlip.color or ""))
         if not color then
             return
         end
 
         selectedBlip.color = color
-        menu.refresh()
+        refreshMenu(menu)
     end)
 
     menu.Button("Taille du blip", "", selectedBlip.scale or "Non défini", "chevron", false, function()
-        local scale = tonumber(VFW.Nui.KeyboardInput(true, "Entrez la taille (0.1 - 1.0)", ""))
+        local scale = tonumber(askText("Taille du blip (0.1 - 1.0)", selectedBlip.scale or ""))
         if not scale then
             return
         end
@@ -151,15 +180,18 @@ local function buildBlipFieldsSection(menu)
         end
 
         selectedBlip.scale = scale
-        menu.refresh()
+        refreshMenu(menu)
     end)
 
-    menu.Button(":pin: Positionner le blip", "", nil, "chevron", false, function()
-        local playerPed <const> = PlayerPedId()
-        local coords <const> = GetEntityCoords(playerPed)
-
-        selectedBlip.position = {x = coords.x, y = coords.y, z = coords.z}
-        menu.refresh()
+    menu.Button("Position du blip", "Clique pour prendre l'endroit où tu es", positionLabel(), "pin", false, function()
+        capturePosition()
+        VFW.ShowNotification({
+            type = "STAFF",
+            variant = "SUCCESS",
+            subtitle = "Blips",
+            message = "Position prise : " .. positionLabel(),
+        })
+        refreshMenu(menu)
     end)
 end
 
@@ -181,7 +213,7 @@ local function buildJobSelectMenu(menu)
             false,
             function()
                 toggleValueInList(selectedBlip.whitelistValues, job.name)
-                menu.refresh()
+                refreshMenu(menu)
             end
         )
     end
@@ -205,13 +237,16 @@ local function buildFactionSelectMenu(menu)
             false,
             function()
                 toggleValueInList(selectedBlip.whitelistValues, faction.name)
-                menu.refresh()
+                refreshMenu(menu)
             end
         )
     end
 end
 
 StaffMenu.CreateBlip.OnOpen(function()
+    if not selectedBlip.position then
+        capturePosition()
+    end
     StaffMenu.CreateBlip.ClearItems()
 
     buildBlipWlSection(StaffMenu.CreateBlip, StaffMenu.BlipSelectJobs, StaffMenu.BlipSelectFactions)
@@ -234,7 +269,7 @@ StaffMenu.CreateBlip.OnOpen(function()
           })
         end
 
-        TriggerServerEvent("core:createBlip", {
+        local res = TriggerServerCallback("core:createBlip", {
             label = selectedBlip.label,
             sprite = selectedBlip.sprite,
             color = selectedBlip.color,
@@ -242,6 +277,21 @@ StaffMenu.CreateBlip.OnOpen(function()
             position = selectedBlip.position,
             whitelistType = wlType,
             whitelistValues = selectedBlip.whitelistValues,
+        })
+        if type(res) ~= "table" or res.ok ~= true or not res.blip then
+            return VFW.ShowNotification({
+                type = "STAFF",
+                variant = "ERROR",
+                subtitle = "Blips",
+                message = (type(res) == "table" and res.error) or "Le blip n'a pas été enregistré.",
+            })
+        end
+        TriggerEvent("blips:add:list", tostring(res.id), res.blip)
+        VFW.ShowNotification({
+            type = "STAFF",
+            variant = "SUCCESS",
+            subtitle = "Blips",
+            message = "Blip #" .. tostring(res.id) .. " enregistré et affiché sur la carte.",
         })
         StaffMenu.builderBlips.close()
     end)
@@ -267,8 +317,11 @@ local function rebuildManageBlipsList()
     StaffMenu.ManageBlips.ClearItems()
 
     local blips = TriggerServerCallback("core:getAllBlips") or {}
+    local count = 0
 
     for _, blip in pairs(blips) do
+        if type(blip) == "table" and blip.label then
+        count = count + 1
         local wlLabel = getWlLabel(blip)
         local stateLabel = (blip.active and "Actif" or "Inactif") .. " | " .. wlLabel
         StaffMenu.ManageBlips.Button(blip.label, stateLabel, nil, "chevron", false, function()
@@ -284,6 +337,11 @@ local function rebuildManageBlipsList()
                 active = blip.active ~= false and blip.active ~= 0,
             }
         end, StaffMenu.EditBlip)
+        end
+    end
+
+    if count == 0 then
+        StaffMenu.ManageBlips.Button("Aucun blip enregistré", "Crée-en un depuis Créer un blip", nil, "empty", true, function() end)
     end
 end
 
@@ -304,7 +362,7 @@ StaffMenu.EditBlip.OnOpen(function()
         function()
             selectedBlip.active = not selectedBlip.active
             TriggerServerEvent("core:toggleBlip", selectedBlip.id, selectedBlip.active)
-            StaffMenu.EditBlip.refresh()
+            refreshMenu(StaffMenu.EditBlip)
         end
     )
 
@@ -344,7 +402,7 @@ StaffMenu.EditBlip.OnOpen(function()
         TriggerServerEvent("core:deleteBlip", selectedBlip.id)
         StaffMenu.EditBlip.close()
         rebuildManageBlipsList()
-        StaffMenu.ManageBlips.refresh()
+        refreshMenu(StaffMenu.ManageBlips)
     end)
 end)
 

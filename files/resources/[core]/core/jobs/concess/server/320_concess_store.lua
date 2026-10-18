@@ -105,6 +105,13 @@ local function serializeEntry(entry)
     }
 end
 
+function Concess.Forget(id)
+    id = tonumber(id)
+    if not id then return end
+    concessList[id] = nil
+    Concess.SavePointsFile()
+end
+
 function Concess.SavePointsFile()
     local list = {}
     for _, entry in pairs(concessList) do
@@ -209,9 +216,26 @@ function Concess.Load()
                     if fileEntry.concessType then dbEntry.concessType = fileEntry.concessType end
                     if fileEntry.automatic ~= nil then dbEntry.automatic = fileEntry.automatic end
                     if fileEntry.pedModel then dbEntry.pedModel = fileEntry.pedModel end
+                    Concess.Persist(dbEntry)
                 else
                     out[id] = fileEntry
                     restoreEntryToDb(fileEntry)
+                end
+            end
+            -- Un point retiré du fichier ne doit pas rester en base, sinon le PED revient.
+            if next(fromFile) then
+                local stale = {}
+                for id in pairs(out) do
+                    if not fromFile[id] then
+                        stale[#stale + 1] = id
+                    end
+                end
+                for i = 1, #stale do
+                    local id = stale[i]
+                    JC.Exec("DELETE FROM concess WHERE id = ?", { id })
+                    JC.Exec("DELETE FROM concess_stock WHERE concess_id = ?", { id })
+                    JC.Exec("DELETE FROM concess_logs WHERE concess_id = ?", { id })
+                    out[id] = nil
                 end
             end
         end

@@ -115,20 +115,22 @@ function StaffMenu.BuildPlayerMenu()
         end)
     end
 
+    -- Par evenement serveur et non par ExecuteCommand : une commande serveur n'est
+    -- pas atteignable depuis le client, les boutons partaient dans le vide.
     if isAnimatorCtx or perms["goto"] then
         P_Button(":arrow: GOTO", "Se téléporter directement sur le joueur", nil, "chevron", false, function()
-            ExecuteCommand(("goto %s"):format(selectedPlayer))
+            TriggerServerEvent("vfw:staff:goto", selectedPlayer)
         end)
 
         P_Button(":back: BRING", "Téléporter le joueur jusqu'à vous", nil, "chevron", false, function()
-            ExecuteCommand(("bring %s"):format(selectedPlayer))
+            TriggerServerEvent("vfw:staff:bring", selectedPlayer)
             player.Return = true
             StaffMenu.player.refresh()
         end)
 
         if player.Return then
             P_Button(":back: RETURN", "Renvoyer le joueur à sa position d'origine avant le bring", nil, "chevron", false, function()
-                ExecuteCommand(("return %s"):format(selectedPlayer))
+                TriggerServerEvent("vfw:staff:return", selectedPlayer)
                 player.Return = false
                 StaffMenu.player.refresh()
             end)

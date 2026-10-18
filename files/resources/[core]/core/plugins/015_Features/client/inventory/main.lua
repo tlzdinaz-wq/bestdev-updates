@@ -1625,14 +1625,19 @@ end
 -- Table pour stocker les items infinis (slot -> itemName mapping)
 local infiniteItemsMap = {}
 
+function VFW.SetInfiniteItemsList(allItems)
+    infiniteItemsMap = {}
+    for _, item in ipairs(allItems or {}) do
+        local slot = tonumber(item.slot or item.position)
+        if slot and type(item.name) == "string" then infiniteItemsMap[slot] = item.name end
+    end
+end
+
 ---Open infinite inventory with all items
 RegisterNetEvent("vfw:openInfiniteItemsInventory", function(allItems)
 
     -- Créer le mapping slot -> itemName
-    infiniteItemsMap = {}
-    for _, item in ipairs(allItems) do
-        infiniteItemsMap[item.slot] = item.name
-    end
+    VFW.SetInfiniteItemsList(allItems)
 
     local infiniteTarget = {
         inventory = allItems,
@@ -1648,5 +1653,5 @@ RegisterNetEvent("vfw:openInfiniteItemsInventory", function(allItems)
 end)
 
 function VFW.GetInfiniteItemNameFromSlot(slot)
-    return infiniteItemsMap[slot]
+    return infiniteItemsMap[tonumber(slot)]
 end

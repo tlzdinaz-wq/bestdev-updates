@@ -785,8 +785,18 @@ local function loadArmories()
             blipColor = row.blip_color,
             blipScale = row.blip_scale,
             active = row.active == 1,
+            logsAllowedGrades = VFW.DB.Decode(row.logs_allowed_grades, {}),
         }
     end
+end
+
+--- Recharge les armureries et pousse la nouvelle liste aux joueurs.
+---
+--- Le builder du menu staff vit dans un autre fichier et ne voit pas ce cache :
+--- il passe par ici apres chaque modification.
+function MiscB.ReloadArmories()
+    loadArmories()
+    TriggerClientEvent("core:jobArmory:sync", -1, armories)
 end
 
 local function loadEquipments()
@@ -874,7 +884,7 @@ MiscB.Cb("core:jobArmory:getWeaponsForPlayer", function(source, armoryId)
     local armory = id and armories[id] or nil
     if not armory or not playerInArmory(xPlayer, armory) then return {}, false end
 
-    local rows = MiscB.Query("SELECT * FROM job_armory_weapons WHERE armory_id = ? ORDER BY id ASC", { id })
+    local rows = MiscB.Query("SELECT * FROM job_armory_weapons WHERE armory_id = ? ORDER BY display_order ASC, id ASC", { id })
     return buildStockList(rows, xPlayer), MiscB.IsBoss(xPlayer)
 end)
 

@@ -3084,6 +3084,21 @@ StaffMenu.optionsStaff.OnOpen(function()
             end
         end)
 
+        if StaffHudStyleList and StaffHudStyleId and ApplyStaffHudStyle then
+            local _, styleIndex = StaffHudStyleId()
+            StaffMenu.optionsStaff.List(":palette: STYLE DU HUD", "Verre, néon, ruban, orbes ou ligne", false, StaffHudStyleList(), styleIndex, function(index)
+                local labels = StaffHudStyleList()
+                local style = StaffHudStyleAt(index)
+                ApplyStaffHudStyle(style)
+                VFW.ShowNotification({
+                    type = "STAFF",
+                    variant = "SUCCESS",
+                    subtitle = "HUD Staff",
+                    message = "Style : " .. (labels[index] or "Classique"),
+                })
+            end)
+        end
+
         local hudOffDutyState = GetResourceKvpString("staff_hud_offduty") == "true"
       StaffMenu.optionsStaff.Checkbox(":signal: HUD HORS-SERVICE", "Garder le HUD staff visible même hors service (utile en cas d'afflux de reports)", false, hudOffDutyState, function(_checked)
             SetResourceKvp("staff_hud_offduty", _checked and "true" or "false")

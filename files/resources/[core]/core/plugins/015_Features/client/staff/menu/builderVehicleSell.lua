@@ -3,7 +3,6 @@ local configData = nil
 local newLocationData = {}
 local previewVehicles = {}
 local previewActive = false
-local isRefreshing = false
 
 local NPC_MODELS <const> = {
     { label = "Dealer", model = "s_m_y_dealer_01", image = VFW.CDN.Get("others/vehicle_sell_seller.png") },
@@ -61,15 +60,35 @@ local function spawnPreviews()
     end)
 end
 
+-- VUI exécute les callbacks OnClose dans un thread à part : ils ne se sont pas encore
+-- produits quand refresh() rend la main. Un drapeau levé puis baissé dans la foulée est
+-- donc déjà retombé lorsque OnClose le consulte : rafraîchir le menu passait pour une
+-- vraie sortie, et le menu effaçait la saisie en cours dès le premier réglage posé.
+--
+-- On compte donc les fermetures attendues, menu par menu : un refresh en produit
+-- exactement une, que le OnClose consomme à son tour.
+local pendingRefresh = {}
+
+--- Vrai si cette fermeture vient d'un rafraîchissement, et non d'une vraie sortie.
+---@param menu table
+---@return boolean
+local function isRefreshClose(menu)
+    local pending = pendingRefresh[menu]
+    if not pending or pending <= 0 then return false end
+
+    pendingRefresh[menu] = pending - 1
+    return true
+end
+
 local function fcRefresh(Menu)
-    isRefreshing = true
+    pendingRefresh[Menu] = (pendingRefresh[Menu] or 0) + 1
+
     local savedStack = {}
     if VUI_MenuStack then
         for i, v in ipairs(VUI_MenuStack) do savedStack[i] = v end
     end
     Menu.refresh()
     VUI_MenuStack = savedStack
-    isRefreshing = false
 end
 
 local function fcCoordsStr(c)
@@ -337,7 +356,7 @@ StaffMenu.vehicleSellParking.OnOpen(function()
 end)
 
 StaffMenu.vehicleSellParking.OnClose(function()
-    if not isRefreshing then
+    if not isRefreshClose(StaffMenu.vehicleSellParking) then
         destroyPreviews()
     end
 end)
@@ -347,7 +366,7 @@ StaffMenu.vehicleSellCreateParking.OnOpen(function()
 end)
 
 StaffMenu.vehicleSellCreateParking.OnClose(function()
-    if not isRefreshing then
+    if not isRefreshClose(StaffMenu.vehicleSellCreateParking) then
         destroyPreviews()
     end
 end)

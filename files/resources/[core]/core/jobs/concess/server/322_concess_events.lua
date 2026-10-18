@@ -463,6 +463,42 @@ RegisterNetEvent("core:concess:removeShowcasePoint", function(concessId, index)
     Concess.Broadcast(entry)
 end)
 
+-- Un staff qui supprime la voiture d'exposition retire aussi le point,
+-- sinon le client la respawn 10 secondes plus tard.
+RegisterNetEvent("core:concess:removeShowcaseNear", function(x, y, z)
+    local source = source
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not xPlayer then return end
+    local allowed = Concess.CanBuild(xPlayer) or (xPlayer.hasPermission and xPlayer.hasPermission("delete_veh"))
+    if not allowed then return end
+
+    x, y, z = tonumber(x), tonumber(y), tonumber(z)
+    if not x or not y or not z then return end
+
+    local list = Concess.GetAll() or {}
+    for _, entry in pairs(list) do
+        local points = entry and entry.showcase
+        if type(points) == "table" then
+            local changed = false
+            for idx = #points, 1, -1 do
+                local point = points[idx]
+                local px, py, pz = tonumber(point.x), tonumber(point.y), tonumber(point.z)
+                if px and py and pz then
+                    local dx, dy, dz = px - x, py - y, pz - z
+                    if (dx * dx + dy * dy + dz * dz) <= (6.0 * 6.0) then
+                        table.remove(points, idx)
+                        changed = true
+                    end
+                end
+            end
+            if changed then
+                Concess.Persist(entry)
+                Concess.Broadcast(entry)
+            end
+        end
+    end
+end)
+
 RegisterNetEvent("core:concess:addShowcasePoint", function(concessId, point)
     local source = source
     local _, entry = showcaseGuard(source, concessId)
@@ -687,6 +723,10 @@ RegisterNetEvent("core:concess:delete", function(id)
     JC.Exec("DELETE FROM concess_stock WHERE concess_id = ?", { entry.id })
     JC.Exec("DELETE FROM concess_logs WHERE concess_id = ?", { entry.id })
 
+    -- Sinon Load relit le JSON et recrée le point (et son PED) juste après.
+    if Concess.Forget then
+        Concess.Forget(entry.id)
+    end
     Concess.Load()
     TriggerClientEvent("concess:deleted", -1, entry.id)
 end)
@@ -723,25 +763,47 @@ RegisterNetEvent("core:concess:deleteCategory", function(name)
     Concess.LoadCatalog()
 end)
 
-RegisterNetEvent("core:concess:addVehicle", function(model, name, category, price)
-    local source = source
+local function addCatalogVehicle(source, model, name, category, price)
     local xPlayer = VFW.GetPlayerFromId(source)
-    if not Concess.CanBuild(xPlayer) then return end
+    if not Concess.CanBuild(xPlayer) then return { success = false, error = "Permission manage_concess requise." } end
 
     local modelName = JC.Str(model, 64)
     local label = JC.Str(name, 128)
     local categoryName = JC.Str(category, 64)
-    local value = JC.Int(price, 0, 1000000000) or 0
+    local value = JC.Int(price, 0, 1000000000)
 
-    if not modelName or not label or not categoryName then return end
-    if not Concess.CategoryType(categoryName:lower()) then return end
+    if not modelName or not label or not categoryName then
+        return { success = false, error = "Modele, nom et categorie requis." }
+    end
+    if value == nil then return { success = false, error = "Prix invalide (entre 0 et 1 000 000 000)." } end
+    modelName, categoryName = modelName:lower(), categoryName:lower()
+    if not Concess.CategoryType(categoryName) then
+        return { success = false, error = "Cette categorie n'existe plus. Rechargez les categories." }
+    end
 
-    JC.Exec([[
+    local ok, affected = pcall(MySQL.update.await, [[
         INSERT INTO concess_vehicles (model, name, price, category) VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE name = VALUES(name), price = VALUES(price), category = VALUES(category)
-    ]], { modelName:lower(), label, value, categoryName:lower() })
+    ]], { modelName, label, value, categoryName })
+    if not ok or affected == false or affected == nil then
+        console.error("[concess] ajout vehicule : " .. tostring(affected))
+        return { success = false, error = "Ecriture SQL impossible. Consultez la console serveur." }
+    end
 
     Concess.LoadCatalog()
+    local saved = Concess.Vehicle(modelName)
+    if not saved or saved.name ~= label or saved.price ~= value or saved.category ~= categoryName then
+        return { success = false, error = "Vehicule enregistre mais catalogue non recharge. Consultez la console serveur." }
+    end
+    return { success = true, model = modelName }
+end
+
+JC.Cb("core:concess:addVehicle", addCatalogVehicle)
+
+-- Compatibilite avec les anciens clients ; les nouveaux attendent le callback.
+RegisterNetEvent("core:concess:addVehicle", function(model, name, category, price)
+    local result = addCatalogVehicle(source, model, name, category, price)
+    if not result.success then JC.Notify(source, result.error, true) end
 end)
 
 RegisterNetEvent("core:concess:updateVehicle", function(model, name, price, category)

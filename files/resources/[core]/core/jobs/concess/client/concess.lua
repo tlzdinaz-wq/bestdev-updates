@@ -28,23 +28,102 @@ local CONCESS_LIST = {}
 local CONCESS_PEDS = {}
 local CONCESS_SHOWCASE_VEHICLES = {} -- { [concessId] = { { entity, rotate }, ... } }
 local SHOWCASE_SPIN_SPEED = 18.0
+local SHOWCASE_STATE_TAG = "concess_showcase"
 
 local function showcaseEntity(entry)
     if type(entry) == "table" then return entry.entity end
     return entry
 end
 
+local function forceDeleteVehicle(veh)
+    if not veh or veh == 0 or not DoesEntityExist(veh) then return end
+    SetEntityAsMissionEntity(veh, true, true)
+    FreezeEntityPosition(veh, false)
+    SetEntityInvincible(veh, false)
+    SetVehicleUndriveable(veh, false)
+    DeleteVehicle(veh)
+    if DoesEntityExist(veh) then
+        DeleteEntity(veh)
+    end
+end
+
 local function deleteShowcaseVehicles(vehicles)
     if type(vehicles) ~= "table" then return end
     for _, entry in ipairs(vehicles) do
-        local veh = showcaseEntity(entry)
-        if veh and DoesEntityExist(veh) then
-            DeleteEntity(veh)
+        forceDeleteVehicle(showcaseEntity(entry))
+    end
+end
+
+-- Anciens T20 / Sultan gelés devant le concessionnaire.
+local STUCK_SHOWCASE = {
+    { model = `t20`, x = 214.39, y = -682.03, z = 35.29 },
+    { model = `sultan`, x = 216.76, y = -685.45, z = 36.14 },
+}
+
+local function sweepStuckShowcase()
+    local pool = GetGamePool("CVehicle")
+    for i = 1, #pool do
+        local veh = pool[i]
+        local state = Entity(veh).state
+        if state and state[SHOWCASE_STATE_TAG] then
+            forceDeleteVehicle(veh)
+        elseif IsEntityPositionFrozen(veh) then
+            local model = GetEntityModel(veh)
+            local pos = GetEntityCoords(veh)
+            for j = 1, #STUCK_SHOWCASE do
+                local spot = STUCK_SHOWCASE[j]
+                if model == spot.model then
+                    local dx, dy, dz = pos.x - spot.x, pos.y - spot.y, pos.z - spot.z
+                    if (dx * dx + dy * dy + dz * dz) <= (12.0 * 12.0) then
+                        forceDeleteVehicle(veh)
+                        break
+                    end
+                end
+            end
         end
     end
 end
 
-local SHOWCASE_STATE_TAG = "concess_showcase"
+function ConcessForgetShowcase(veh)
+    if not veh or veh == 0 or not DoesEntityExist(veh) then return false end
+    local tagged = false
+    local state = Entity(veh).state
+    if state and state[SHOWCASE_STATE_TAG] then
+        tagged = true
+    end
+    if not tagged then
+        for _, vehicles in pairs(CONCESS_SHOWCASE_VEHICLES) do
+            if type(vehicles) == "table" then
+                for _, entry in ipairs(vehicles) do
+                    if showcaseEntity(entry) == veh then
+                        tagged = true
+                        break
+                    end
+                end
+            end
+            if tagged then break end
+        end
+    end
+    if not tagged and IsEntityPositionFrozen(veh) then
+        local model = GetEntityModel(veh)
+        local pos = GetEntityCoords(veh)
+        for i = 1, #STUCK_SHOWCASE do
+            local spot = STUCK_SHOWCASE[i]
+            if model == spot.model then
+                local dx, dy, dz = pos.x - spot.x, pos.y - spot.y, pos.z - spot.z
+                if (dx * dx + dy * dy + dz * dz) <= (12.0 * 12.0) then
+                    tagged = true
+                    break
+                end
+            end
+        end
+    end
+    if not tagged then return false end
+    local pos = GetEntityCoords(veh)
+    TriggerServerEvent("core:concess:removeShowcaseNear", pos.x, pos.y, pos.z)
+    forceDeleteVehicle(veh)
+    return true
+end
 
 -- Supprime tout véhicule "fantôme" à un point de showcase issu d'une session précédente
 -- (cas où onResourceStop n'a pas pu nettoyer, ou crash). On combine deux signaux pour
@@ -92,6 +171,8 @@ local function LoadConcessionnaires()
         CONCESS_LIST[concess.id] = concess
         SetupConcessionnaire(concess)
     end
+
+    sweepStuckShowcase()
 end
 
 -- Nettoyer tous les éléments (PEDs, markers, etc.)

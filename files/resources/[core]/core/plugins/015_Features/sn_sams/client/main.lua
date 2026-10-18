@@ -6,6 +6,52 @@ local isMDTMinimized = false
 local mdtTabletProp = nil
 local lastActionTime = 0
 local ACTION_COOLDOWN = 2000 -- 2 secondes
+local mdtOpening = false
+local mdtSession = 0
+
+-- Lua encode une table vide en objet JSON. Le rendu React attend des tableaux
+-- pour ces datasets (.map/.filter), y compris lorsqu'il n'y a aucune donnee.
+local nativeSendNUIMessage = SendNUIMessage
+local mdtListActions = {}
+for _, name in ipairs({ "Logs", "Citizens", "Reports", "Announcements", "Invoices", "Treatments",
+    "Procedures", "Documents", "Medecins", "Alerts", "Zones", "DeletedReports" }) do
+    mdtListActions["nui:sams:set" .. name] = true
+end
+local function SendNUIMessage(message)
+    if mdtListActions[message.action] then
+        local rows = {}
+        if type(message.data) == "table" then
+            for i = 1, #message.data do rows[#rows + 1] = json.encode(message.data[i]) end
+        end
+        SendNuiMessage('{"action":' .. json.encode(message.action) .. ',"data":[' .. table.concat(rows, ",") .. ']}')
+    else
+        nativeSendNUIMessage(message)
+    end
+end
+
+local function BeginMDTOpen()
+    mdtOpening = true
+    mdtSession = mdtSession + 1
+    local session = mdtSession
+    SetTimeout(15000, function()
+        if mdtOpening and mdtSession == session then
+            mdtOpening = false
+            mdtSession = mdtSession + 1
+            VFW.ShowNotification({ type = 'ROUGE', content = "Le MDT ne repond pas. Reessayez dans un instant." })
+        end
+    end)
+    return session
+end
+
+local function LoadMDTAsset(session, request, loaded, asset)
+    local started = GetGameTimer()
+    request(asset)
+    while not loaded(asset) do
+        if not isMDTOpen or mdtSession ~= session or GetGameTimer() - started >= 5000 then return false end
+        Wait(10)
+    end
+    return isMDTOpen and mdtSession == session
+end
 
 -- Controles a desactiver quand le MDT est ouvert avec keepInput
 -- (empeche tir, visee, rotation camera, melee, etc.)
@@ -48,11 +94,14 @@ end
 
 --- Ouvre le MDT SAMS
 function SN_SAMS.OpenMDT()
-    if isMDTOpen then return end
+    if isMDTOpen or mdtOpening then return end
     if not SN_SAMS.IsOnDuty() then return end
-
-    local data = TriggerServerCallback("sn_sams:openMDT")
-    if not data then
+    local session = BeginMDTOpen()
+    CreateThread(function()
+    local ok, data = pcall(TriggerServerCallback, "sn_sams:openMDT")
+    if session ~= mdtSession then return end
+    mdtOpening = false
+    if not ok or type(data) ~= "table" or type(data.agent) ~= "table" then
         VFW.ShowNotification({ type = 'JOB', logo = SN_SAMS.Logo, title = "SAMS", subtitle = "Erreur", content = "Impossible d'ouvrir le MDT." })
         return
     end
@@ -88,7 +137,8 @@ function SN_SAMS.OpenMDT()
 
     -- Boucle de desactivation des controles dangereux + minimize/restore (Espace)
     CreateThread(function()
-        while isMDTOpen do
+        while isMDTOpen and mdtSession == session do
+            if IsControlJustPressed(0, 322) then SN_SAMS.CloseMDT() break end
             if isMDTMinimized then
                 Wait(0)
                 -- Quand minimise, detecter Espace pour restaurer
@@ -111,20 +161,21 @@ function SN_SAMS.OpenMDT()
 
     -- Prop tablette + animation
     CreateThread(function()
-        if not isMDTOpen then return end
+        if not isMDTOpen or mdtSession ~= session then return end
 
         local ped = PlayerPedId()
         local dict = "amb@world_human_seat_wall_tablet@female@base"
         local anim = "base"
         local propModel = "prop_cs_tablet"
 
-        RequestAnimDict(dict)
-        while not HasAnimDictLoaded(dict) do Wait(10) end
-
-        RequestModel(propModel)
-        while not HasModelLoaded(propModel) do Wait(10) end
+        if not LoadMDTAsset(session, RequestAnimDict, HasAnimDictLoaded, dict) then return end
+        if not LoadMDTAsset(session, RequestModel, HasModelLoaded, GetHashKey(propModel)) then return end
 
         mdtTabletProp = CreateObject(GetHashKey(propModel), 0.0, 0.0, 0.0, false, true, false)
+        local tabletProp = mdtTabletProp
+        SetModelAsNoLongerNeeded(GetHashKey(propModel))
+        if not tabletProp or tabletProp == 0 or not DoesEntityExist(tabletProp) then return end
+        SetEntityCollision(tabletProp, false, false)
         AttachEntityToEntity(mdtTabletProp, ped, GetPedBoneIndex(ped, 28422),
             -0.01, 0.0, 0.0,
             0.0, 0.0, 0.0,
@@ -133,27 +184,31 @@ function SN_SAMS.OpenMDT()
 
         TaskPlayAnim(ped, dict, anim, 8.0, -8.0, -1, 49, 0, false, false, false)
 
-        while isMDTOpen do
+        while isMDTOpen and mdtSession == session do
             if not IsEntityPlayingAnim(ped, dict, anim, 3) then
                 TaskPlayAnim(ped, dict, anim, 8.0, -8.0, -1, 49, 0, false, false, false)
             end
             Wait(500)
         end
 
-        ClearPedTasks(ped)
-        if mdtTabletProp and DoesEntityExist(mdtTabletProp) then
-            DeleteEntity(mdtTabletProp)
+        if mdtSession == session then ClearPedTasks(ped) end
+        if DoesEntityExist(tabletProp) then DeleteEntity(tabletProp) end
+        if mdtTabletProp == tabletProp then
             mdtTabletProp = nil
         end
+    end)
     end)
 end
 
 --- Ouvre le MDT SAMS en mode Staff (sans vérification IsOnDuty, toutes perms)
 function SN_SAMS.OpenMDTStaff()
-    if isMDTOpen then return end
-
-    local data = TriggerServerCallback("sn_sams:openMDTStaff")
-    if not data then
+    if isMDTOpen or mdtOpening then return end
+    local session = BeginMDTOpen()
+    CreateThread(function()
+    local ok, data = pcall(TriggerServerCallback, "sn_sams:openMDTStaff")
+    if session ~= mdtSession then return end
+    mdtOpening = false
+    if not ok or type(data) ~= "table" or type(data.agent) ~= "table" then
         VFW.ShowNotification({ type = 'STAFF', subtitle = 'MDT SAMS', content = "Impossible d'ouvrir le MDT." })
         return
     end
@@ -177,7 +232,8 @@ function SN_SAMS.OpenMDTStaff()
 
     -- Boucle de désactivation des contrôles + minimize/restore (Espace)
     CreateThread(function()
-        while isMDTOpen do
+        while isMDTOpen and mdtSession == session do
+            if IsControlJustPressed(0, 322) then SN_SAMS.CloseMDT() break end
             if isMDTMinimized then
                 Wait(0)
                 if IsControlJustPressed(0, 22) then -- Space
@@ -196,20 +252,21 @@ function SN_SAMS.OpenMDTStaff()
 
     -- Prop tablette + animation
     CreateThread(function()
-        if not isMDTOpen then return end
+        if not isMDTOpen or mdtSession ~= session then return end
 
         local ped = PlayerPedId()
         local dict = "amb@world_human_seat_wall_tablet@female@base"
         local anim = "base"
         local propModel = "prop_cs_tablet"
 
-        RequestAnimDict(dict)
-        while not HasAnimDictLoaded(dict) do Wait(10) end
-
-        RequestModel(propModel)
-        while not HasModelLoaded(propModel) do Wait(10) end
+        if not LoadMDTAsset(session, RequestAnimDict, HasAnimDictLoaded, dict) then return end
+        if not LoadMDTAsset(session, RequestModel, HasModelLoaded, GetHashKey(propModel)) then return end
 
         mdtTabletProp = CreateObject(GetHashKey(propModel), 0.0, 0.0, 0.0, false, true, false)
+        local tabletProp = mdtTabletProp
+        SetModelAsNoLongerNeeded(GetHashKey(propModel))
+        if not tabletProp or tabletProp == 0 or not DoesEntityExist(tabletProp) then return end
+        SetEntityCollision(tabletProp, false, false)
         AttachEntityToEntity(mdtTabletProp, ped, GetPedBoneIndex(ped, 28422),
             -0.01, 0.0, 0.0,
             0.0, 0.0, 0.0,
@@ -218,25 +275,28 @@ function SN_SAMS.OpenMDTStaff()
 
         TaskPlayAnim(ped, dict, anim, 8.0, -8.0, -1, 49, 0, false, false, false)
 
-        while isMDTOpen do
+        while isMDTOpen and mdtSession == session do
             if not IsEntityPlayingAnim(ped, dict, anim, 3) then
                 TaskPlayAnim(ped, dict, anim, 8.0, -8.0, -1, 49, 0, false, false, false)
             end
             Wait(500)
         end
 
-        ClearPedTasks(ped)
-        if mdtTabletProp and DoesEntityExist(mdtTabletProp) then
-            DeleteEntity(mdtTabletProp)
+        if mdtSession == session then ClearPedTasks(ped) end
+        if DoesEntityExist(tabletProp) then DeleteEntity(tabletProp) end
+        if mdtTabletProp == tabletProp then
             mdtTabletProp = nil
         end
+    end)
     end)
 end
 
 --- Ferme le MDT SAMS
 function SN_SAMS.CloseMDT()
-    if not isMDTOpen then return end
+    if not isMDTOpen and not mdtOpening then return end
 
+    mdtOpening = false
+    mdtSession = mdtSession + 1
     isMDTOpen = false
     isMDTMinimized = false
 
@@ -246,6 +306,9 @@ function SN_SAMS.CloseMDT()
     })
 
     VFW.Nui.Focus(false)
+    ClearPedSecondaryTask(PlayerPedId())
+    if mdtTabletProp and DoesEntityExist(mdtTabletProp) then DeleteEntity(mdtTabletProp) end
+    mdtTabletProp = nil
     TriggerServerEvent("sn_sams:closeMDT")
 end
 
@@ -254,8 +317,10 @@ end
 -- ============================================================
 AddEventHandler("onResourceStop", function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
-    if not isMDTOpen then return end
+    if not isMDTOpen and not mdtOpening then return end
 
+    mdtOpening = false
+    mdtSession = mdtSession + 1
     isMDTOpen = false
     isMDTMinimized = false
     VFW.Nui.Focus(false)

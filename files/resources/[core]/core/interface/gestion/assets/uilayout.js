@@ -26,6 +26,7 @@
       '<label class="ul-card"><div><strong>HUD</strong><span>Staff, faim / soif, vie</span></div><select id="ul-hud"><option value="vertical">Vertical</option><option value="horizontal">Horizontal</option></select></label>',
       '<label class="ul-card"><div><strong>Menus</strong><span>Menus VUI</span></div><select id="ul-menu"><option value="vertical">Vertical</option><option value="horizontal">Horizontal</option></select></label>',
       '<label class="ul-card"><div><strong>Notifications</strong><span>File des notifications</span></div><select id="ul-notif"><option value="vertical">Vertical</option><option value="horizontal">Horizontal</option></select></label>',
+      '<label class="ul-card ul-card--col"><div><strong>Fond tablette Gestion</strong><span>Lien direct image (https://…). Vide = fond par défaut.</span></div><input id="ul-bg" type="url" maxlength="1024" placeholder="https://exemple.com/fond.jpg" spellcheck="false"></label>',
       '</div>',
       '<div class="ul-bar"><button type="button" id="ul-save">Enregistrer pour tous</button><button type="button" class="is-ghost" id="ul-back">Retour</button></div>',
       '<div class="ul-msg" id="ul-msg"></div>'
@@ -48,6 +49,9 @@
       var el = document.getElementById('ul-' + key)
       if (el && data[key]) el.value = data[key]
     })
+    var bg = document.getElementById('ul-bg')
+    if (bg) bg.value = data.gestionBg || ''
+    if (window.__setGestionBg) window.__setGestionBg(data.gestionBg || '')
   }
 
   function hide() {
@@ -71,7 +75,8 @@
     var payload = {
       hud: document.getElementById('ul-hud').value,
       menu: document.getElementById('ul-menu').value,
-      notif: document.getElementById('ul-notif').value
+      notif: document.getElementById('ul-notif').value,
+      gestionBg: (document.getElementById('ul-bg') && document.getElementById('ul-bg').value) || ''
     }
     post('gestion:uilayout:save', payload).then(function (res) {
       if (!res || !res.ok) {

@@ -5306,6 +5306,13 @@ local function SelectDoorVisually()
     local selectedEntity = nil
     local selectedCoords = nil
 
+    -- La touche E porte deja le systeme d'interactions du serveur, qui tourne en
+    -- permanence. Sans ce verrou, appuyer pour choisir une porte declenchait aussi
+    -- l'interaction la plus proche — d'ou le « Il n'y a aucune personne a proximite »
+    -- en pleine selection, et une selection qui n'aboutissait pas quand l'interaction
+    -- ouvrait quelque chose par-dessus.
+    if VFW.DisableInterations then VFW.DisableInterations(true) end
+
     CreateThread(function()
         while selectionActive do
             Wait(0)
@@ -5348,6 +5355,8 @@ local function SelectDoorVisually()
     while selectionActive do
         Wait(100)
     end
+
+    if VFW.DisableInterations then VFW.DisableInterations(false) end
 
     return selectedEntity, selectedCoords
 end

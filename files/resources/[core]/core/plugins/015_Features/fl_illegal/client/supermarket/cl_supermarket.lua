@@ -911,11 +911,16 @@ local function SetupSupermarket(id, supermarket)
                 SupermarketAPUs[id] = nil
             end
 
-            -- Use VFW.CreatePed with proper coordinates
+            -- Position brute, sans decalage vertical.
+            --
+            -- Le builder enregistre GetEntityCoords du staff, c'est-a-dire ses pieds.
+            -- Retirer un metre enfonçait donc le vendeur d'un metre dans le sol —
+            -- c'est ce qu'on voyait derriere le comptoir des LTD. Tous les autres
+            -- PNJ de la base sont crees avec la position telle quelle.
             local coords = {
                 x = supermarket.apuPos.x,
                 y = supermarket.apuPos.y,
-                z = supermarket.apuPos.z - 1.0,
+                z = supermarket.apuPos.z,
                 w = supermarket.apuPos.h or 0.0  -- heading
             }
 

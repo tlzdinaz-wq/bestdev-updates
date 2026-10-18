@@ -59,6 +59,13 @@ function StaffMenu.BuildVehicleExtraMenu()
         not VFW.PlayerGlobalData.permissions["delete_veh"], function()
         local veh = getClosestVehicleNow()
         if DoesEntityExist(veh) then
+            if ConcessForgetShowcase and ConcessForgetShowcase(veh) then
+                VFW.ShowNotification({
+                    type = 'STAFF', variant = 'SUCCESS', subtitle = 'Extras Véhicules',
+                    message = "Voiture d'exposition retirée"
+                })
+                return
+            end
             if NetworkGetEntityIsNetworked(veh) then
                 local netId = NetworkGetNetworkIdFromEntity(veh)
                 if netId and netId ~= 0 then

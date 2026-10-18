@@ -875,6 +875,19 @@ function VFW.Nui.ColorTextEditorVisible(visible)
         action = "nui:colortexteditor:visible",
         data = visible,
     })
+    if StaffMenu and StaffMenu.IsGestionHubOpen and StaffMenu.IsGestionHubOpen() then
+        if visible then
+            if StaffMenu.CoverGestionHub then StaffMenu.CoverGestionHub() end
+            VFW.Nui.Focus(true)
+        else
+            if StaffMenu.UncoverGestionHub then
+                StaffMenu.UncoverGestionHub()
+            elseif StaffMenu.RestoreGestionHubFocus then
+                StaffMenu.RestoreGestionHubFocus()
+            end
+        end
+        return
+    end
     VFW.Nui.Focus(visible)
 end
 

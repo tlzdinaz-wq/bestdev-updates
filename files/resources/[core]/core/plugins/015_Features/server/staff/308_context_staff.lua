@@ -12,8 +12,9 @@ local function registerStaffSelfActions()
     register("staff:heal", function(source, _, _, _, xPlayer)
         if not xPlayer then return { ok = false, err = "Joueur introuvable." } end
         xPlayer.setMeta("health", 200)
+        VFW.SetStatus(source, 100, 100)
         TriggerClientEvent("vfw:healPlayer", source)
-        return { ok = true, msg = "Santé restaurée" }
+        return { ok = true, msg = "Vie, faim et soif restaurees" }
     end, "alt_heal")
 
     register("staff:eat", function(source)

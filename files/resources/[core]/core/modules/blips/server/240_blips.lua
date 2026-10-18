@@ -1,5 +1,7 @@
 local blipsList = {}
 local loaded = false
+local nextId = 1
+local JSON_FILE = "config/custom_blips.json"
 
 VFW.Blips = VFW.Blips or {}
 
@@ -61,28 +63,50 @@ function VFW.Blips.SyncAll()
     TriggerClientEvent("blips:retrieve:list", -1, blipsList)
 end
 
+local function saveJson()
+    local body = json.encode({ nextId = nextId, blips = blipsList })
+    return SaveResourceFile(GetCurrentResourceName(), JSON_FILE, body, -1) == true
+end
+
+local function loadJson()
+    local raw = LoadResourceFile(GetCurrentResourceName(), JSON_FILE)
+    if type(raw) ~= "string" or raw == "" then return end
+    local ok, decoded = pcall(json.decode, raw)
+    if not ok or type(decoded) ~= "table" or type(decoded.blips) ~= "table" then return end
+    blipsList = decoded.blips
+    nextId = tonumber(decoded.nextId) or 1
+    for id in pairs(blipsList) do
+        local n = tonumber(id)
+        if n and n >= nextId then nextId = n + 1 end
+    end
+end
+
 function VFW.Blips.Create(data, createdBy)
     local blipData = sanitize(data)
     if not blipData then return nil end
 
-    local insertId = MySQL.insert.await(
-        "INSERT INTO `blips` (`label`, `sprite`, `color`, `scale`, `x`, `y`, `z`, `created_by`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        {
-            blipData.label,
-            blipData.sprite,
-            blipData.color,
-            blipData.scale,
-            blipData.position.x,
-            blipData.position.y,
-            blipData.position.z,
-            type(createdBy) == "string" and createdBy:sub(1, 80) or "",
-        }
-    )
-
-    if not insertId then return nil end
-
-    local key = tostring(insertId)
+    local key = tostring(nextId)
+    nextId = nextId + 1
     blipsList[key] = blipData
+    saveJson()
+
+    pcall(function()
+        ensureTable()
+        MySQL.insert.await(
+            "INSERT INTO `blips` (`id`, `label`, `sprite`, `color`, `scale`, `x`, `y`, `z`, `created_by`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            {
+                tonumber(key),
+                blipData.label,
+                blipData.sprite,
+                blipData.color,
+                blipData.scale,
+                blipData.position.x,
+                blipData.position.y,
+                blipData.position.z,
+                type(createdBy) == "string" and createdBy:sub(1, 80) or "",
+            }
+        )
+    end)
 
     TriggerClientEvent("blips:add:list", -1, key, blipData)
     TriggerEvent("vfw:blips:created", key, blipData)
@@ -115,21 +139,24 @@ function VFW.Blips.Update(blipId, data)
         merged = incoming
     end
 
-    MySQL.update.await(
-        "UPDATE `blips` SET `label` = ?, `sprite` = ?, `color` = ?, `scale` = ?, `x` = ?, `y` = ?, `z` = ? WHERE `id` = ?",
-        {
-            merged.label,
-            merged.sprite,
-            merged.color,
-            merged.scale,
-            merged.position.x,
-            merged.position.y,
-            merged.position.z,
-            tonumber(blipId),
-        }
-    )
+    pcall(function()
+        MySQL.update.await(
+            "UPDATE `blips` SET `label` = ?, `sprite` = ?, `color` = ?, `scale` = ?, `x` = ?, `y` = ?, `z` = ? WHERE `id` = ?",
+            {
+                merged.label,
+                merged.sprite,
+                merged.color,
+                merged.scale,
+                merged.position.x,
+                merged.position.y,
+                merged.position.z,
+                tonumber(blipId),
+            }
+        )
+    end)
 
     blipsList[key] = merged
+    saveJson()
 
     TriggerClientEvent("blips:update:list", -1, key, merged)
     TriggerEvent("vfw:blips:updated", key, merged)
@@ -141,9 +168,12 @@ function VFW.Blips.Remove(blipId)
     local key = tostring(blipId)
     if not blipsList[key] then return false end
 
-    MySQL.update.await("DELETE FROM `blips` WHERE `id` = ?", { tonumber(blipId) })
+    pcall(function()
+        MySQL.update.await("DELETE FROM `blips` WHERE `id` = ?", { tonumber(blipId) })
+    end)
 
     blipsList[key] = nil
+    saveJson()
 
     TriggerClientEvent("blips:remove:list", -1, key)
     TriggerEvent("vfw:blips:removed", key)
@@ -151,12 +181,38 @@ function VFW.Blips.Remove(blipId)
     return true
 end
 
-local function load()
-    local rows = MySQL.query.await("SELECT * FROM `blips`") or {}
+local function ensureTable()
+    MySQL.query.await([[
+        CREATE TABLE IF NOT EXISTS `blips` (
+            `id` INT NOT NULL AUTO_INCREMENT,
+            `label` VARCHAR(64) NOT NULL,
+            `sprite` INT NOT NULL DEFAULT 1,
+            `color` INT NOT NULL DEFAULT 0,
+            `scale` FLOAT NOT NULL DEFAULT 0.8,
+            `x` DOUBLE NOT NULL,
+            `y` DOUBLE NOT NULL,
+            `z` DOUBLE NOT NULL,
+            `created_by` VARCHAR(80) NOT NULL DEFAULT '',
+            PRIMARY KEY (`id`)
+        )
+    ]])
+end
 
-    blipsList = {}
+local function load()
+    loadJson()
+    local ok, rows = pcall(function()
+        ensureTable()
+        return MySQL.query.await("SELECT * FROM `blips`") or {}
+    end)
+    rows = (ok and rows) or {}
+
     for i = 1, #rows do
-        blipsList[tostring(rows[i].id)] = toBlipData(rows[i])
+        local key = tostring(rows[i].id)
+        if not blipsList[key] then
+            blipsList[key] = toBlipData(rows[i])
+        end
+        local n = tonumber(key)
+        if n and n >= nextId then nextId = n + 1 end
     end
 
     loaded = true
@@ -173,8 +229,119 @@ AddEventHandler("vfw:playerLoaded", function(source)
     VFW.Blips.SyncTo(source)
 end)
 
+RegisterNetEvent("blips:request:list", function()
+    if not loaded then return end
+    VFW.Blips.SyncTo(source)
+end)
+
 AddEventHandler("vfw:blips:register", function(data, createdBy)
     VFW.Blips.Create(data, createdBy)
+end)
+
+local function staffPlayer(source)
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not xPlayer or not xPlayer.hasPermission then return nil end
+    if xPlayer.hasPermission("manage_blips")
+        or xPlayer.hasPermission("builder_menu")
+        or xPlayer.hasPermission("dev")
+        or xPlayer.hasPermission("staff")
+        or xPlayer.hasPermission("admin")
+        or xPlayer.hasPermission("staff_menu") then
+        return xPlayer
+    end
+    return nil
+end
+
+local function publicList()
+    local out = {}
+    for id, blip in pairs(blipsList) do
+        out[#out + 1] = {
+            id = tonumber(id),
+            label = blip.label,
+            sprite = blip.sprite,
+            color = blip.color,
+            scale = blip.scale,
+            position = blip.position,
+            active = true,
+            whitelistType = "global",
+            whitelistValues = {},
+        }
+    end
+    table.sort(out, function(a, b) return (a.id or 0) < (b.id or 0) end)
+    return out
+end
+
+RegisterServerCallback("core:createBlip", function(source, data)
+    local xPlayer = staffPlayer(source)
+    if not xPlayer then
+        return { ok = false, error = "Permission refusée." }
+    end
+    if type(data) ~= "table" then
+        return { ok = false, error = "Données invalides." }
+    end
+    local key = VFW.Blips.Create(data, xPlayer.identifier)
+    if not key then
+        return { ok = false, error = "Nom ou position manquant." }
+    end
+    return { ok = true, id = key, blip = blipsList[key] }
+end)
+
+RegisterNetEvent("core:updateBlip", function(blipId, data)
+    local xPlayer = staffPlayer(source)
+    if not xPlayer then return end
+    local ok = VFW.Blips.Update(blipId, data)
+    xPlayer.showNotification({
+        type = "STAFF",
+        variant = ok and "SUCCESS" or "ERROR",
+        subtitle = "Blips",
+        message = ok and "Blip mis à jour." or "Blip introuvable.",
+    })
+end)
+
+RegisterNetEvent("core:deleteBlip", function(blipId)
+    local xPlayer = staffPlayer(source)
+    if not xPlayer then return end
+    local ok = VFW.Blips.Remove(blipId)
+    xPlayer.showNotification({
+        type = "STAFF",
+        variant = ok and "SUCCESS" or "ERROR",
+        subtitle = "Blips",
+        message = ok and "Blip supprimé." or "Blip introuvable.",
+    })
+end)
+
+RegisterNetEvent("core:toggleBlip", function(blipId, active)
+    local xPlayer = staffPlayer(source)
+    if not xPlayer then return end
+    if active == false then
+        TriggerClientEvent("blips:remove:list", -1, tostring(blipId))
+    else
+        local blip = VFW.Blips.Get(blipId)
+        if blip then
+            TriggerClientEvent("blips:add:list", -1, tostring(blipId), blip)
+        end
+    end
+end)
+
+RegisterServerCallback("core:getAllBlips", function(source)
+    if not staffPlayer(source) then return {} end
+    return publicList()
+end)
+
+RegisterServerCallback("core:blips:getAllJobs", function(source)
+    if not staffPlayer(source) then return {} end
+    local ok, rows = pcall(function()
+        return MySQL.query.await("SELECT name, label FROM jobs ORDER BY label ASC")
+    end)
+    return (ok and rows) or {}
+end)
+
+RegisterServerCallback("core:blips:getAllFactions", function(source)
+    if not staffPlayer(source) then return {} end
+    local ok, rows = pcall(function()
+        return MySQL.query.await("SELECT name, label FROM factions ORDER BY label ASC")
+    end)
+    return (ok and rows) or {}
 end)
 
 MySQL.ready(function()

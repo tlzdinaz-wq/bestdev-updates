@@ -169,6 +169,8 @@ local function persistRoles(roles)
         INSERT INTO variables (name, data) VALUES (?, ?)
         ON DUPLICATE KEY UPDATE data = VALUES(data)
     ]], { ROLES_VARIABLE, Staff29.Encode(roles) })
+
+    TriggerEvent("vfw:gamerTag:refreshAll")
 end
 
 local function loadRoles()
@@ -290,6 +292,7 @@ local function setTargetRole(target, roleId)
     if target.accountId then
         Staff29.Update("UPDATE users SET role = ? WHERE id = ?", { roleId, target.accountId })
     end
+    TriggerEvent("vfw:gamerTag:refresh", target.source)
 end
 
 local function gradeDefaults(isBoss)

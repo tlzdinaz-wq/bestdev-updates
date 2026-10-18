@@ -259,7 +259,11 @@ RegisterNetEvent("Admin:gamerTag", function(BOOLEAN)
                             )
                             local isNew = playerData["NEW"] == true
                                 and (not playerData.newUntil or GetGameTimer() < playerData.newUntil)
-                            if isNew then displayText = '~y~[NEW]~s~ ' .. displayText end
+                            -- Sans balise de couleur : CreateFakeMpGamerTag passe la chaîne
+                            -- telle quelle au scaleform, qui ne lit pas les codes `~y~`. Ils
+                            -- s'affichaient donc en toutes lettres devant le nom. La couleur
+                            -- du tag vient du grade, appliquée plus bas sur le composant 0.
+                            if isNew then displayText = '[NEW] ' .. displayText end
 
                             -- Check if tag needs to be recreated (data changed or doesn't exist).
                             -- On compare aussi le serverId: les ped handles GTA peuvent être

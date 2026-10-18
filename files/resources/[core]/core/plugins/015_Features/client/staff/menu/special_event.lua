@@ -51,8 +51,7 @@ function StaffMenu.BuildSpecialEventMenu()
 
     StaffMenu.specialEffects.Separator("EFFETS ENVIRONNEMENT")
 
-    StaffMenu.specialEffects.Checkbox(":bolt: BLACKOUT (Coupure électrique)", "Éteindre tous les éclairages publics de la ville", false, fireData.blackout, function(_checked)
-        fireData.blackout = _checked
+    StaffMenu.specialEffects.Checkbox(":bolt: BLACKOUT (Coupure électrique)", "Éteindre tous les éclairages publics de la ville", false, GlobalState.blackout == true, function(_checked)
         TriggerServerEvent("vfw:staff:setBlackout", _checked)
     end)
 

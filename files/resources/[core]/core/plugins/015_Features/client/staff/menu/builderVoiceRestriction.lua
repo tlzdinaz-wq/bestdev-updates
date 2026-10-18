@@ -19,7 +19,6 @@ local zoneData = {
 
 local markerThread = nil
 local isMarkersActive = false
-local isRefreshing = false
 local isNavigating = false
 
 local function resetZoneData()
@@ -31,10 +30,29 @@ local function resetZoneData()
     }
 end
 
+-- VUI exécute les callbacks OnClose dans un thread à part : ils ne se sont pas encore
+-- produits quand refresh() rend la main. Un drapeau levé puis baissé dans la foulée est
+-- donc déjà retombé lorsque OnClose le consulte : rafraîchir le menu passait pour une
+-- vraie sortie, et le menu effaçait la saisie en cours dès le premier réglage posé.
+--
+-- On compte donc les fermetures attendues, menu par menu : un refresh en produit
+-- exactement une, que le OnClose consomme à son tour.
+local pendingRefresh = {}
+
+--- Vrai si cette fermeture vient d'un rafraîchissement, et non d'une vraie sortie.
+---@param menu table
+---@return boolean
+local function isRefreshClose(menu)
+    local pending = pendingRefresh[menu]
+    if not pending or pending <= 0 then return false end
+
+    pendingRefresh[menu] = pending - 1
+    return true
+end
+
 local function safeRefresh(menu)
-    isRefreshing = true
+    pendingRefresh[menu] = (pendingRefresh[menu] or 0) + 1
     menu.refresh()
-    isRefreshing = false
 end
 
 local function stopMarkerThread()
@@ -446,7 +464,7 @@ StaffMenu.builderVoiceRestrictionCreate.OnOpen(function()
 end)
 
 StaffMenu.builderVoiceRestrictionCreate.OnClose(function()
-    if not isRefreshing and not isNavigating then
+    if not isRefreshClose(StaffMenu.builderVoiceRestrictionCreate) and not isNavigating then
         if not zoneData.isUpdate then
             stopMarkerThread()
             resetZoneData()
@@ -460,7 +478,7 @@ StaffMenu.builderVoiceRestrictionList.OnOpen(function()
 end)
 
 StaffMenu.builderVoiceRestrictionList.OnClose(function()
-    if not isRefreshing and not isNavigating then
+    if not isRefreshClose(StaffMenu.builderVoiceRestrictionList) and not isNavigating then
         stopMarkerThread()
         resetZoneData()
     end
@@ -472,7 +490,7 @@ StaffMenu.builderVoiceRestrictionManage.OnOpen(function()
 end)
 
 StaffMenu.builderVoiceRestrictionManage.OnClose(function()
-    if not isRefreshing and not isNavigating then
+    if not isRefreshClose(StaffMenu.builderVoiceRestrictionManage) and not isNavigating then
         stopMarkerThread()
         resetZoneData()
     end
@@ -543,7 +561,7 @@ StaffMenu.builderVoiceRestrictionBypass.OnOpen(function()
 end)
 
 StaffMenu.builderVoiceRestrictionBypass.OnClose(function()
-    if not isRefreshing and not isNavigating then
+    if not isRefreshClose(StaffMenu.builderVoiceRestrictionBypass) and not isNavigating then
         bypassSearchText = ""
     end
     isNavigating = false

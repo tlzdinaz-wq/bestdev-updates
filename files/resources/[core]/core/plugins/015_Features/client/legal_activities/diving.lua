@@ -95,26 +95,34 @@ function Diving.start(oxygenLevel)
             end
 
             if math.floor(lastOxygenPercent) ~= math.floor(maskPercent) then
-                SendNUIMessage({
-                    action = "nui:oxygenBar:update",
-                    data = {
-                        visible = true,
-                        percent = math.floor(maskPercent)
-                    }
-                })
+                if VFW.PushOxygenBar then
+                    VFW.PushOxygenBar(true, math.floor(maskPercent))
+                else
+                    SendNUIMessage({
+                        action = "nui:oxygenBar:update",
+                        data = {
+                            visible = true,
+                            percent = math.floor(maskPercent)
+                        }
+                    })
+                end
                 Wait(100)
                 lastOxygenPercent = maskPercent
             end
             Wait(100)
         end
 
-        SendNUIMessage({
-            action = "nui:oxygenBar:update",
-            data = {
-                visible = false,
-                percent = 0
-            }
-        })
+        if VFW.PushOxygenBar then
+            VFW.PushOxygenBar(false, 0)
+        else
+            SendNUIMessage({
+                action = "nui:oxygenBar:update",
+                data = {
+                    visible = false,
+                    percent = 0
+                }
+            })
+        end
     end)
 
     -- BOUCLE 3 : MISSION (Uniquement si une zone est définie)
