@@ -96,7 +96,7 @@ local builderEntries = {
     { label = ":cart: GESTION BAR & RESTAURANTS", desc = "Gérer les bars et restaurants (cartes, points, etc.)", submenu = "builderBarsMain", perm = "restaurant_builder" },
     { label = ":building: MAGASINS", desc = "Créer et gérer les magasins (vêtements, tatouages, masques)", submenu = "builderShops", perm = "manage_clothes" },
     { label = ":signal: MARKET", desc = "Créer et gérer les Markets par job", submenu = "builderMarket", perm = "builder_spacemarket" },
-    { label = ":box: GESTION ITEMS LTD", desc = "Configurer les prix supérette, spacemarket et catalogue revente", submenu = "builderLTDItems", perm = "manage_ltd_items" },
+    { label = ":building: LTD / SUPERETTES", desc = "Créer les vendeurs et gérer les produits vendus", submenu = "builderSupermarket", perm = "builder_supermarket", opens = "supermarket" },
     { label = ":car: STATIONS ESSENCE", desc = "Créer et gérer les stations d'essence", submenu = "gasStationMain", perm = "builder_gas_station" },
     { label = ":cart: DISTRIBUTEURS", desc = "Gérer les distributeurs automatiques", submenu = "builderVendingMachines", perm = "builder_vending" },
     { label = ":sparkles: GESTION FIREWORK", desc = "Gérer les boutiques de feux d'artifice", submenu = "builderFirework", perm = "builder_firework" },
@@ -107,6 +107,8 @@ local builderEntries = {
     { label = ":cart: LIVRAISONS BEAN COFFEE", desc = "Configurer les clients de livraison Bean Coffee", submenu = "builderBeanCoffeeDelivery", perm = "restaurant_builder" },
     { label = ":heart: LIVRAISONS UWU CAFE", desc = "Configurer les clients de livraison UwU Cafe", submenu = "builderUwuCafeDelivery", perm = "restaurant_builder" },
     { label = ":compass: POSITIONS STATIONS RESTAURANTS", desc = "Déplacer grill, friteuse, four, table de préparation... de chaque restaurant", submenu = "builderRestaurantStations", perm = "restaurant_builder" },
+    { label = ":star: GESTION VIP", desc = "Gérer les véhicules du mois VIP", submenu = "builderVIP", perm = "boutique", opens = "vip" },
+    { label = ":gift: BOUTIQUE AFK", desc = "Gérer les caisses et lots de la boutique AFK", submenu = "builderAFKShop", perm = "boutique", opens = "afk" },
 
     -- SANTÉ & MÉDICAL
     { separator = ":hospital: SANTÉ & MÉDICAL" },
@@ -144,7 +146,6 @@ local builderEntries = {
     -- BRAQUAGES
     { separator = ":mask: CATÉGORIE BRAQUAGES" },
     { label = ":money: ATM", desc = "Gestion des braquages ATM", submenu = "builderATM", perm = "builder_atm" },
-    { label = ":building: SUPERETTE", desc = "Gestion des supérettes (braquages)", submenu = "builderSupermarket", perm = "builder_supermarket", opens = "supermarket" },
     { label = ":building: BANQUES FLEECA", desc = "Gestion des banques Fleeca", submenu = "builderFleeca", perm = "builder_fleeca" },
     { label = ":building: BANQUES PACIFIC", desc = "Gestion des banques Pacific", submenu = "builderPacific", perm = "builder_pacific" },
     { label = ":diamond: BIJOUTERIE", desc = "Gestion de la bijouterie", submenu = "builderJewelry", perm = "builder_jewelry" },
@@ -176,11 +177,7 @@ local builderEntries = {
     { separator = ":skull: ZOMBIE" },
     { label = ":skull: ZONES ZOMBIE", desc = "Creer et gerer les zones de spawn zombie", submenu = "builderZombie", perm = "builder_zombie" },
 
-    -- BOUTIQUE
-    { separator = ":diamond: BOUTIQUE", perm = "boutique" },
-    { label = ":cart: BOUTIQUE PAYANTE", desc = "Administration des items et Coins", submenu = "builderPaidShop", perm = "boutique", opens = "paidshop" },
-    { label = ":star: GESTION VIP", desc = "Gérer les véhicules du mois VIP", submenu = "builderVIP", perm = "boutique", opens = "vip" },
-    { label = ":gift: BOUTIQUE AFK", desc = "Gérer les caisses et lots de la boutique AFK", submenu = "builderAFKShop", perm = "boutique", opens = "afk" },
+    -- La boutique se modifie directement dans la boutique (bouton Éditer) : plus de catégorie BOUTIQUE ici.
 }
 
 -- Exposé pour le hub de gestion NUI (gestion_hub.lua) : séparateurs = catégories, boutons = outils

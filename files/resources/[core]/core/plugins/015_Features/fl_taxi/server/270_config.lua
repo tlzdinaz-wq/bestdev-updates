@@ -19,7 +19,11 @@ function TaxiServer.IsOnDuty(xPlayer)
 end
 
 function TaxiServer.GetPhone(source)
+    -- sd-phone (le téléphone du serveur) d'abord ; lb-phone reste reconnu s'il revient un jour.
     local ok, number = pcall(function()
+        if GetResourceState("sd-phone") == "started" then
+            return exports["sd-phone"]:getPhoneNumber(source)
+        end
         return exports["lb-phone"]:GetEquippedPhoneNumber(source)
     end)
     if ok and type(number) == "string" and number ~= "" then return number end

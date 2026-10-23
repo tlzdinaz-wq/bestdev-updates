@@ -1,0 +1,74 @@
+#gestion-toast-layer {
+  position: fixed;
+  top: 5.25rem;
+  right: 1.5rem;
+  z-index: 2147483647;
+  display: flex;
+  width: min(25rem, calc(100vw - 3rem));
+  flex-direction: column;
+  gap: 0.65rem;
+  pointer-events: none;
+}
+
+.gestion-toast {
+  --toast-accent: #35d39a;
+  position: relative;
+  overflow: hidden;
+  padding: 0.9rem 1rem 1rem 1.05rem;
+  border: 1px solid color-mix(in srgb, var(--toast-accent) 48%, transparent);
+  border-radius: 0.85rem;
+  background: rgba(11, 14, 21, 0.97);
+  color: #f7f8fb;
+  box-shadow: 0 1rem 2.4rem rgba(0, 0, 0, 0.48), 0 0 1.6rem color-mix(in srgb, var(--toast-accent) 18%, transparent);
+  font-family: Montserrat, Arial, sans-serif;
+  opacity: 0;
+  transform: translateX(1rem);
+  animation: gestion-toast-in 180ms ease-out forwards;
+}
+
+.gestion-toast[data-variant="error"] { --toast-accent: #ff5c67; }
+.gestion-toast[data-variant="warning"] { --toast-accent: #ffbd4a; }
+.gestion-toast[data-variant="info"] { --toast-accent: #58a6ff; }
+
+.gestion-toast.is-leaving {
+  animation: gestion-toast-out 180ms ease-in forwards;
+}
+
+.gestion-toast__title {
+  margin: 0 0 0.32rem;
+  color: var(--toast-accent);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gestion-toast__message {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.gestion-toast__timer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 0.18rem;
+  background: var(--toast-accent);
+  transform-origin: left;
+  animation: gestion-toast-timer var(--toast-duration, 5000ms) linear forwards;
+}
+
+@keyframes gestion-toast-in {
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes gestion-toast-out {
+  to { opacity: 0; transform: translateX(1rem); }
+}
+
+@keyframes gestion-toast-timer {
+  to { transform: scaleX(0); }
+}

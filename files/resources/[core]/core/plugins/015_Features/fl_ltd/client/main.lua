@@ -1,5 +1,9 @@
 local Config = LTDDelivery.Config
 
+if not Config.EnableJobSystem then
+    return
+end
+
 local mission = {
     active = false,
     jobName = nil,

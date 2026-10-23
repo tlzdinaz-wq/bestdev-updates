@@ -806,8 +806,54 @@ end)
 
 
 
-RegisterNUICallback("nui:deathscreen:send-report", function(data)
-    ExecuteCommand("report " .. data.report)
+-- Signalement depuis l'écran de mort.
+--
+-- Le bouton et le formulaire sont posés par interface/build/skin/deathscreen-report.js :
+-- le rendu de l'écran est compilé, on ne peut pas y ajouter de bouton autrement.
+--
+-- Le texte repart par le même circuit que /report et que le formulaire Support du
+-- menu pause : rien n'est dupliqué, les signalements arrivent au même endroit et
+-- héritent des mêmes garde-fous serveur (anti-spam, longueur, file d'attente).
+
+--- L'écran de mort laisse les touches du jeu actives — le chat y reste accessible.
+--- Pendant la saisie il faut les lui retirer, sinon taper un « t » ouvre le chat,
+--- qui prend le focus et vide le formulaire.
+RegisterNUICallback("nui:deathscreen:report:typing", function(data, cb)
+    local wants = type(data) == "table" and data.typing == true
+
+    -- Rendre les touches au jeu uniquement si l'écran est encore là : le joueur a
+    -- pu être relevé pendant qu'il écrivait.
+    if wants or Death.isDead then
+        SetNuiFocus(true, true)
+        SetNuiFocusKeepInput(not wants)
+    end
+
+    cb("ok")
+end)
+
+RegisterNUICallback("nui:deathscreen:report", function(data, cb)
+    local message = type(data) == "table" and data.message or ""
+    if type(message) ~= "string" then message = tostring(message or "") end
+
+    CreateThread(function()
+        local result = TriggerServerCallback("core:pausemenu:report", message)
+        if type(result) ~= "table" then
+            -- Sans réponse du serveur, le formulaire resterait en « envoi en cours ».
+            cb({ ok = false, message = "Envoi impossible, réessayez." })
+            return
+        end
+        cb(result)
+    end)
+end)
+
+-- Ancien nom, conservé pour les interfaces qui l'utilisent encore.
+RegisterNUICallback("nui:deathscreen:send-report", function(data, cb)
+    local message = type(data) == "table" and (data.message or data.report) or ""
+
+    CreateThread(function()
+        local result = TriggerServerCallback("core:pausemenu:report", tostring(message or ""))
+        cb(type(result) == "table" and result or { ok = false, message = "Envoi impossible, réessayez." })
+    end)
 end)
 
 RegisterNUICallback("nui:deathscreen:callemergency", function()

@@ -163,7 +163,7 @@ local function fetchPersonnel()
             hospital = row.job == "sams_pab" and "paleto" or "pillbox",
             grade = row.job_grade,
             gradeLabel = gradeData and gradeData.label or "Agent",
-            onDuty = online and online.job.onDuty or (row.job_duty == 1),
+            onDuty = online and online.job.onDuty or VFW.DB.IsSet(row.job_duty),
             online = online ~= nil,
             mugshot = row.mugshot or "",
         }

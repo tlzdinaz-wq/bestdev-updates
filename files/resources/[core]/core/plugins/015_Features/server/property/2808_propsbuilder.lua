@@ -247,7 +247,18 @@ function PS.LoadBuilderProps()
     PS.RebuildZones(false)
 end
 
+-- Les limites affichees dans le menu F3 VIP viennent de la config de palier (modifiable dans Gestion) et
+-- le palier d'un joueur peut venir d'une permission vip_* : on applique les memes valeurs.
 local function propsLimits(xPlayer)
+    local vip = Staff29 and Staff29.VIP
+    if vip and vip.GetPlayerTier and vip.GetTierConfig then
+        local config = vip.GetTierConfig(vip.GetPlayerTier(xPlayer))
+        return {
+            temporary = PS.ToInt(config.propsTemporary) or 0,
+            permanent = PS.ToInt(config.propsPermanent) or 0,
+        }
+    end
+
     local tier = PS.ToInt(xPlayer.vipTier) or 0
     if VIPConfig and VIPConfig.GetPropsLimits then
         local limits = VIPConfig.GetPropsLimits(tier)
@@ -332,7 +343,7 @@ end)
 local function parsePropsData(data)
     if type(data) ~= "table" then return nil end
 
-    local model = PS.SafeString(data.model, 64)
+    local model = PS.SafeString(data.model, 60)
     if not model then return nil end
 
     local position = data.position
@@ -403,7 +414,7 @@ RegisterNetEvent("core:propsBuilder:createProp", function(data)
     ]], {
         parsed.model, parsed.label, PS.Encode(position),
         xPlayer.identifier, xPlayer.name,
-        parsed.durationType, parsed.duration, now, expiresAt,
+        parsed.durationType, parsed.duration or 0, now, expiresAt,
     })
 
     if not id then return end
@@ -468,7 +479,7 @@ RegisterNetEvent("propsBuilder:updateProp", function(propId, data)
     MySQL.update.await([[
         UPDATE propsbuilder_props SET model = ?, label = ?, position = ?, duration_type = ?, duration = ?, expires_at = ? WHERE id = ?
     ]], {
-        prop.model, prop.label, PS.Encode(prop.position), prop.durationType, prop.duration, prop.expiresAt, id,
+        prop.model, prop.label, PS.Encode(prop.position), prop.durationType, prop.duration or 0, prop.expiresAt, id,
     })
 
     local changed, created = PS.RebuildZones(true)

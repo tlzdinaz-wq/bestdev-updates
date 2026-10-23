@@ -1,6 +1,7 @@
 VFW.Commands = {}
 
 local registered = {}
+local executors = {}
 
 --- Une commande peut accepter plusieurs permissions : il suffit d en avoir une.
 ---
@@ -33,7 +34,7 @@ function VFW.RegisterCommand(name, permission, handler, options)
         params = options.params or {},
     }
 
-    RegisterCommand(name, function(source, args, raw)
+    local function execute(source, args, raw)
         source = tonumber(source) or 0
 
         if source == 0 then
@@ -59,8 +60,67 @@ function VFW.RegisterCommand(name, permission, handler, options)
         end
 
         handler(source, xPlayer, args, raw)
-    end, false)
+    end
+    executors[name] = execute
+    RegisterCommand(name, execute, false)
 end
+
+-- Le chat personnalise transmet ici les commandes serveur. Ne jamais utiliser
+-- ExecuteCommand cote serveur : il les executerait comme la console (source 0).
+
+--- La commande existe-t-elle quelque part sur le serveur ?
+---
+--- Le pont ne connaissait que les commandes declarees par VFW.RegisterCommand. Toute
+--- commande enregistree autrement — et il y en a — etait annoncee « inconnue » au
+--- joueur, alors meme que le jeu la connait. Un message faux est plus trompeur que
+--- pas de message du tout : on consulte le registre du jeu avant de se prononcer.
+---@param name string
+---@return boolean
+local function knownToServer(name)
+    local ok, list = pcall(GetRegisteredCommands)
+    if not ok or type(list) ~= "table" then return false end
+
+    for i = 1, #list do
+        local entry = list[i]
+        local entryName = type(entry) == "table" and entry.name or entry
+        if type(entryName) == "string" and entryName:lower() == name then return true end
+    end
+
+    return false
+end
+RegisterNetEvent("vfw:command:run", function(name, args)
+    local src = tonumber(source)
+    if not src or src <= 0 then return end
+    if type(name) ~= "string" or #name > 64 then return end
+    name = name:lower()
+    if not name:match("^[%w_:%-]+$") or type(args) ~= "table" or #args > 32 then return end
+
+    local cleanArgs, length = {}, #name
+    for i = 1, #args do
+        if type(args[i]) ~= "string" or #args[i] > 512 then return end
+        length = length + #args[i] + 1
+        if length > 2048 then return end
+        cleanArgs[i] = args[i]
+    end
+
+    local execute = executors[name]
+    if not execute then
+        -- Connue du jeu mais pas de VFW : elle a son propre chemin, on se tait.
+        if not knownToServer(name) then
+            TriggerClientEvent("chat:addMessage", src,
+                { args = { "Commandes", "Commande inconnue : /" .. name } })
+        end
+        return
+    end
+    if VFW.CommandCooldownAllows and not VFW.CommandCooldownAllows(src, name) then return end
+
+    local raw = name .. (#cleanArgs > 0 and (" " .. table.concat(cleanArgs, " ")) or "")
+    local ok, err = pcall(execute, src, cleanArgs, raw)
+    if not ok then
+        console.error(("[commandes] /%s (joueur %s) : %s"):format(name, src, tostring(err)))
+        TriggerClientEvent("chat:addMessage", src, { args = { "Commandes", "Erreur pendant /" .. name .. ". Consultez la console serveur." } })
+    end
+end)
 
 function VFW.GetRegisteredCommands()
     return registered

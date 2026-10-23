@@ -119,3 +119,28 @@ AddEventHandler('VUI:Open', function()
         })
     end
 end)
+
+-- Le téléphone (sd-phone) s'ouvre par une commande FiveM (F1 par défaut) : DisableControlAction ne
+-- l'atteint pas, contrairement à l'ancienne touche K. On passe donc par son interrupteur
+-- d'activation (exports["sd-phone"]:setDisabled), n'agissant qu'aux entrées et sorties de TIG.
+do
+    local phoneDisabled = false
+
+    AddEventHandler("onClientResourceStart", function(resourceName)
+        -- Un redémarrage de sd-phone remet l'interrupteur à zéro.
+        if resourceName == "sd-phone" then phoneDisabled = false end
+    end)
+
+    CreateThread(function()
+        while true do
+            local inTig = IsPlayerInTIG() == true
+
+            if inTig ~= phoneDisabled and GetResourceState("sd-phone") == "started" then
+                local ok = pcall(function() exports["sd-phone"]:setDisabled(inTig) end)
+                if ok then phoneDisabled = inTig end
+            end
+
+            Wait(inTig and 500 or 1500)
+        end
+    end)
+end

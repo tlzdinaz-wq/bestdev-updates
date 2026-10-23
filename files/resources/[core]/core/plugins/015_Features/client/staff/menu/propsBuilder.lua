@@ -45,11 +45,18 @@ local function CleanupPreview()
     end
 end
 
+-- menu.refresh() = close() puis open() ; OnClose / OnOpen tournent au tick suivant, donc un drapeau leve
+-- puis baisse autour de refresh() est deja retombe : l'apercu de l'objet etait supprime a chaque refresh.
+local iRefreshExpectedUntil = 0
+
+local function IsGuarded()
+    return openedMenu or gizmoActive or simplePlacing or GetGameTimer() < iRefreshExpectedUntil
+end
+
 local function SafeRefresh(menu)
     if menu.opened then
-        openedMenu = true
+        iRefreshExpectedUntil = GetGameTimer() + 1500
         menu.refresh()
-        openedMenu = false
     end
 end
 
@@ -284,6 +291,7 @@ local function BuildPropsForm(menu, data, vip, categoryMenu)
         menu.close()
         Wait(100)
         menu.open()
+        openedMenu = false
     end)
 
     menu.Button("Modèle de l'objet", data.model or "Aucun modèle sélectionné", nil, nil, false, function()
@@ -501,7 +509,7 @@ CreatePropsMenu.OnOpen(function()
 end)
 
 CreatePropsMenu.OnClose(function()
-    if openedMenu or gizmoActive or simplePlacing then
+    if IsGuarded() then
         return
     end
 
@@ -687,7 +695,7 @@ PropManage.OnOpen(function()
 end)
 
 PropManage.OnClose(function()
-    if openedMenu or gizmoActive or simplePlacing then
+    if IsGuarded() then
         return
     end
 
@@ -725,7 +733,7 @@ EditProp.OnOpen(function()
 end)
 
 EditProp.OnClose(function()
-    if openedMenu or gizmoActive or simplePlacing then
+    if IsGuarded() then
         return
     end
 
@@ -825,7 +833,7 @@ function renderPropsCreateProps(menu, categoryMenu, parentMenu)
     end)
 
     menu.OnClose(function()
-        if openedMenu or gizmoActive or simplePlacing then
+        if IsGuarded() then
             return
         end
 

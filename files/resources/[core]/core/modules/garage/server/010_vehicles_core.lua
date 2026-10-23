@@ -58,12 +58,15 @@ function Vehicles.Decode(row)
         row.label = row.vehName or ""
     end
 
-    row.stored = tonumber(row.stored) or 0
-    row.pounded = tonumber(row.pounded) or 0
+    -- stored / pounded sont des TINYINT(1) : oxmysql les rend en booléens, que tonumber() ne sait pas
+    -- lire (nil -> 0). Résultat : tout véhicule rangé se lisait « déjà sorti ». Le reste du code
+    -- garde son contrat numérique (== 1).
+    row.stored = VFW.DB.IsSet(row.stored) and 1 or 0
+    row.pounded = VFW.DB.IsSet(row.pounded) and 1 or 0
     row.engineHealth = tonumber(row.engineHealth) or 1000.0
     row.bodyHealth = tonumber(row.bodyHealth) or 1000.0
     row.fuelLevel = tonumber(row.fuelLevel) or 100.0
-    row.modTurbo = tonumber(row.modTurbo) == 1
+    row.modTurbo = VFW.DB.IsSet(row.modTurbo)
     return row
 end
 

@@ -251,7 +251,7 @@ function Bank.GetTransactions(iban, limit)
             -- a partir de `positive`.
             amount = ("%+d"):format(math.floor(tonumber(row.amount) or 0)),
             date = tostring(row.date or Bank.Now()),
-            positive = tonumber(row.positive) == 1,
+            positive = VFW.DB.IsSet(row.positive),
         }
     end
 

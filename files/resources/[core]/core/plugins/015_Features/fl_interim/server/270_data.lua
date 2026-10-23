@@ -402,7 +402,7 @@ function InterimServer.BuildJobsCenterConfig()
             heading = (row.heading or 0.0) + 0.0,
             label = row.label or "Appuyez sur ~INPUT_CONTEXT~ pour parler",
             blip = {
-                enabled = row.blip_enabled == 1,
+                enabled = VFW.DB.IsSet(row.blip_enabled),
                 sprite = row.blip_sprite or 351,
                 scale = (row.blip_scale or 0.5) + 0.0,
                 color = row.blip_color or 5,
@@ -425,13 +425,9 @@ function InterimServer.SetInterimJob(xPlayer, jobId)
     xPlayer.setMeta("interimJob", jobId or "")
 end
 
-function InterimServer.IsUnemployed(xPlayer)
-    if not xPlayer or not xPlayer.job then return false end
-    return xPlayer.job.name == "unemployed"
-end
-
+--- Le métier d'intérim est indépendant du métier du joueur : on peut être policier ou LifeInvader et livrer des pizzas.
 function InterimServer.HasJob(xPlayer, jobId)
-    if not InterimServer.IsUnemployed(xPlayer) then return false end
+    if not xPlayer then return false end
     return InterimServer.GetInterimJob(xPlayer) == jobId
 end
 

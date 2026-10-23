@@ -238,6 +238,20 @@ RegisterServerCallback("paidshop:getShopData", function(source)
         if id and not items[id] then items[id] = {} end
     end
 
+    -- Le mode édition de la boutique choisit ses champs d'après le type d'article de la catégorie
+    -- (objet, arme, véhicule...) et sait si le nom technique est créé automatiquement (packs, caisses).
+    local described = {}
+    for i = 1, #categories do
+        local entry = {}
+        for key, value in pairs(categories[i]) do entry[key] = value end
+        local config = PaidShop.CategoryConfig(entry.id)
+        entry.itemType = config and config.itemType or nil
+        entry.autoSpawn = config and config.autoGenerateSpawnName == true or false
+        entry.requiresPreview = config and config.requiresPreview == true or false
+        described[i] = entry
+    end
+    categories = described
+
     return {
         categories = categories,
         items = items,

@@ -2,6 +2,22 @@ voiceData = {}
 radioData = {}
 callData = {}
 
+-- Each player must transmit on their own Mumble channel. Clients then add the
+-- channels of nearby players to their voice target. The client-side proximity
+-- code relies on this replicated state being present before it can build that
+-- target, so keep the allocation on the server and release it on disconnect.
+local mappedChannels = {}
+
+local function firstFreeChannel()
+	for channel = 1, 2048 do
+		if not mappedChannels[channel] then
+			return channel
+		end
+	end
+
+	return 0
+end
+
 function defaultTable(source)
 	handleStateBagInitilization(source)
 	return {
@@ -23,6 +39,16 @@ function handleStateBagInitilization(source)
 		plyState:set('voiceIntent', 'speech', true)
 		-- We want to save voice inits because we'll automatically reinitalize calls and channels
 		plyState:set('pmaVoiceInit', true, false)
+	end
+
+	local assignedChannel = firstFreeChannel()
+	plyState:set('assignedChannel', assignedChannel, true)
+
+	if assignedChannel ~= 0 then
+		mappedChannels[assignedChannel] = source
+		logger.verbose('[proximity] Assigned player %s to Mumble channel %s', source, assignedChannel)
+	else
+		logger.error('[proximity] Failed to find a free Mumble channel for player %s', source)
 	end
 end
 
@@ -98,6 +124,7 @@ end)
 
 AddEventHandler("playerDropped", function()
 	local source = source
+	local assignedChannel = Player(source).state.assignedChannel
 	if voiceData[source] then
 		local plyData = voiceData[source]
 
@@ -110,6 +137,11 @@ AddEventHandler("playerDropped", function()
 		end
 
 		voiceData[source] = nil
+	end
+
+	if assignedChannel then
+		mappedChannels[assignedChannel] = nil
+		logger.verbose('[proximity] Released Mumble channel %s from player %s', assignedChannel, source)
 	end
 end)
 

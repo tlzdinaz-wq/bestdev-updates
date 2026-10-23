@@ -542,7 +542,7 @@ local function registerPointEndpoints(prefix, table_, ownerColumn)
         local rows = query(("SELECT * FROM `%s` WHERE `%s` = ? ORDER BY id"):format(table_, ownerColumn), { id })
         for i = 1, #rows do
             rows[i].inputs = decode(rows[i].inputs, {})
-            rows[i].blip_enabled = rows[i].blip_enabled == 1
+            rows[i].blip_enabled = VFW.DB.IsSet(rows[i].blip_enabled)
         end
         return rows
     end)

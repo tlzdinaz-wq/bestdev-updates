@@ -20,6 +20,7 @@ local robbingSafes = {}
 
 local SupermarketSettings = {
     InteractDistance = 3.0,
+    SimpleShopMode = LTDDelivery.Config.SimpleShopMode == true,
     SafeInteractDistance = 1.5,
     PoliceBlipDuration = 300000,
     APU = {
@@ -604,6 +605,10 @@ end)
 
 -- Safe marker thread - Draw ground markers for safes
 CreateThread(function()
+    if SupermarketSettings.SimpleShopMode then
+        return
+    end
+
     while true do
         local playerCoords = GetEntityCoords(PlayerPedId())
 
@@ -633,8 +638,51 @@ CreateThread(function()
     end
 end)
 
+-- Mode LTD simplifié : le vendeur est le seul point d'interaction.
+-- E près du PNJ ouvre directement la boutique, sans métier ni livraison.
+CreateThread(function()
+    if not SupermarketSettings.SimpleShopMode then
+        return
+    end
+
+    while true do
+        local wait = 1000
+        local playerCoords = GetEntityCoords(PlayerPedId())
+        local closestStoreId = nil
+        local closestDistance = SupermarketSettings.InteractDistance
+
+        for id, vendor in pairs(SupermarketAPUs) do
+            local supermarket = Supermarkets[id]
+
+            if supermarket and supermarket.active and DoesEntityExist(vendor) then
+                local distance = #(playerCoords - GetEntityCoords(vendor))
+                if distance < closestDistance then
+                    closestStoreId = id
+                    closestDistance = distance
+                end
+            end
+        end
+
+        if closestStoreId then
+            wait = 0
+            ShowHelp("Appuyez sur ~INPUT_CONTEXT~ pour ouvrir le magasin")
+
+            if not IsNuiFocused() and IsShopOpenPressed() then
+                OpenAutomaticShop(closestStoreId)
+                Wait(500)
+            end
+        end
+
+        Wait(wait)
+    end
+end)
+
 -- Main detection thread
 CreateThread(function()
+    if SupermarketSettings.SimpleShopMode then
+        return
+    end
+
     while true do
         local wait = 1000
         local playerPed = PlayerPedId()
@@ -873,6 +921,39 @@ local function CleanupSupermarket(id)
     end
 end
 
+--- Pose le vendeur au sol. Le builder enregistre GetEntityCoords du staff : le centre du personnage, a environ
+--- un metre au-dessus du sol. Cree tel quel puis gele, le vendeur flottait. On cherche le sol sous lui, on le
+--- depose juste au-dessus, on laisse la physique le poser, puis on le gele.
+local GROUND_PROBE_UP = 1.5       -- on sonde depuis un peu au-dessus de la position enregistree
+local PED_ORIGIN_HEIGHT = 1.0     -- l'origine d'un personnage est a environ 1 m au-dessus de ses pieds
+
+local function PlaceVendorOnGround(id, ped, coords)
+    CreateThread(function()
+        local x, y, z = coords.x, coords.y, coords.z
+
+        RequestCollisionAtCoord(x, y, z)
+        local deadline = GetGameTimer() + 3000
+        while DoesEntityExist(ped) and not HasCollisionLoadedAroundEntity(ped) and GetGameTimer() < deadline do
+            Wait(50)
+        end
+
+        -- Remplace ou supprime entre-temps (resynchronisation depuis Gestion) : plus rien a faire.
+        if SupermarketAPUs[id] ~= ped or not DoesEntityExist(ped) then return end
+
+        local found, groundZ = GetGroundZFor_3dCoord(x, y, z + GROUND_PROBE_UP, false)
+        if not found then groundZ = z - PED_ORIGIN_HEIGHT end
+
+        FreezeEntityPosition(ped, false)
+        SetEntityCoordsNoOffset(ped, x, y, groundZ + PED_ORIGIN_HEIGHT + 0.1, false, false, false)
+        SetEntityHeading(ped, coords.w or 0.0)
+
+        Wait(700)
+
+        if SupermarketAPUs[id] ~= ped or not DoesEntityExist(ped) then return end
+        LockAPU(ped)
+    end)
+end
+
 -- Function to create/update a supermarket's blip and APU
 local function SetupSupermarket(id, supermarket)
     if supermarket.active then
@@ -936,6 +1017,7 @@ local function SetupSupermarket(id, supermarket)
                 LockAPU(apu)
 
                 SupermarketAPUs[id] = apu
+                PlaceVendorOnGround(id, apu, coords)
             end
         else
             -- No apuPos defined, clean up any existing APU

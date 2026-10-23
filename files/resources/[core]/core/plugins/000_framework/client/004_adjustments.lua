@@ -31,6 +31,66 @@ function Adjustments:DisableNPCDrops()
     end
 end
 
+--- Billets natifs GTA (PNJ/joueurs morts), distincts des depots RP de l'inventaire.
+local moneyPickups <const> = {
+    `PICKUP_MONEY_VARIABLE`, `PICKUP_MONEY_WALLET`, `PICKUP_MONEY_PURSE`,
+    `PICKUP_MONEY_CASE`, `PICKUP_MONEY_SECURITY_CASE`, `PICKUP_MONEY_DEP_BAG`,
+    `PICKUP_MONEY_MED_BAG`, `PICKUP_MONEY_PAPER_BAG`, `PICKUP_GANG_ATTACK_MONEY`,
+    `PICKUP_VEHICLE_MONEY_VARIABLE`,
+}
+local moneyDropsGuardStarted = false
+
+local function removeNativeMoneyPickups()
+    local playerId = PlayerId()
+    for i = 1, #moneyPickups do
+        ToggleUsePickupsForPlayer(playerId, moneyPickups[i], false)
+        RemoveAllPickupsOfType(moneyPickups[i])
+    end
+end
+
+local function clearNativePedMoney()
+    local peds = GetGamePool("CPed")
+    for i = 1, #peds do
+        local ped = peds[i]
+        if ped and ped ~= 0 and DoesEntityExist(ped) then
+            -- L'argent RP est stocké dans les comptes VFW, pas sur le ped GTA.
+            -- Mettre cette valeur native à zéro empêche son drop à la mort.
+            SetPedMoney(ped, 0)
+        end
+    end
+end
+
+function Adjustments:DisableNativeMoneyDrops()
+    if moneyDropsGuardStarted then return end
+    moneyDropsGuardStarted = true
+
+    -- Mettre la valeur à zéro dès le coup fatal et retirer le pickup généré dans
+    -- les frames suivantes. Cela couvre les PNJ comme les joueurs réseau.
+    AddEventHandler("gameEventTriggered", function(eventName, args)
+        if eventName ~= "CEventNetworkEntityDamage" or type(args) ~= "table" then return end
+
+        local victim = args[1]
+        if not victim or victim == 0 or not DoesEntityExist(victim) or not IsEntityAPed(victim) then return end
+        SetPedMoney(victim, 0)
+
+        if args[6] == 1 or IsPedDeadOrDying(victim, true) or IsPedFatallyInjured(victim) then
+            CreateThread(function()
+                removeNativeMoneyPickups()
+                Wait(50)
+                removeNativeMoneyPickups()
+            end)
+        end
+    end)
+
+    CreateThread(function()
+        while true do
+            clearNativePedMoney()
+            removeNativeMoneyPickups()
+            Wait(500)
+        end
+    end)
+end
+
 --- Handles seat shuffling when entering a vehicle.
 function Adjustments:SeatShuffle()
 ---@param vehicle any
@@ -583,6 +643,7 @@ function Adjustments:Load()
     self:HideHealthArmour()
     self:DisableAimAssist()
     self:DisableNPCDrops()
+    self:DisableNativeMoneyDrops()
     self:SeatShuffle()
     self:HealthRegeneration()
     self:AmmoAndVehicleRewards()

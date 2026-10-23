@@ -103,6 +103,28 @@ local function encode(data)
     return json.encode(sanitize(data))
 end
 
+local VARIABLE <const> = "ui_layout"
+
+--- La disposition de l'interface est doublee en base de donnees.
+---
+--- Elle ne vivait que dans ce fichier, a l interieur de la ressource. Un client qui
+--- remplace le dossier `core` pour se mettre a jour retrouvait la disposition par
+--- defaut, et devait tout repositionner.
+local function mirrorToDatabase(data)
+    if not VFW.Variables or not VFW.Variables.SetVariable then return end
+    pcall(VFW.Variables.SetVariable, VARIABLE, data)
+end
+
+---@return table|nil disposition, boolean consultee
+local function readFromDatabase()
+    if not VFW.Variables or not VFW.Variables.GetVariable then return nil, false end
+
+    local ok, stored = pcall(VFW.Variables.GetVariable, VARIABLE)
+    if not ok then return nil, false end
+    if type(stored) ~= "table" or not next(stored) then return nil, true end
+    return stored, true
+end
+
 local function loadFile()
     if cache then
         return cache
@@ -115,6 +137,18 @@ local function loadFile()
             return cache
         end
     end
+    -- Fichier absent : la copie en base prend le relais, avant de retomber sur les
+    -- valeurs par defaut.
+    local stored, consulted = readFromDatabase()
+    if stored then
+        cache = sanitize(stored)
+        return cache
+    end
+
+    -- Base pas encore joignable : ne rien retenir, sinon ces valeurs par defaut
+    -- tiendraient lieu de disposition pour toute la duree du serveur.
+    if not consulted then return defaults() end
+
     cache = defaults()
     return cache
 end
@@ -125,7 +159,9 @@ local function saveFile(data)
     if not ok then
         return false
     end
+
     cache = sanitize(data)
+    mirrorToDatabase(cache)
     return true
 end
 

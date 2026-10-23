@@ -61,6 +61,9 @@ local ITEM_DATA_KEYS = {
     alcool = "boolean",
     drugs = "boolean",
     droppable = "boolean",
+    -- Interrupteur « Consommable » de Gestion > Items : il tranche dans les deux
+    -- sens, y compris pour retirer la consommation d'un item qui s'en réclame.
+    consumable = "boolean",
 }
 
 local sessionWeights = {}
@@ -212,6 +215,35 @@ end
 local function broadcastCatalog()
     TriggerClientEvent("vfw:loadItems", -1, VFW.Items)
 end
+
+local catalogReloading = false
+local catalogLastReload = nil
+local catalogReloadError = nil
+registerCallback("vfw:items:getCatalog", function(source)
+    if not VFW.GetPlayerFromId(source) then
+        return { ok = false, error = "Personnage non charge cote serveur. Reconnectez-vous." }
+    end
+    if (type(VFW.Items) ~= "table" or next(VFW.Items) == nil) and not catalogReloading then
+        if type(VFW.DB) ~= "table" or type(VFW.DB.RefreshItemsCatalog) ~= "function" then
+            return { ok = false, error = "Fichiers serveur incomplets : remplacez aussi 002_database.lua et redemarrez le serveur." }
+        end
+        local now = GetGameTimer()
+        if not catalogLastReload or now - catalogLastReload >= 5000 then
+            catalogReloading = true
+            catalogLastReload = now
+            local ok, err = pcall(VFW.DB.RefreshItemsCatalog)
+            catalogReloading = false
+            catalogReloadError = not ok and "Echec de lecture SQL du catalogue : consultez l'erreur [items] dans la console serveur." or nil
+            if not ok then console.error("[items] Relecture du catalogue : " .. tostring(err)) end
+        end
+    end
+    if type(VFW.Items) ~= "table" or next(VFW.Items) == nil then
+        console.error("[items] Catalogue serveur vide : verifier le chargement de la table items.")
+        return { ok = false, error = catalogReloading and "Catalogue en cours de rechargement. Reessayez dans quelques secondes."
+            or catalogReloadError or "La table items lue par ce serveur est vide. Verifiez que sa connexion SQL utilise la bonne base." }
+    end
+    return { ok = true, items = VFW.Items }
+end)
 
 local function resolveWeaponItem(model)
     if type(model) ~= "string" or model == "" or #model > ITEM_NAME_MAX then return nil end

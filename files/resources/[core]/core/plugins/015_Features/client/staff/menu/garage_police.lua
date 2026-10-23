@@ -214,9 +214,9 @@ StaffMenu.builderPoliceGarageForm.OnOpen(function()
         " Points de spawn", "Placer les emplacements véhicules",
         hasSpawn and "Définis" or "Non définis",
         "chevron", false, function()
-            StaffMenu.builderPoliceGarageForm.close()
-            local exits = Garage:SetExitPoint(1)
-            StaffMenu.builderPoliceGarageForm.open()
+            local exits = StaffMenu.PlaceInWorld(StaffMenu.builderPoliceGarageForm, function()
+                return Garage:SetExitPoint(1)
+            end)
             policeGarageSelected.spawnPositions = exits
             StaffMenu.builderPoliceGarageForm.refresh()
         end

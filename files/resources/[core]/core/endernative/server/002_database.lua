@@ -10,6 +10,19 @@ end
 
 VFW.DB.Decode = decode
 
+--- Un drapeau lu en base (colonne TINYINT(1)) est-il levé ?
+---
+--- oxmysql renvoie ces colonnes en BOOLÉENS (true / false) et les autres entiers en nombres. Le code du
+--- serveur, lui, les compare volontiers à 1 : or `true == 1` est faux et `tonumber(true)` vaut nil, de
+--- sorte qu'un drapeau levé se lisait comme éteint (véhicule « déjà sorti » de tous les garages, service
+--- et état de mort perdus à la connexion...). Vrai ici pour true, 1 et "1" ; faux pour tout le reste.
+---@param value any
+---@return boolean
+function VFW.DB.IsSet(value)
+    if value == true then return true end
+    return tonumber(value) == 1
+end
+
 function VFW.DB.Encode(value)
     return json.encode(value or {})
 end
@@ -37,6 +50,8 @@ end
 
 local function itemWeight(name, kind)
     if name == "money" or name == "dirty_money" then return 0 end
+    local configured = VFW.ItemWeights and VFW.ItemWeights[name]
+    if type(configured) == "number" and configured >= 0 then return configured end
     if kind == "weapons" then return 1500 end
     if name:sub(1, 5) == "ammo_" then return 1 end
     return 100
@@ -85,9 +100,6 @@ function VFW.DB.EnsureClothingItems()
 end
 
 function VFW.DB.SeedItemsIfEmpty()
-    local count = tonumber(MySQL.scalar.await("SELECT COUNT(*) FROM items") or 0) or 0
-    if count > 0 then return end
-
     local catalog = VFW.ItemDescriptions
     if type(catalog) ~= "table" then
         console.warn("Items: catalogue introuvable, table `items` laissée vide")
@@ -123,17 +135,73 @@ function VFW.DB.SeedItemsIfEmpty()
     end
     flush()
 
-    console.init("Items", ("%d objets amorcés depuis le catalogue"):format(inserted))
+    -- INSERT IGNORE conserve les réglages SQL existants tout en ajoutant les
+    -- nouveaux objets du catalogue aux bases déjà initialisées.
+    console.init("Items", ("%d objets vérifiés depuis le catalogue"):format(inserted))
 end
 
-function VFW.DB.LoadItems()
-    VFW.DB.SeedItemsIfEmpty()
-    VFW.DB.EnsureClothingItems()
-    local rows = MySQL.query.await("SELECT * FROM items") or {}
+--- Drapeau d'un item (colonne facultative de `items`).
+---
+--- Notre table n'a ni `can_remove`, ni `rare`, ni `usable` : `row.can_remove == 1` était alors faux pour
+--- TOUS les items, qui se retrouvaient « non jetables » (« Cet objet ne peut pas être jeté »). Colonne
+--- absente = valeur par défaut ; colonne présente = lecture tolérante (true, 1 et "1" sont levés).
+---@param value any
+---@param default boolean
+---@return boolean
+local function itemFlag(value, default)
+    if value == nil then return default end
+    return VFW.DB.IsSet(value)
+end
+
+--- Poids : les valeurs de config/item_weights.lua (1 = 5 g) ne s'appliquaient qu'aux items créés à la
+--- première amorce de la table. Une base déjà remplie gardait l'ancien poids posé par défaut (un fusil
+--- d'assaut à 1500, une bouteille d'eau à 100), tant que sql/items_poids.sql n'était pas importé à la main.
+---
+--- Fait ici, une seule fois, ce que fait ce script : seuls les items encore à un poids posé par défaut
+--- (100, 1 ou 1500) changent, un poids réglé à la main dans Gestion > Items est gardé. La table
+--- `items_poids_sauvegarde` garde les poids d'origine ; elle sert aussi de repère « déjà fait » (le script
+--- SQL la crée de la même façon). Pour rejouer : la supprimer, puis relancer le serveur.
+---@return number changed
+function VFW.DB.ApplyConfiguredWeights()
+    local configured = VFW.ItemWeights
+    if type(configured) ~= "table" then return 0 end
+
+    local marker = MySQL.scalar.await(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'items_poids_sauvegarde'")
+    if (tonumber(marker) or 0) > 0 then return 0 end
+
+    -- Sans sauvegarde, pas de modification : sans repère « déjà fait », les poids réglés à la main
+    -- seraient réécrits à chaque démarrage.
+    MySQL.query.await("CREATE TABLE `items_poids_sauvegarde` AS SELECT `name`, `weight` FROM `items`")
+
+    local changed = 0
+    for name, weight in pairs(configured) do
+        if type(name) == "string" and type(weight) == "number" and weight >= 0 then
+            local affected = MySQL.update.await(
+                "UPDATE `items` SET `weight` = ? WHERE `name` = ? AND `weight` IN (100, 1, 1500) AND `weight` <> ?",
+                { weight, name, weight })
+            changed = changed + (tonumber(affected) or 0)
+        end
+    end
+
+    console.init("Items", ("%d poids remis à l'échelle (1 = 5 g), sauvegarde dans items_poids_sauvegarde"):format(changed))
+    return changed
+end
+
+-- Relecture seule : utilisable pour recuperer un catalogue dont le chargement
+-- initial a echoue, sans amorcage ni migration lors d'une ouverture de menu.
+function VFW.DB.RefreshItemsCatalog()
+    local rows = MySQL.query.await("SELECT * FROM items")
+    if type(rows) ~= "table" then error("[items] La lecture SQL du catalogue n'a pas renvoye de liste.") end
+    if #rows == 0 and type(VFW.Items) == "table" and next(VFW.Items) ~= nil then
+        console.error("[items] Lecture du catalogue vide : conservation du catalogue deja charge.")
+        return VFW.Items
+    end
     local items = {}
     for i = 1, #rows do
         local row = rows[i]
         local data = decode(row.data, {})
+        if type(data) ~= "table" then data = {} end
         if not data.type then data.type = "objects" end
 
         local image = row.image
@@ -142,7 +210,7 @@ function VFW.DB.LoadItems()
         elseif type(image) ~= "string" or image == "" then
             -- Le fichier réellement présent, quelle que soit son extension : un pack
             -- d'icônes en PNG est ainsi pris en compte sans rien changer en base.
-            image = VFW.ItemImageRelPath(row.name) or ("items/%s.webp"):format(row.name)
+            image = (VFW.ItemImageRelPath and VFW.ItemImageRelPath(row.name)) or ("items/%s.webp"):format(row.name)
         end
 
         items[row.name] = {
@@ -150,10 +218,10 @@ function VFW.DB.LoadItems()
             label = row.label,
             type = row.type,
             weight = row.weight,
-            rare = row.rare == 1,
-            canRemove = row.can_remove == 1,
-            usable = row.usable == 1,
-            premium = row.premium == 1,
+            rare = itemFlag(row.rare, false),
+            canRemove = itemFlag(row.can_remove, true),
+            usable = itemFlag(row.usable, false),
+            premium = VFW.DB.IsSet(row.premium),
             perm = row.perm == 1,
             image = image,
             description = row.description,
@@ -163,6 +231,18 @@ function VFW.DB.LoadItems()
     VFW.Items = items
     console.init("Items", ("%d items chargés"):format(#rows))
     return items
+end
+
+function VFW.DB.LoadItems()
+    -- Une erreur de migration/amorcage ne doit pas cacher les definitions qui
+    -- existent deja en base. La lecture reste stricte et ne vide pas un cache sain.
+    local ok, err = pcall(VFW.DB.SeedItemsIfEmpty)
+    if not ok then console.warn("[items] Amorcage impossible : " .. tostring(err)) end
+    ok, err = pcall(VFW.DB.EnsureClothingItems)
+    if not ok then console.warn("[items] Migration vetements impossible : " .. tostring(err)) end
+    ok, err = pcall(VFW.DB.ApplyConfiguredWeights)
+    if not ok then console.warn("[items] Poids non remis a l'echelle : " .. tostring(err)) end
+    return VFW.DB.RefreshItemsCatalog()
 end
 
 function VFW.DB.LoadJobs()
@@ -176,7 +256,7 @@ function VFW.DB.LoadJobs()
             name = row.name,
             label = row.label,
             type = row.type,
-            whitelisted = row.whitelisted == 1,
+            whitelisted = VFW.DB.IsSet(row.whitelisted),
             grades = {},
         }
     end

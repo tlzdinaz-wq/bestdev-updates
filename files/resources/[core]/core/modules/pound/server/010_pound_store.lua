@@ -24,7 +24,7 @@ local function decodePound(row)
         label = row.label or "Fourriere",
         position = position,
         spawnPositions = spawnPositions,
-        useMarker = tonumber(row.useMarker) == 1,
+        useMarker = VFW.DB.IsSet(row.useMarker),
         pedModel = row.pedModel or "a_m_y_business_02",
         price = tonumber(row.price) or defaultPrice(),
         zone = (row.zone ~= nil and row.zone ~= "") and row.zone or nil,

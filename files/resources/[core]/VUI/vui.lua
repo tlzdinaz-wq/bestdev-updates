@@ -782,6 +782,86 @@ function CreateMenu(title, banner, autoRefresh)
         }, index)
     end
 
+    --- Vrai pour les actions finales d'un formulaire de Gestion.
+    local function IsValidationAction(title)
+        local text = tostring(title or ""):gsub(":([%w%-]+):", "")
+        local needles = {
+            "CRÉER", "Créer", "créer", "CREER", "Creer", "creer",
+            "SAUVEGARDER", "Sauvegarder", "sauvegarder",
+            "VALIDER", "Valider", "valider",
+            "ENREGISTRER", "Enregistrer", "enregistrer",
+            "AJOUTER", "Ajouter", "ajouter"
+        }
+        for i = 1, #needles do
+            if text:find(needles[i], 1, true) then return true end
+        end
+        return false
+    end
+
+    local function IsExplicitReason(value)
+        local text = tostring(value or "")
+        if text == "" then return false end
+        local needles = {
+            "requis", "requise", "reprises", "manquant", "manquante", "manquantes",
+            "minimum", "au moins", "aucun", "aucune", "invalide", "incompl",
+            "non défini", "non définie", "définir", "choisir", "remplir", "compléter",
+            "Requis", "Requise", "Manquant", "Manquante", "Minimum", "Aucun", "Aucune",
+            "Invalide", "Incompl", "Non défini", "Non définie", "Définir", "Choisir",
+            "Remplir", "Compléter"
+        }
+        for i = 1, #needles do
+            if text:find(needles[i], 1, true) then return true end
+        end
+        return false
+    end
+
+    --- Déduit les champs visiblement incomplets placés avant le bouton de validation.
+    local function InferMissingFields(items)
+        local missing, seen = {}, {}
+        for i = 1, #items do
+            local item = items[i]
+            local props = item and item.props or nil
+            if props and item.type ~= "separator" and item.type ~= "title" then
+                local state = tostring(props.rightLabel or "")
+                if state ~= "" and IsExplicitReason(state) then
+                    local label = tostring(props.title or "champ"):gsub(":([%w%-]+):", "")
+                    label = label:gsub("^%s+", ""):gsub("%s+$", "")
+                    if label ~= "" and not seen[label] then
+                        seen[label] = true
+                        missing[#missing + 1] = label
+                    end
+                end
+            end
+        end
+        return missing
+    end
+
+    --- Donne systématiquement une raison visible aux validations bloquées dans Gestion.
+    local function ExplainBlockedValidation(title, subtitle, rightLabel, disabled)
+        if not VUI_HubMode or not disabled or not IsValidationAction(title) then
+            return subtitle, rightLabel, nil
+        end
+
+        local reason
+        if IsExplicitReason(subtitle) then
+            reason = tostring(subtitle)
+        elseif IsExplicitReason(rightLabel) then
+            reason = tostring(rightLabel)
+        else
+            local missing = InferMissingFields(menu.items)
+            if #missing > 0 then
+                reason = "Champs manquants : " .. table.concat(missing, ", ")
+            else
+                reason = "Complétez tous les champs obligatoires du formulaire"
+            end
+        end
+
+        if not reason:find("^Impossible", 1) then
+            reason = "Impossible : " .. reason
+        end
+        return reason, rightLabel or "INCOMPLET", reason
+    end
+
     --- Ajoute un bouton standard.
     ---@param title string Label principal
     ---@param subtitle string|nil Description sous le titre
@@ -794,6 +874,10 @@ function CreateMenu(title, banner, autoRefresh)
     ---@param panel any|nil Données panel optionnelles
     ---@return VUIItem
     menu.Button = function(title, subtitle, rightLabel, icon, disabled, callback, submenu, index, panel)
+        local blockedReason
+        subtitle, rightLabel, blockedReason = ExplainBlockedValidation(title, subtitle, rightLabel, disabled)
+        local uiDisabled = disabled
+        if blockedReason then uiDisabled = false end
         return AddItem(menu.items, {
             type = "button",
             callback = callback,
@@ -803,7 +887,11 @@ function CreateMenu(title, banner, autoRefresh)
                 subtitle = subtitle,
                 rightLabel = rightLabel,
                 icon = icon,
-                disabled = disabled,
+                -- Une validation incomplète reste sélectionnable afin d'expliquer le blocage.
+                -- Le callback NUI l'intercepte avant le callback métier.
+                disabled = uiDisabled,
+                validationBlocked = blockedReason ~= nil,
+                blockedReason = blockedReason,
                 panel = panel
             },
         }, index)
@@ -820,6 +908,10 @@ function CreateMenu(title, banner, autoRefresh)
     ---@param index number|nil
     ---@return VUIItem
     menu.UnSearchableButton = function(title, subtitle, rightLabel, icon, disabled, callback, submenu, index)
+        local blockedReason
+        subtitle, rightLabel, blockedReason = ExplainBlockedValidation(title, subtitle, rightLabel, disabled)
+        local uiDisabled = disabled
+        if blockedReason then uiDisabled = false end
         return AddItem(menu.items, {
             type = "unsearchableButton",
             callback = callback,
@@ -829,7 +921,9 @@ function CreateMenu(title, banner, autoRefresh)
                 subtitle = subtitle,
                 rightLabel = rightLabel,
                 icon = icon,
-                disabled = disabled
+                disabled = uiDisabled,
+                validationBlocked = blockedReason ~= nil,
+                blockedReason = blockedReason
             },
         }, index)
     end

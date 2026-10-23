@@ -223,6 +223,17 @@ MiscB.Cb("gouvernement:setCitizenPhone", function(source, data)
     local phone = MiscB.Str(data.phone, 20)
     if not identifier or not phone then return false end
 
+    -- Le numéro doit aussi être celui du téléphone en jeu : sd-phone le vérifie (déjà pris, mal
+    -- formé), l'enregistre, et recopie lui-même le numéro dans `character_phones`.
+    if GetResourceState("sd-phone") == "started" then
+        local ok, applied, reason = pcall(function()
+            return exports["sd-phone"]:setPhoneNumberByIdentifier(identifier, phone)
+        end)
+        if ok and applied == true then return true end
+        -- 'unsupported' = téléphones uniques : l'annuaire reste libre. Tout autre refus est réel.
+        if ok and applied == false and reason ~= "unsupported" then return false end
+    end
+
     MiscB.Update([[
         INSERT INTO character_phones (identifier, phone) VALUES (?, ?)
         ON DUPLICATE KEY UPDATE phone = VALUES(phone)
@@ -482,7 +493,7 @@ MiscB.Cb("gouvernement:getTaxSettings", function(source, societyName)
 
     local row = MiscB.Single("SELECT rate, active FROM gouv_society_tax WHERE society = ? LIMIT 1", { name })
     if not row then return { rate = 0, active = false } end
-    return { rate = row.rate, active = row.active == 1 }
+    return { rate = row.rate, active = VFW.DB.IsSet(row.active) }
 end)
 
 MiscB.Cb("gouvernement:setSocietyTax", function(source, data)

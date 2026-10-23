@@ -27,6 +27,30 @@ end)
 local cig = false
 local cigmodel = "prop_cs_ciggy_01"
 local cig_net = nil
+--- Barre de progression pendant le geste d'un item (manger, boire, consommer).
+--- Le serveur a déjà retiré l'item et appliqué ses effets : la barre n'est pas annulable, elle montre
+--- seulement la durée du geste. Elle refuse de démarrer tant que l'inventaire est ouvert (et rend alors
+--- la main aussitôt) : on attend dans tous les cas le temps restant, pour que le geste dure toujours `ms`.
+---@param title string
+---@param ms number
+local function waitWithProgress(title, ms)
+    -- Les drogues sont utilisées depuis l'inventaire, encore ouvert à ce stade : on le ferme, sinon la barre
+    -- refuse de démarrer et affiche « Fermez votre inventaire ».
+    if VFW.IsInventoryOpen and VFW.IsInventoryOpen() and VFW.CloseInventory then
+        VFW.CloseInventory()
+        Wait(50)
+    end
+
+    local startedAt = GetGameTimer()
+
+    if VFW.Nui and VFW.Nui.ProgressBar then
+        pcall(VFW.Nui.ProgressBar, title, ms, false, false)
+    end
+
+    local remaining = ms - (GetGameTimer() - startedAt)
+    if remaining > 0 then Wait(remaining) end
+end
+
 local cigar = false
 local cigarmodel = "lux_prop_cigar_01_luxe"
 local cigar_net = nil
@@ -115,7 +139,7 @@ RegisterNetEvent("core:CokeEffect", function()
     }
 
     PlayAnimation(playerPed, animData)
-    Wait(6000)
+    waitWithProgress("Vous consommez...", 6000)
 
     StopAnimation(playerPed)
 
@@ -169,7 +193,7 @@ RegisterNetEvent("core:FentanylEffect", function()
 
 
     PlayAnimation(playerPed, animData)
-    Wait(6000)
+    waitWithProgress("Vous consommez...", 6000)
 
     StopAnimation(playerPed) -- ✅ Limpia props justo después de la animación
 
@@ -223,7 +247,7 @@ RegisterNetEvent("core:WeedEffect", function()
     }
 
     PlayAnimation(playerPed, animData)
-    Wait(35000)
+    waitWithProgress("Vous fumez...", 35000)
 
     StopAnimation(playerPed)
 
@@ -281,7 +305,7 @@ RegisterNetEvent("core:MethEffect", function()
     }
 
     PlayAnimation(playerPed, animData)
-    Wait(6000)
+    waitWithProgress("Vous consommez...", 6000)
 
     StopAnimation(playerPed)
 
@@ -605,7 +629,14 @@ RegisterNetEvent("core:UseConsumable", function(itemName, itemData)
         propPlacement = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
         duration = 8000
     else
-        return
+        -- Item marqué consommable sans faim ni soif renseignées : le serveur l'a
+        -- déjà retiré de l'inventaire, s'arrêter ici ne laisserait aucun geste.
+        animDict = "mp_player_inteat@burger"
+        animName = "mp_player_int_eat_burger"
+        propModel = itemData.prop or "prop_food_bs_burg3"
+        propBone = 28422
+        propPlacement = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
+        duration = 6000
     end
 
     local secondProp = itemData.secondProp
@@ -657,8 +688,21 @@ RegisterNetEvent("core:UseConsumable", function(itemName, itemData)
         end
     end)
 
+    -- « Vous buvez : Eau », « Vous mangez : Pain »... d'après la faim ou la soif que l'item restaure.
+    local hunger = tonumber(itemData.hunger) or 0
+    local thirst = tonumber(itemData.thirst) or 0
+    local verb = "Vous utilisez"
+    if thirst > 0 and thirst >= hunger then
+        verb = "Vous buvez"
+    elseif hunger > 0 then
+        verb = "Vous mangez"
+    end
+
+    local entry = VFW.Items and VFW.Items[itemName]
+    local label = entry and entry.label or itemName
+
     PlayAnimation(playerPed, animData)
-    Wait(duration)
+    waitWithProgress(("%s : %s"):format(verb, label), duration)
     StopAnimation(playerPed)
 
     consuming = false

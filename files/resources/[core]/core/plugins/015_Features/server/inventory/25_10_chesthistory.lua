@@ -20,6 +20,17 @@ local function canViewHistory(xPlayer, chestId)
         end
     end
 
+    -- « Grade min pour l'historique » du builder de coffres : un membre du groupe du coffre dont le
+    -- grade atteint ce seuil le consulte, même sans être patron. Sans seuil, seuls les patrons le font.
+    local builderId = type(chestId) == "string" and chestId:match("^chestbuilder:(%d+)$") or nil
+    if builderId and ChestBuilderServer and ChestBuilderServer.PlayerGrade then
+        local chest = ChestBuilderServer.Find(tonumber(builderId))
+        if chest and chest.accessName ~= "" and chest.gradeMinHistory then
+            local belongs, grade = ChestBuilderServer.PlayerGrade(xPlayer, chest.accessName)
+            if belongs and grade >= chest.gradeMinHistory then return true end
+        end
+    end
+
     return false
 end
 

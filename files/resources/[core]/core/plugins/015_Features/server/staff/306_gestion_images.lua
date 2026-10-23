@@ -23,7 +23,7 @@ local ITEM_CAT_LABELS = {
 local ready = false
 local settingsReady = false
 local PAUSE_STORE = "pause_menu"
-local PAUSE_TILES = { "personnage", "carte", "boutique", "reglages", "support" }
+local PAUSE_TILES = { "carte", "boutique", "reglages", "support" }
 VFW.GestionImages = VFW.GestionImages or {}
 VFW.GestionImages.Cache = VFW.GestionImages.Cache or {}
 
@@ -104,6 +104,8 @@ local function ensureTables()
     Staff29.Query("ALTER TABLE faction_hub MODIFY COLUMN `image` VARCHAR(1024) DEFAULT NULL", {})
     Staff29.Query("ALTER TABLE faction_hub MODIFY COLUMN `banner` VARCHAR(1024) DEFAULT NULL", {})
     Staff29.Query("ALTER TABLE banner_templates MODIFY COLUMN `url` VARCHAR(1024) NOT NULL", {})
+    -- Métiers d'intérim : la colonne faisait 255 caractères, trop court pour certains liens FiveManage.
+    pcall(Staff29.Query, "ALTER TABLE interim_jobs MODIFY COLUMN `image` VARCHAR(1024) DEFAULT NULL", {})
     ready = true
 end
 
@@ -308,6 +310,54 @@ local function listItems()
     return out
 end
 
+--- Libellé d'une catégorie de la boutique (« Véhicules », « Armes »...), d'après sa config.
+local function shopCategoryLabel(category)
+    local config = PaidShopConfig
+    if type(config) == "table" then
+        local entry = type(config.ConfigurableCategories) == "table" and config.ConfigurableCategories[category] or nil
+        if type(entry) == "table" and type(entry.label) == "string" then return entry.label end
+        local vip = config.VIPCategory
+        if type(vip) == "table" and vip.id == category and type(vip.label) == "string" then return vip.label end
+    end
+    return category
+end
+
+--- Les articles de la boutique avec leur image : tout ce que la table `paidshop_items` contient, activés ou non.
+--- Une base sans cette table donne une liste vide au lieu de casser tout le panneau.
+local function listShopItems()
+    local ok, rows = pcall(MySQL.query.await, "SELECT id, category, spawn_name, name, image, enabled FROM paidshop_items ORDER BY category ASC, id ASC")
+    if not ok or type(rows) ~= "table" then return {} end
+
+    local out = {}
+    for i = 1, #rows do
+        local row = rows[i]
+        local category = tostring(row.category or "")
+        local stored = type(row.image) == "string" and row.image or ""
+        local label = (type(row.name) == "string" and row.name ~= "") and row.name or tostring(row.spawn_name or row.id)
+        local url = resolveUrl(stored)
+        out[#out + 1] = {
+            id = row.id,
+            name = tostring(row.spawn_name or ""),
+            label = label,
+            category = category,
+            categoryLabel = shopCategoryLabel(category),
+            enabled = row.enabled == true or tonumber(row.enabled) == 1,
+            stored = stored,
+            image = url,
+            imageUrl = url,
+            url = url,
+        }
+    end
+
+    table.sort(out, function(a, b)
+        if a.categoryLabel == b.categoryLabel then
+            return tostring(a.label):lower() < tostring(b.label):lower()
+        end
+        return a.categoryLabel < b.categoryLabel
+    end)
+    return out
+end
+
 local function societyEntry(name, society)
     local image = (society and society.image) or ""
     local banner = (society and society.banner) or ""
@@ -346,6 +396,29 @@ local function listSocieties()
         end
     end
     table.sort(out, function(a, b) return tostring(a.label) < tostring(b.label) end)
+    return out
+end
+
+--- Les métiers d'intérim (centre d'emploi) : une image par métier, dans la colonne `image` de interim_jobs.
+local function listInterimJobs()
+    ensureTables()
+    local out = {}
+    local ok, rows = pcall(Staff29.Query, "SELECT id, label, image FROM interim_jobs ORDER BY sort_order ASC, id ASC", {})
+    if not ok or type(rows) ~= "table" then return out end
+    for i = 1, #rows do
+        local row = rows[i]
+        local stored = row.image or ""
+        local url = resolveUrl(stored)
+        out[#out + 1] = {
+            id = row.id,
+            name = row.id,
+            label = row.label or row.id,
+            storedImage = stored,
+            image = url,
+            imageUrl = url,
+            url = url,
+        }
+    end
     return out
 end
 
@@ -534,6 +607,8 @@ local function panel()
     local bannersMetier = listBanners("metier")
     local bannersFaction = listBanners("faction")
     local mugshots = listMugshots()
+    local shopItems = listShopItems()
+    local interimJobs = listInterimJobs()
     local withMug = 0
     for i = 1, #mugshots do
         if mugshots[i].imageUrl ~= "" then withMug = withMug + 1 end
@@ -548,6 +623,8 @@ local function panel()
         bannersMetier = bannersMetier,
         bannersFaction = bannersFaction,
         mugshots = mugshots,
+        shopItems = shopItems,
+        interimJobs = interimJobs,
         globalLogo = branding.globalLogo,
         globalBanner = branding.globalBanner,
         globalLogoUrl = branding.globalLogoUrl,
@@ -560,6 +637,8 @@ local function panel()
             bannersMetier = #bannersMetier,
             bannersFaction = #bannersFaction,
             mugshots = withMug,
+            shopItems = #shopItems,
+            interimJobs = #interimJobs,
         },
     }
 end
@@ -589,6 +668,36 @@ local function setItemImage(name, url)
     current.data = data
     VFW.Items[name] = current
     TriggerClientEvent("vfw:items:update", -1, name, current)
+    return true
+end
+
+--- Change l'image d'un article de la boutique (`url` vide : on la retire).
+local function setShopImage(id, url)
+    local shopId = math.floor(tonumber(id) or 0)
+    if shopId <= 0 then return false, "Article introuvable." end
+
+    local row = MySQL.single.await("SELECT id FROM paidshop_items WHERE id = ?", { shopId })
+    if not row then return false, "Article introuvable." end
+
+    -- La colonne fait 500 caractères : un lien plus long serait refusé par la base, autant le dire ici.
+    local stored = cleanStored(url, 1024)
+    if #stored > 500 then return false, "Lien trop long (500 caractères au plus)." end
+
+    MySQL.update.await("UPDATE paidshop_items SET image = ? WHERE id = ?", { stored, shopId })
+
+    -- La boutique garde son catalogue en mémoire : sans ça, l'ancienne image resterait jusqu'au redémarrage.
+    if PaidShop and PaidShop.InvalidateItems then PaidShop.InvalidateItems() end
+
+    return true
+end
+
+--- Change l'image d'un métier d'intérim (`url` vide : on la retire, le centre d'emploi affiche alors une icône).
+local function setInterimImage(id, url)
+    if type(id) ~= "string" or id == "" then return false, "Métier introuvable." end
+    local row = Staff29.Single("SELECT id FROM interim_jobs WHERE id = ?", { id })
+    if not row then return false, "Métier introuvable." end
+    local stored = cleanStored(url, 1024)
+    Staff29.Update("UPDATE interim_jobs SET image = ? WHERE id = ?", { stored, id })
     return true
 end
 
@@ -697,6 +806,10 @@ Staff29.Cb("gestionImages:save", function(source, data)
     local ok, err
     if action == "item" then
         ok, err = setItemImage(data.name, url)
+    elseif action == "shop" then
+        ok, err = setShopImage(data.id, url)
+    elseif action == "interim" then
+        ok, err = setInterimImage(data.id, url)
     elseif action == "society" then
         ok, err = setSocietyField(data.name, data.field or "image", url)
     elseif action == "faction" then

@@ -63,7 +63,7 @@ CreateThread(function()
     end
 
     local waited = 0
-    while GetResourceState("lb-phone") ~= "started" do
+    while not VFW.PhoneResource() do
         waited = waited + 1
         if waited > 60 then return end
         Wait(500)
@@ -75,7 +75,7 @@ end)
 
 -- Re-register when lb-phone restarts (ensure lb-phone)
 AddEventHandler("onResourceStart", function(resourceName)
-    if resourceName ~= "lb-phone" then return end
+    if not VFW.IsPhoneResource(resourceName) then return end
     Wait(2000)
     RegisterLifeInvaderApp()
 end)
@@ -274,7 +274,7 @@ end)
 
 -- Also cleanup if resource stops
 AddEventHandler("onResourceStop", function(resourceName)
-    if resourceName == "lb-phone" or resourceName == "pma-voice" or resourceName == GetCurrentResourceName() then
+    if VFW.IsPhoneResource(resourceName) or resourceName == "pma-voice" or resourceName == GetCurrentResourceName() then
         if isCapturing then
             isCapturing = false
             SendNUIMessage({ action = "lifeinvader:stopCapture" })

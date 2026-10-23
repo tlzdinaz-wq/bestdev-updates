@@ -1655,3 +1655,8 @@ end)
 function VFW.GetInfiniteItemNameFromSlot(slot)
     return infiniteItemsMap[tonumber(slot)]
 end
+
+-- sd-phone ouvre le téléphone depuis l'item : l'inventaire se ferme comme avec l'ancien téléphone.
+RegisterNetEvent("sd-phone:client:openFromItem", function()
+    VFW.CloseInventory()
+end)

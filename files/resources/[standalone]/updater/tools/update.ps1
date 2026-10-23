@@ -28,9 +28,9 @@ $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $updaterDir))
 $stateFile = Join-Path $updaterDir 'state.txt'
 $stateJson = Join-Path $updaterDir 'state.json'
 
-function Info($m)  { Write-Host "[update] $m" -ForegroundColor Cyan }
-function Warn($m)  { Write-Host "[update] $m" -ForegroundColor Yellow }
-function Fail($m)  { Write-Host "[update] $m" -ForegroundColor Red }
+function Info($m)  { Write-Host "[Aurora] $m" -ForegroundColor Cyan }
+function Warn($m)  { Write-Host "[Aurora] $m" -ForegroundColor Yellow }
+function Fail($m)  { Write-Host "[Aurora] $m" -ForegroundColor Red }
 
 # ── source ─────────────────────────────────────────────────────
 if (-not $Url) {

@@ -700,16 +700,20 @@ RegisterNetEvent("core:deleteMapCoord", function(id)
 end)
 
 -- ═══════════════════════════════════════════════════════════════
--- Gestion téléphone : cette base n'embarque pas de ressource téléphone
--- (lb-phone absent) ; la liste des numéros fonctionne (character_phones),
--- les actions sur le contenu répondent explicitement au staff.
+-- Gestion téléphone : le téléphone du serveur est sd-phone. La liste des numéros fonctionne
+-- (character_phones, recopié par sd-phone) ; la modération du contenu (purge d'une application,
+-- historique, certification) se fait dans le panneau d'administration de sd-phone (/phoneadmin),
+-- que ces actions ne dupliquent pas.
 -- ═══════════════════════════════════════════════════════════════
 
 local function PhoneUnavailable(source)
-    local state = GetResourceState("lb-phone")
+    if GetResourceState("sd-phone") == "started" then
+        Staff29.Notify(source, "INFO", "Gestion téléphone",
+            "Le contenu du téléphone se modère depuis le panneau sd-phone : tapez /phoneadmin.")
+        return
+    end
     Staff29.Notify(source, "ERROR", "Gestion téléphone",
-        state == "started" and "Intégration du contenu téléphone non configurée sur cette base."
-        or "Aucune ressource téléphone (lb-phone) installée : rien à supprimer.")
+        "Aucune ressource téléphone (sd-phone) démarrée : rien à modérer.")
 end
 
 RegisterNetEvent("vfw:staff:phone:wipeApp", function()

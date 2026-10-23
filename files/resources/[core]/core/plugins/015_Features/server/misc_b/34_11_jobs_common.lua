@@ -198,6 +198,28 @@ local function canClearVehicleKeys(source, xPlayer, plate, holders)
     return vehicleWithinReach(source, plate)
 end
 
+--- Retire toutes les clés temporaires d'une plaque (sans contrôle de droits : l'appelant les a déjà faits).
+--- Aussi appelée par /dv quand un véhicule est supprimé.
+---@return boolean removed
+local function clearTempKeys(normalized)
+    local holders = tempKeys[normalized]
+    if not holders then return false end
+
+    tempKeys[normalized] = nil
+    for src in pairs(holders) do
+        local target = tonumber(src)
+        if target and VFW.GetPlayerFromId(target) then
+            Player(target).state:set("tempVehicleKey:" .. normalized, nil, true)
+        end
+    end
+
+    TriggerClientEvent("vfw:vehicle:keyTemporarly:removed", -1, normalized)
+    TriggerEvent("vfw:vehicle:tempKeyRemoved", normalized)
+    return true
+end
+
+MiscB.ClearTempKeys = clearTempKeys
+
 RegisterNetEvent("vfw:vehicle:keyTemporarly:remove", function(keyType, plate)
     local source = source
     if type(plate) ~= "string" or #plate > 12 then return end
@@ -215,16 +237,7 @@ RegisterNetEvent("vfw:vehicle:keyTemporarly:remove", function(keyType, plate)
         return
     end
 
-    tempKeys[normalized] = nil
-    for src in pairs(holders) do
-        local target = tonumber(src)
-        if target and VFW.GetPlayerFromId(target) then
-            Player(target).state:set("tempVehicleKey:" .. normalized, nil, true)
-        end
-    end
-
-    TriggerClientEvent("vfw:vehicle:keyTemporarly:removed", -1, normalized)
-    TriggerEvent("vfw:vehicle:tempKeyRemoved", normalized)
+    clearTempKeys(normalized)
 end)
 
 RegisterNetEvent("core:deletesyncItem", function(netId)
@@ -525,9 +538,21 @@ RegisterNetEvent("core:jobs:server:addDouille", function(data)
     })
 end)
 
+-- Zones de circulation (limites de vitesse) : table `job_traffic_zones` (id, job, data JSON). Posées par la
+-- police (MDT, onglet circulation) ou par le staff (Gestion > Zones de circulation).
+--
+-- L'identifiant d'une zone est celui de la base, partout (`id` et `zoneId`). Avant, `zoneId` était le numéro
+-- de nœud de route du client qui l'avait créée : sans valeur pour les autres joueurs, de sorte que
+-- supprimer une zone visait une mauvaise ligne et ne la retirait pas de chez les autres.
 local trafficZones = {}
 local trafficLoaded = false
 local trafficLoading = false
+
+MiscB.Traffic = {}
+
+local TRAFFIC_MIN_RADIUS, TRAFFIC_MAX_RADIUS = 5.0, 1000.0
+local TRAFFIC_MIN_SPEED, TRAFFIC_MAX_SPEED = 5, 300
+local TRAFFIC_MAX_ZONES = 300
 
 local function loadTraffic()
     if trafficLoaded then return end
@@ -543,8 +568,9 @@ local function loadTraffic()
     local rows = MiscB.Query("SELECT id, job, data FROM job_traffic_zones", {})
     for i = 1, #rows do
         local zone = VFW.DB.Decode(rows[i].data, {})
-        if type(zone) == "table" then
+        if type(zone) == "table" and type(zone.zonePos) == "table" then
             zone.id = rows[i].id
+            zone.zoneId = rows[i].id
             zone.job = rows[i].job
             trafficZones[rows[i].id] = zone
         end
@@ -553,32 +579,131 @@ local function loadTraffic()
     trafficLoading = false
 end
 
-MiscB.Cb("core:jobs:traffic:get", function(source)
+--- Une zone reçue d'un client, remise au propre : position, rayon, limite et nom contrôlés.
+---@return table|nil zone, string|nil reason
+function MiscB.Traffic.Clean(zone)
+    if type(zone) ~= "table" then return nil, "Zone invalide." end
+
+    local pos = type(zone.zonePos) == "table" and zone.zonePos or {}
+    local x, y, z = tonumber(pos.x), tonumber(pos.y), tonumber(pos.z)
+    if not (x and y and z) then return nil, "Position invalide." end
+
+    local radius = tonumber(zone.zoneRadius)
+    if not radius or radius < TRAFFIC_MIN_RADIUS or radius > TRAFFIC_MAX_RADIUS then
+        return nil, "Rayon invalide (5 à 1000 m)."
+    end
+
+    local speed = tonumber(zone.zoneSpeed)
+    if not speed or speed < TRAFFIC_MIN_SPEED or speed > TRAFFIC_MAX_SPEED then
+        return nil, "Limite invalide (5 à 300 km/h)."
+    end
+
+    local name = tostring(zone.zoneName or ""):gsub("%c", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    if #name > 60 then name = name:sub(1, 60) end
+    if name == "" then name = "Zone" end
+
+    return {
+        zoneName = name,
+        zonePos = { x = x, y = y, z = z },
+        zoneRadius = radius,
+        zoneSpeed = speed,
+        zoneDuration = tonumber(zone.zoneDuration) or 30,
+    }
+end
+
+local function publishable(clean, id, job)
+    local zone = {}
+    for key, value in pairs(clean) do zone[key] = value end
+    zone.id = id
+    zone.zoneId = id
+    zone.job = job
+    return zone
+end
+
+function MiscB.Traffic.List()
     loadTraffic()
     local out = {}
     for _, zone in pairs(trafficZones) do
         out[#out + 1] = zone
     end
+    table.sort(out, function(a, b) return a.id < b.id end)
     return out
+end
+
+---@return table|nil zone, string|nil reason
+function MiscB.Traffic.Add(clean, job)
+    loadTraffic()
+
+    local count = 0
+    for _ in pairs(trafficZones) do count = count + 1 end
+    if count >= TRAFFIC_MAX_ZONES then return nil, "Trop de zones (300 au plus)." end
+
+    local id = MiscB.Insert("INSERT INTO job_traffic_zones (job, data) VALUES (?, ?)", { job or "", VFW.DB.Encode(clean) })
+    if not id then return nil, "Enregistrement impossible." end
+
+    local zone = publishable(clean, id, job or "")
+    trafficZones[id] = zone
+    TriggerClientEvent("core:jobs:traffic:addclient", -1, zone)
+    return zone
+end
+
+---@return table|nil zone, string|nil reason
+function MiscB.Traffic.Update(id, clean)
+    loadTraffic()
+    local current = trafficZones[id]
+    if not current then return nil, "Zone introuvable." end
+
+    -- Pas de test sur le nombre de lignes : MariaDB n'en compte aucune quand rien ne change.
+    MiscB.Update("UPDATE job_traffic_zones SET data = ? WHERE id = ?", { VFW.DB.Encode(clean), id })
+
+    local zone = publishable(clean, id, current.job)
+    trafficZones[id] = zone
+    TriggerClientEvent("core:jobs:traffic:removeclient", -1, id)
+    TriggerClientEvent("core:jobs:traffic:addclient", -1, zone)
+    return zone
+end
+
+function MiscB.Traffic.Remove(id)
+    loadTraffic()
+    local existed = trafficZones[id] ~= nil
+    trafficZones[id] = nil
+    MiscB.Update("DELETE FROM job_traffic_zones WHERE id = ?", { id })
+    TriggerClientEvent("core:jobs:traffic:removeclient", -1, id)
+    return existed
+end
+
+MiscB.Cb("core:jobs:traffic:get", function(source)
+    return MiscB.Traffic.List()
 end)
 
+-- Création depuis le MDT : rend la zone avec son identifiant en base.
+MiscB.Cb("core:jobs:traffic:create", function(source, zone)
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not xPlayer or not MiscB.IsLawEnforcement(xPlayer) then return nil end
+
+    local clean, reason = MiscB.Traffic.Clean(zone)
+    if not clean then
+        MiscB.Notify(source, reason)
+        return nil
+    end
+
+    local created, err = MiscB.Traffic.Add(clean, MiscB.JobName(xPlayer))
+    if not created then
+        MiscB.Notify(source, err)
+        return nil
+    end
+    return created
+end)
+
+-- Ancien chemin (événement), gardé avec les mêmes contrôles.
 RegisterNetEvent("core:jobs:traffic:add", function(zone)
     local source = source
-    if type(zone) ~= "table" then return end
-
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer or not MiscB.IsLawEnforcement(xPlayer) then return end
 
-    loadTraffic()
-    local id = MiscB.Insert("INSERT INTO job_traffic_zones (job, data) VALUES (?, ?)",
-        { MiscB.JobName(xPlayer) or "", VFW.DB.Encode(zone) })
-    if not id then return end
-
-    zone.id = id
-    zone.job = MiscB.JobName(xPlayer)
-    trafficZones[id] = zone
-
-    TriggerClientEvent("core:jobs:traffic:addclient", -1, zone)
+    local clean = MiscB.Traffic.Clean(zone)
+    if not clean then return end
+    MiscB.Traffic.Add(clean, MiscB.JobName(xPlayer))
 end)
 
 RegisterNetEvent("core:jobs:traffic:remove", function(zoneId)
@@ -589,10 +714,7 @@ RegisterNetEvent("core:jobs:traffic:remove", function(zoneId)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer or not MiscB.IsLawEnforcement(xPlayer) then return end
 
-    loadTraffic()
-    trafficZones[id] = nil
-    MiscB.Update("DELETE FROM job_traffic_zones WHERE id = ?", { id })
-    TriggerClientEvent("core:jobs:traffic:removeclient", -1, id)
+    MiscB.Traffic.Remove(id)
 end)
 
 AddEventHandler("vfw:playerLoaded", function(source)
@@ -780,11 +902,11 @@ local function loadArmories()
             pos = VFW.DB.Decode(row.pos, nil),
             npcPos = VFW.DB.Decode(row.npc_pos, nil),
             npcModel = row.npc_model,
-            blipEnabled = row.blip_enabled == 1,
+            blipEnabled = VFW.DB.IsSet(row.blip_enabled),
             blipSprite = row.blip_sprite,
             blipColor = row.blip_color,
             blipScale = row.blip_scale,
-            active = row.active == 1,
+            active = VFW.DB.IsSet(row.active),
             logsAllowedGrades = VFW.DB.Decode(row.logs_allowed_grades, {}),
         }
     end
@@ -811,11 +933,11 @@ local function loadEquipments()
             pos = VFW.DB.Decode(row.pos, nil),
             npcPos = VFW.DB.Decode(row.npc_pos, nil),
             npcModel = row.npc_model,
-            blipEnabled = row.blip_enabled == 1,
+            blipEnabled = VFW.DB.IsSet(row.blip_enabled),
             blipSprite = row.blip_sprite,
             blipColor = row.blip_color,
             blipScale = row.blip_scale,
-            active = row.active == 1,
+            active = VFW.DB.IsSet(row.active),
         }
     end
 end

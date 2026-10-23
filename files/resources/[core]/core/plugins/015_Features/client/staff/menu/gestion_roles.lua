@@ -11,6 +11,28 @@ local CAT_LABELS = {
     gestion = "Gestion",
 }
 
+-- Noms de permissions choisis dans Gestion : appliques a Config.Permissions, que tous les menus lisent.
+local originalLabels = {}
+
+local function ApplyLabels(map)
+    map = type(map) == "table" and map or {}
+
+    for key, def in pairs(Config.Permissions or {}) do
+        if type(def) == "table" then
+            local custom = map[key]
+            if type(custom) == "string" and custom ~= "" then
+                if originalLabels[key] == nil then originalLabels[key] = def.label or key end
+                def.label = custom
+            elseif originalLabels[key] ~= nil then
+                def.label = originalLabels[key]
+                originalLabels[key] = nil
+            end
+        end
+    end
+end
+
+RegisterNetEvent("core:permissions:labels", ApplyLabels)
+
 local function IsDev()
     local role = VFW.PlayerGlobalData and (VFW.PlayerGlobalData.role or VFW.PlayerGlobalData.roleId)
     return role == "niveau_6"
@@ -140,6 +162,7 @@ RegisterNuiCallback("gestion:roles:save", function(data, cb)
     end
     TriggerServerEvent("vfw:staff:saveRole", {{
         id = data.id,
+        name = data.name,
         power = tonumber(data.level) or 1,
         color = data.color,
         permissions = data.permissions or {},
@@ -150,6 +173,27 @@ RegisterNuiCallback("gestion:roles:save", function(data, cb)
         message = "Rôle enregistré.",
     })
     cb(Payload({ selectId = data.id }))
+end)
+
+RegisterNuiCallback("gestion:roles:renamePerm", function(data, cb)
+    if not Guard() then
+        cb({ ok = false, error = "Vous n'avez pas la permission requise." })
+        return
+    end
+    if type(data) ~= "table" or type(data.name) ~= "string" then
+        cb({ ok = false, error = "Permission invalide." })
+        return
+    end
+
+    local ok, result = TriggerServerCallback("vfw:staff:renamePermission", data.name, data.label)
+    if not ok then
+        cb({ ok = false, error = tostring(result or "Impossible de renommer cette permission.") })
+        return
+    end
+
+    -- Sans attendre l'evenement du serveur : le catalogue renvoye doit deja porter le nouveau nom.
+    ApplyLabels(result)
+    cb({ ok = true, catalog = BuildCatalog() })
 end)
 
 RegisterNuiCallback("gestion:roles:delete", function(data, cb)

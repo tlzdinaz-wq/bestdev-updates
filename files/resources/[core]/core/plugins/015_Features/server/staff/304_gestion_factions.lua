@@ -379,7 +379,7 @@ local function publicFaction(crew, hub, counts)
     local hasHub = hub.faction_name ~= nil
     local active = true
     if hasHub then
-        active = tonumber(hub.active) == 1
+        active = VFW.DB.IsSet(hub.active)
     end
     return {
         name = crew.name,

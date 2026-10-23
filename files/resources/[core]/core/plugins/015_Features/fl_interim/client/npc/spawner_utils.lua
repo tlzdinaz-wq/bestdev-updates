@@ -43,11 +43,45 @@ function SpawnNpcsInterimJobs(model, position, heading, interactLabel, onInterac
     table.insert(spawnedNpcs, {
         entity = npc,
         coords = position,
+        heading = heading,
         label  = interactLabel,
-        action = onInteract
+        action = onInteract,
+        grounded = false,
+        tries = 0,
     })
 
     return npc
+end
+
+-- Le PNJ apparaît à la hauteur enregistrée, qui est celle d'un joueur debout (hauteur de ceinture) : il flottait.
+-- On cherche le sol sous ce point (un rayon vers le bas, sur la carte seulement : ni objets ni véhicules) et on pose
+-- le PNJ dessus, ses pieds au sol d'après les dimensions de son modèle. Sans sol chargé, le rayon ne touche rien :
+-- on réessaie tant que le joueur est à portée.
+local MAX_TRIES <const> = 300
+local GROUND_RANGE <const> = 120.0
+
+local function groundNpc(npc)
+    npc.tries = npc.tries + 1
+    local entity = npc.entity
+    local c = npc.coords
+
+    RequestCollisionAtCoord(c.x, c.y, c.z)
+    local ray = StartExpensiveSynchronousShapeTestLosProbe(c.x, c.y, c.z + 1.5, c.x, c.y, c.z - 6.0, 1, entity, 4)
+    local _, hit, hitCoords = GetShapeTestResult(ray)
+    if hit ~= true and hit ~= 1 then return false end
+
+    local minimum = GetModelDimensions(GetEntityModel(entity))
+    local feet = (minimum and minimum.z) or -1.0
+    local rootZ = hitCoords.z - feet
+
+    FreezeEntityPosition(entity, false)
+    SetEntityCoordsNoOffset(entity, c.x, c.y, rootZ, false, false, false)
+    SetEntityHeading(entity, npc.heading)
+    FreezeEntityPosition(entity, true)
+
+    npc.coords = vector3(c.x, c.y, rootZ)
+    npc.grounded = true
+    return true
 end
 
 CreateThread(function()
@@ -64,6 +98,11 @@ CreateThread(function()
                 table.remove(spawnedNpcs, i)
             else
                 local dist = #(pCoords - npc.coords)
+                if not npc.grounded and npc.tries < MAX_TRIES and dist < GROUND_RANGE then
+                    groundNpc(npc)
+                    sleep = math.min(sleep, 100)
+                    dist = #(pCoords - npc.coords)
+                end
                 if dist < 2.0 then
                     sleep = 0
                     isNear = true

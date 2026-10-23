@@ -292,6 +292,8 @@ function VFW.Society.LoadSocieties()
     societies = out
     rebuildMinified()
     console.init("Society", ("%d sociétés chargées"):format(#rows))
+    -- Annonce aux autres ressources (le téléphone en fait son annuaire d'entreprises).
+    TriggerEvent("vfw:society:changed")
     return out
 end
 
@@ -383,6 +385,7 @@ function VFW.Society.Reload(name)
 
     societies[name] = normalize(row)
     rebuildMinified()
+    TriggerEvent("vfw:society:changed", name)
     return societies[name]
 end
 
@@ -390,6 +393,7 @@ function VFW.Society.Remove(name)
     societies[name] = nil
     doorbellsByJob[name] = nil
     rebuildMinified()
+    TriggerEvent("vfw:society:changed", name)
 end
 
 function VFW.Society.BuildPayload(name)
@@ -516,7 +520,10 @@ function VFW.Society.RefreshJobs()
     local ok, err = pcall(VFW.DB.LoadJobs)
     if not ok then
         console.error(("[Society] Rechargement des métiers impossible: %s"):format(tostring(err)))
+        return
     end
+    -- La liste des métiers a changé (création, grades) : le téléphone relit son annuaire.
+    TriggerEvent("vfw:society:changed")
 end
 
 MySQL.ready(function()

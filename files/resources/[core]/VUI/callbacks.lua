@@ -37,6 +37,10 @@ RegisterNUICallback('vui:menu:click', function(data, cb)
     end
 
     if not item then return end
+    if item.props and item.props.validationBlocked then
+        TriggerEvent("vui:validation:blocked", item.props.blockedReason or item.props.subtitle or "Complétez les champs obligatoires.")
+        return
+    end
     if item.type == "list2" then
         item.props.index = data.item.props.index + 1
         if item.onEnter then

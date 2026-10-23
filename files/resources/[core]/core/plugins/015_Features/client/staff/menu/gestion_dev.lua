@@ -374,6 +374,10 @@ end)
 
 OPEN.items = function()
     if not Has("gestion_items") then return Fail("Permission gestion_items requise.") end
+    if VFW.EnsureItemCatalog then
+        local ready, reason = VFW.EnsureItemCatalog(true)
+        if not ready then return Fail(reason or "Catalogue serveur indisponible. Verifiez la console serveur.") end
+    end
     local count = 0
     for _ in pairs(VFW.Items or {}) do count = count + 1 end
     return Ok({ types = ITEM_TYPES, count = count })
@@ -1241,6 +1245,123 @@ CALL.density = function(action, a)
     local cfg = TriggerServerCallback("vfw:density:set", values)
     if not cfg then return Fail("Enregistrement refusé.") end
     return Ok({ density = cfg })
+end
+
+-- ═══════════════════════════════════════════════════════════════
+-- Zones de circulation (limites de vitesse) — stockage : MiscB.Traffic (serveur)
+-- ═══════════════════════════════════════════════════════════════
+
+local function StreetAt(pos)
+    if type(pos) ~= "table" or not tonumber(pos.x) then return "" end
+    local street = GetStreetNameAtCoord(pos.x + 0.0, pos.y + 0.0, pos.z + 0.0)
+    return street and GetStreetNameFromHashKey(street) or ""
+end
+
+local function TrafficList()
+    local res = TriggerServerCallback("gestion:traffic:list")
+    if type(res) ~= "table" or res.ok ~= true then
+        return nil, type(res) == "table" and res.error or "Zones indisponibles."
+    end
+    for i = 1, #res.zones do
+        res.zones[i].street = StreetAt(res.zones[i].zonePos)
+    end
+    return res.zones
+end
+
+OPEN.traffic = function()
+    if not Has("server_management", "dev") then return Fail("Permission gestion serveur requise.") end
+    local zones, err = TrafficList()
+    if not zones then return Fail(err) end
+    return Ok({ zones = zones })
+end
+
+CALL.traffic = function(action, a)
+    a = a or {}
+    if action == "here" then
+        local pos = GetEntityCoords(PlayerPedId())
+        local point = { x = pos.x, y = pos.y, z = pos.z }
+        return Ok({ pos = point, street = StreetAt(point) })
+    elseif action == "teleport" then
+        local p = type(a.zonePos) == "table" and a.zonePos or {}
+        if not (tonumber(p.x) and tonumber(p.y) and tonumber(p.z)) then return Fail("Position invalide.") end
+        SetEntityCoords(PlayerPedId(), p.x + 0.0, p.y + 0.0, p.z + 0.0, false, false, false, false)
+        return Ok()
+    elseif action == "save" then
+        local res = TriggerServerCallback("gestion:traffic:save", {
+            id = a.id,
+            zoneName = Str(a.zoneName, 60),
+            zonePos = a.zonePos,
+            zoneRadius = tonumber(a.zoneRadius),
+            zoneSpeed = tonumber(a.zoneSpeed),
+        })
+        if type(res) ~= "table" or res.ok ~= true then return Fail(type(res) == "table" and res.error or "Enregistrement refusé.") end
+    elseif action == "delete" then
+        local res = TriggerServerCallback("gestion:traffic:delete", a.id)
+        if type(res) ~= "table" or res.ok ~= true then return Fail(type(res) == "table" and res.error or "Suppression refusée.") end
+    else
+        return Fail("Action inconnue.")
+    end
+
+    local zones, err = TrafficList()
+    if not zones then return Fail(err) end
+    return Ok({ zones = zones })
+end
+
+-- ═══════════════════════════════════════════════════════════════
+-- Intérim : métiers, points, réglages, centre d'emploi (serveur : fl_interim/server/277_admin_panel.lua)
+-- ═══════════════════════════════════════════════════════════════
+
+local function InterimCall(action, args)
+    local res = TriggerServerCallback("gestion:interim:do", action, args or {})
+    if type(res) ~= "table" or res.ok ~= true then
+        return Fail(type(res) == "table" and res.error or "Action refusée.")
+    end
+    return res
+end
+
+--- Cache le hub : le staff marche jusqu'à l'endroit voulu et valide avec E (Retour pour annuler).
+local function InterimPlaceOnWorld()
+    return StaffMenu.PlaceInWorld(nil, function()
+        local placed
+        while true do
+            Wait(0)
+            local ped = PlayerPedId()
+            local pos = GetEntityCoords(ped)
+            DrawMarker(1, pos.x, pos.y, pos.z - 0.98, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9, 0.9, 0.4, 114, 99, 238, 140, false, false, 2, false, nil, nil, false)
+            VFW.ShowHelpNotification("~INPUT_CONTEXT~ Placer le point ici~n~~INPUT_FRONTEND_RRIGHT~ Annuler")
+            if IsControlJustPressed(0, 38) then
+                placed = { x = pos.x, y = pos.y, z = pos.z, h = GetEntityHeading(ped) }
+                break
+            end
+            if IsControlJustPressed(0, 177) or IsDisabledControlJustPressed(0, 177) then break end
+        end
+        Wait(200)
+        return placed
+    end)
+end
+
+OPEN.interim = function()
+    if not Has("builder_interim_economy", "server_management", "dev") then return Fail("Permission requise.") end
+    return InterimCall("overview")
+end
+
+CALL.interim = function(action, a)
+    a = a or {}
+    if action == "here" then
+        local ped = PlayerPedId()
+        local pos = GetEntityCoords(ped)
+        return Ok({ pos = { x = pos.x, y = pos.y, z = pos.z, h = GetEntityHeading(ped) } })
+    elseif action == "place" then
+        local placed = InterimPlaceOnWorld()
+        if not placed then return Ok({ cancelled = true }) end
+        return Ok({ pos = placed })
+    elseif action == "teleport" then
+        local x, y, z = tonumber(a.x), tonumber(a.y), tonumber(a.z)
+        if not (x and y and z) then return Fail("Position invalide.") end
+        SetEntityCoords(PlayerPedId(), x + 0.0, y + 0.0, z + 0.0, false, false, false, false)
+        return Ok()
+    end
+    return InterimCall(action, a)
 end
 
 -- ═══════════════════════════════════════════════════════════════

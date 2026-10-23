@@ -1,5 +1,9 @@
 local Config = LTDDelivery.Config
 
+if not Config.EnableJobSystem then
+    return
+end
+
 local pickupBlip = nil
 local deliveryBlip = nil
 local boxBlip = nil

@@ -70,7 +70,7 @@ end)
 RegisterServerCallback("interim:routier:requestvehicle", function(source, coords, heading, options)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer then return false end
-    if not InterimServer.HasJob(xPlayer, JOB) then return false end
+    if not InterimServer.EnsureJob(source, xPlayer, JOB) then return false end
 
     local kind = type(options) == "table" and options.type or nil
     if kind ~= "truck" and kind ~= "trailer" then return false end

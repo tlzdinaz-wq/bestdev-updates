@@ -513,11 +513,26 @@ RegisterNetEvent("vfw:staff:saveRole", function(payload)
                     if canGrantPermission(ctx, xPlayer, key) then nextPerms[key] = true end
                 end
 
+                -- Renommer : n'importe quel role que l'acteur peut gerer. L'identifiant (niveau_6...) ne change
+                -- pas, seul le nom affiche. Un nom vide ou illisible laisse l'ancien en place.
+                local renamedFrom = nil
+                if type(entry.name) == "string" then
+                    local label = Staff29.Clean(entry.name, 32)
+                    label = label and label:gsub("^%s+", ""):gsub("%s+$", "")
+                    if label and label ~= "" and label ~= role.name then
+                        renamedFrom = role.name
+                        role.name = label
+                    end
+                end
+
                 role.level = level
                 role.color = hexColor(entry.color, role.color)
                 role.permissions = nextPerms
                 saved = saved + 1
-                changes[#changes + 1] = { id = entry.id, level = level, count = countSet(nextPerms) }
+                changes[#changes + 1] = {
+                    id = entry.id, level = level, count = countSet(nextPerms),
+                    name = renamedFrom and role.name or nil, renamedFrom = renamedFrom,
+                }
             else
                 refused = refused + 1
             end

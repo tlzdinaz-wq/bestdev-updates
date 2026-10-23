@@ -62,6 +62,24 @@ local function fcRefresh(Menu)
     end
 end
 
+--- Revient au menu parent sans terminer la chaîne VUI rendue dans le hub Gestion.
+---
+--- `menu.close()` vide toute la pile et quitte le mode hub. Rouvrir ensuite le parent
+--- affiche donc un second menu VUI derrière la tablette ; la fermeture de la tablette
+--- nettoie alors les deux interfaces. En mode hub, le gestionnaire Back effectue une
+--- transition interne et conserve le rendu dans la tablette.
+local function fcReturnToParent(currentMenu, parentMenu, delay)
+    if exports["VUI"]:IsHubMode() then
+        exports["VUI"]:HandleBack()
+        return
+    end
+
+    currentMenu.close()
+    SetTimeout(delay or 0, function()
+        parentMenu.open()
+    end)
+end
+
 local function fcLoadSocieties()
     CreateThread(function()
         societiesCache = TriggerServerCallback("core:get:societies") or {}
@@ -105,6 +123,40 @@ local function fcCoords(offsetZ)
     local pos = GetEntityCoords(PlayerPedId())
     local h = GetEntityHeading(PlayerPedId())
     return { x = pos.x, y = pos.y, z = pos.z - (offsetZ or 0.0), h = h }
+end
+
+--- Ouvre un vrai mode de placement : la tablette est masquée, le joueur peut
+--- se déplacer puis confirmer sa position avec E. Le callback de menu rend la
+--- main immédiatement grâce au thread, ce qui évite les yields inter-ressources.
+local function fcPlacePoint(Menu, offsetZ, label, onPlaced)
+    CreateThread(function()
+        local point = StaffMenu.PlaceInWorld(Menu, function()
+            Wait(250)
+            while true do
+                Wait(0)
+                local ped = PlayerPedId()
+                local pos = GetEntityCoords(ped)
+                DrawMarker(28, pos.x, pos.y, pos.z + 0.15, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.32, 0.32, 0.32, 32, 211, 154, 210, false, true, 2, false, nil, nil, false)
+                VFW.ShowHelpNotification("~INPUT_CONTEXT~ Confirmer le point | ~INPUT_CELLPHONE_CANCEL~ Annuler")
+
+                if (VFW.Interact and VFW.Interact.JustPressed(0, 38)) or IsControlJustPressed(0, 38) then
+                    return fcCoords(offsetZ)
+                end
+                if IsControlJustPressed(0, 177) or IsDisabledControlJustPressed(0, 177) then
+                    return nil
+                end
+            end
+        end)
+
+        if not point then
+            VFW.ShowNotification({ type = 'STAFF', variant = 'INFO', subtitle = 'Concessionnaires', message = "Placement annulé." })
+            return
+        end
+
+        onPlaced(point)
+        VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = label })
+        fcRefresh(Menu)
+    end)
 end
 
 --- Ancien clavier NUI : le hub se masque le temps de la saisie (cover/uncover).
@@ -220,9 +272,9 @@ ConcessCreate.OnOpen(function()
     ConcessCreate.Separator(":pin: POINTS CATALOGUE")
 
     ConcessCreate.Button(":plus: Ajouter point catalogue", fcPointLabel(#tNewConcess.catalog), nil, "chevron", false, function()
-        tNewConcess.catalog[#tNewConcess.catalog + 1] = fcCoords(0.99)
-        VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Point catalogue : " .. #tNewConcess.catalog })
-        fcRefresh(ConcessCreate)
+        fcPlacePoint(ConcessCreate, 0.99, "Point catalogue ajouté.", function(point)
+            tNewConcess.catalog[#tNewConcess.catalog + 1] = point
+        end)
     end)
 
     for i, point in ipairs(tNewConcess.catalog) do
@@ -235,9 +287,9 @@ ConcessCreate.OnOpen(function()
     ConcessCreate.Separator(":eye: POINTS PREVIEW")
 
     ConcessCreate.Button(":plus: Ajouter point preview", fcPointLabel(#tNewConcess.preview), nil, "chevron", false, function()
-        tNewConcess.preview[#tNewConcess.preview + 1] = fcCoords(0.99)
-        VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Point preview : " .. #tNewConcess.preview })
-        fcRefresh(ConcessCreate)
+        fcPlacePoint(ConcessCreate, 0.99, "Point preview ajouté.", function(point)
+            tNewConcess.preview[#tNewConcess.preview + 1] = point
+        end)
     end)
 
     for i, point in ipairs(tNewConcess.preview) do
@@ -250,9 +302,9 @@ ConcessCreate.OnOpen(function()
     ConcessCreate.Separator(":car: POINTS SPAWN")
 
     ConcessCreate.Button(":plus: Ajouter point spawn", fcPointLabel(#tNewConcess.spawn), nil, "chevron", false, function()
-        tNewConcess.spawn[#tNewConcess.spawn + 1] = fcCoords(0)
-        VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Point spawn : " .. #tNewConcess.spawn })
-        fcRefresh(ConcessCreate)
+        fcPlacePoint(ConcessCreate, 0, "Point spawn ajouté.", function(point)
+            tNewConcess.spawn[#tNewConcess.spawn + 1] = point
+        end)
     end)
 
     for i, point in ipairs(tNewConcess.spawn) do
@@ -266,11 +318,10 @@ ConcessCreate.OnOpen(function()
 
     ConcessCreate.Button(":plus: Ajouter point showcase", fcPointLabel(#tNewConcess.showcase), nil, "chevron", false, function()
         fcAskText("Modèle du véhicule (ex: adder)", "", function(sModel)
-            local p = fcCoords(0.99)
-            p.model = sModel:lower()
-            tNewConcess.showcase[#tNewConcess.showcase + 1] = p
-            VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Showcase : " .. sModel })
-            fcRefresh(ConcessCreate)
+            fcPlacePoint(ConcessCreate, 0.99, "Showcase " .. sModel .. " ajouté.", function(point)
+                point.model = sModel:lower()
+                tNewConcess.showcase[#tNewConcess.showcase + 1] = point
+            end)
         end)
     end)
 
@@ -283,19 +334,22 @@ ConcessCreate.OnOpen(function()
 
     ConcessCreate.Separator(":wrench: ACTIONS")
 
-    local bJobOk = tNewConcess.automatic or tNewConcess.job ~= ""
-    local bCanCreate = tNewConcess.name ~= "" and bJobOk and #tNewConcess.catalog > 0
-    local sStatus = bCanCreate and "Prêt à créer" or (tNewConcess.automatic and "Nom et 1 point catalogue requis" or "Nom, Job et 1 point catalogue requis")
+    local tMissing = {}
+    if tNewConcess.name == "" then tMissing[#tMissing + 1] = "nom" end
+    if not tNewConcess.automatic and tNewConcess.job == "" then tMissing[#tMissing + 1] = "job" end
+    if #tNewConcess.catalog == 0 then tMissing[#tMissing + 1] = "point catalogue" end
+    local bCanCreate = #tMissing == 0
+    local sStatus = bCanCreate and "Prêt à créer" or ("Manque : " .. table.concat(tMissing, ", "))
 
-    ConcessCreate.Button(":check: CRÉER LE CONCESSIONNAIRE", sStatus, nil, bCanCreate and "check" or "lock", not bCanCreate, function()
-        if not bCanCreate then return end
+    ConcessCreate.Button(":check: CRÉER LE CONCESSIONNAIRE", sStatus, nil, bCanCreate and "check" or "lock", false, function()
+        if not bCanCreate then
+            VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Concessionnaires', message = "Création impossible. Il manque : " .. table.concat(tMissing, ", ") .. "." })
+            return
+        end
         TriggerServerEvent("core:concess:create", tNewConcess)
         VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Concessionnaire '" .. tNewConcess.name .. "' créé." })
         fcResetNewConcess()
-        ConcessCreate.close()
-        SetTimeout(300, function()
-            StaffMenu.builderConcess.open()
-        end)
+        fcReturnToParent(ConcessCreate, StaffMenu.builderConcess, 300)
     end)
 end)
 
@@ -365,9 +419,9 @@ ConcessEdit.OnOpen(function()
     ConcessEdit.Separator(":pin: POINTS CATALOGUE")
 
     ConcessEdit.Button(":plus: Ajouter point catalogue", fcPointLabel(#tSelectedConcess.catalog), nil, "chevron", false, function()
-        tSelectedConcess.catalog[#tSelectedConcess.catalog + 1] = fcCoords(0.99)
-        VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Point catalogue : " .. #tSelectedConcess.catalog })
-        fcRefresh(ConcessEdit)
+        fcPlacePoint(ConcessEdit, 0.99, "Point catalogue ajouté.", function(point)
+            tSelectedConcess.catalog[#tSelectedConcess.catalog + 1] = point
+        end)
     end)
 
     for i, point in ipairs(tSelectedConcess.catalog) do
@@ -380,9 +434,9 @@ ConcessEdit.OnOpen(function()
     ConcessEdit.Separator(":eye: POINTS PREVIEW")
 
     ConcessEdit.Button(":plus: Ajouter point preview", fcPointLabel(#tSelectedConcess.preview), nil, "chevron", false, function()
-        tSelectedConcess.preview[#tSelectedConcess.preview + 1] = fcCoords(0.99)
-        VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Point preview : " .. #tSelectedConcess.preview })
-        fcRefresh(ConcessEdit)
+        fcPlacePoint(ConcessEdit, 0.99, "Point preview ajouté.", function(point)
+            tSelectedConcess.preview[#tSelectedConcess.preview + 1] = point
+        end)
     end)
 
     for i, point in ipairs(tSelectedConcess.preview) do
@@ -395,9 +449,9 @@ ConcessEdit.OnOpen(function()
     ConcessEdit.Separator(":car: POINTS SPAWN")
 
     ConcessEdit.Button(":plus: Ajouter point spawn", fcPointLabel(#tSelectedConcess.spawn), nil, "chevron", false, function()
-        tSelectedConcess.spawn[#tSelectedConcess.spawn + 1] = fcCoords(0)
-        VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Point spawn : " .. #tSelectedConcess.spawn })
-        fcRefresh(ConcessEdit)
+        fcPlacePoint(ConcessEdit, 0, "Point spawn ajouté.", function(point)
+            tSelectedConcess.spawn[#tSelectedConcess.spawn + 1] = point
+        end)
     end)
 
     for i, point in ipairs(tSelectedConcess.spawn) do
@@ -411,11 +465,10 @@ ConcessEdit.OnOpen(function()
 
     ConcessEdit.Button(":plus: Ajouter point showcase", fcPointLabel(#tSelectedConcess.showcase), nil, "chevron", false, function()
         fcAskText("Modèle du véhicule (ex: adder)", "", function(sModel)
-            local p = fcCoords(0.99)
-            p.model = sModel:lower()
-            tSelectedConcess.showcase[#tSelectedConcess.showcase + 1] = p
-            VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Showcase : " .. sModel })
-            fcRefresh(ConcessEdit)
+            fcPlacePoint(ConcessEdit, 0.99, "Showcase " .. sModel .. " ajouté.", function(point)
+                point.model = sModel:lower()
+                tSelectedConcess.showcase[#tSelectedConcess.showcase + 1] = point
+            end)
         end)
     end)
 
@@ -431,10 +484,7 @@ ConcessEdit.OnOpen(function()
     ConcessEdit.Button(":save: SAUVEGARDER", "Enregistrer les modifications", nil, "check", false, function()
         TriggerServerEvent("core:concess:update", tSelectedConcess.id, tSelectedConcess)
         VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Concessionnaire modifié." })
-        ConcessEdit.close()
-        SetTimeout(300, function()
-            ConcessManage.open()
-        end)
+        fcReturnToParent(ConcessEdit, ConcessManage, 300)
     end)
 
     ConcessEdit.Button(":trash: SUPPRIMER", "Supprimer ce concessionnaire", nil, "trash", false, function()
@@ -442,10 +492,7 @@ ConcessEdit.OnOpen(function()
             if confirmResult:upper() == "CONFIRMER" then
                 TriggerServerEvent("core:concess:delete", tSelectedConcess.id)
                 VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Concessionnaire supprimé." })
-                ConcessEdit.close()
-                SetTimeout(300, function()
-                    ConcessManage.open()
-                end)
+                fcReturnToParent(ConcessEdit, ConcessManage, 300)
             end
         end)
     end)
@@ -551,8 +598,11 @@ ConcessCategoryCreate.OnOpen(function()
     end)
 
     local bCanCreate = tNewCategory ~= ""
-    ConcessCategoryCreate.Button(":check: CRÉER", bCanCreate and ("Prêt à créer : " .. concessTypeLabels[tNewCategoryType]) or "Nom requis", nil, bCanCreate and "check" or "lock", not bCanCreate, function()
-        if not bCanCreate then return end
+    ConcessCategoryCreate.Button(":check: CRÉER", bCanCreate and ("Prêt à créer : " .. concessTypeLabels[tNewCategoryType]) or "Manque : nom", nil, bCanCreate and "check" or "lock", false, function()
+        if not bCanCreate then
+            VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Concessionnaires', message = "Création impossible. Il manque : nom." })
+            return
+        end
         TriggerServerEvent("core:concess:createCategory", tNewCategory, tNewCategoryType)
         VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Catégorie '" .. tNewCategory .. "' créée (" .. concessTypeLabels[tNewCategoryType] .. ")." })
         tNewCategory = ""
@@ -560,8 +610,7 @@ ConcessCategoryCreate.OnOpen(function()
         categoriesCache = nil
         categoriesWithTypeCache = nil
         fcLoadCategories()
-        ConcessCategoryCreate.close()
-        SetTimeout(200, function() ConcessCategories.open() end)
+        fcReturnToParent(ConcessCategoryCreate, ConcessCategories, 200)
     end)
 end)
 
@@ -628,8 +677,7 @@ ConcessVehicleEditor.OnOpen(function()
     ConcessVehicleEditor.Button(":save: SAUVEGARDER", "", nil, "check", false, function()
         TriggerServerEvent("core:concess:updateVehicle", tSelectedVehicle.model, tSelectedVehicle.name, tSelectedVehicle.price, tSelectedVehicle.category)
         VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Véhicule modifié." })
-        ConcessVehicleEditor.close()
-        SetTimeout(300, function() ConcessVehiclesByCategory.open() end)
+        fcReturnToParent(ConcessVehicleEditor, ConcessVehiclesByCategory, 300)
     end)
 
     ConcessVehicleEditor.Button(":trash: SUPPRIMER", "", nil, "trash", false, function()
@@ -637,8 +685,7 @@ ConcessVehicleEditor.OnOpen(function()
             if confirmResult:upper() == "CONFIRMER" then
                 TriggerServerEvent("core:concess:deleteVehicle", tSelectedVehicle.model)
                 VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Véhicule supprimé." })
-                ConcessVehicleEditor.close()
-                SetTimeout(300, function() ConcessVehiclesByCategory.open() end)
+                fcReturnToParent(ConcessVehicleEditor, ConcessVehiclesByCategory, 300)
             end
         end)
     end)
@@ -693,10 +740,19 @@ ConcessVehicleAdd.OnOpen(function()
         end)
     end)
 
-    local bCanCreate = tNewVehicle.sModel ~= "" and tNewVehicle.sName ~= "" and tNewVehicle.sCategory ~= ""
+    local tMissing = {}
+    if tNewVehicle.sModel == "" then tMissing[#tMissing + 1] = "modèle" end
+    if tNewVehicle.sName == "" then tMissing[#tMissing + 1] = "nom" end
+    if tNewVehicle.sCategory == "" then tMissing[#tMissing + 1] = "catégorie" end
+    local bCanCreate = #tMissing == 0
+    local sCreateStatus = vehicleSavePending and "Enregistrement…" or (bCanCreate and "Prêt" or ("Manque : " .. table.concat(tMissing, ", ")))
 
-    ConcessVehicleAdd.Button(":check: CRÉER", vehicleSavePending and "Enregistrement…" or (bCanCreate and "Prêt" or "Model, Nom et Catégorie requis"), nil, bCanCreate and "check" or "lock", not bCanCreate or vehicleSavePending, function()
-        if not bCanCreate or vehicleSavePending then return end
+    ConcessVehicleAdd.Button(":check: CRÉER", sCreateStatus, nil, bCanCreate and "check" or "lock", vehicleSavePending, function()
+        if vehicleSavePending then return end
+        if not bCanCreate then
+            VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Concessionnaires', message = "Création impossible. Il manque : " .. table.concat(tMissing, ", ") .. "." })
+            return
+        end
         vehicleSavePending = true
         local model, name, category, price = tNewVehicle.sModel, tNewVehicle.sName, tNewVehicle.sCategory, tNewVehicle.iPrice
         CreateThread(function()
@@ -709,8 +765,7 @@ ConcessVehicleAdd.OnOpen(function()
             end
             VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires', message = "Véhicule ajouté au catalogue." })
             tNewVehicle = { sModel = "", sName = "", sCategory = category, iPrice = 0 }
-            ConcessVehicleAdd.close()
-            ConcessVehicles.open()
+            fcReturnToParent(ConcessVehicleAdd, ConcessVehicles)
         end)
     end)
 end)

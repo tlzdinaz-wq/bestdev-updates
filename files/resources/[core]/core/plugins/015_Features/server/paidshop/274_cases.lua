@@ -141,10 +141,10 @@ RegisterServerCallback("paidshop:getDisplayedCases", function(source)
             itemName = row.item_name,
             category = row.category,
             price = row.price,
-            revealed = row.revealed == 1,
+            revealed = VFW.DB.IsSet(row.revealed),
         }
         cases[#cases + 1] = entry
-        if row.revealed == 1 then
+        if VFW.DB.IsSet(row.revealed) then
             reveals[#reveals + 1] = entry
         end
     end
@@ -164,7 +164,7 @@ RegisterServerCallback("paidshop:scanCase", function(source, caseId)
     local row = MySQL.single.await("SELECT * FROM paidshop_cases WHERE `case_id` = ? AND `sold` = 0", { tostring(caseId) })
     if not row then return { success = false, error = "Caisse introuvable" } end
 
-    if row.revealed ~= 1 then
+    if not VFW.DB.IsSet(row.revealed) then
         MySQL.update.await("UPDATE paidshop_cases SET `revealed` = 1, `revealed_by` = ? WHERE `id` = ?", {
             xPlayer.identifier, row.id,
         })

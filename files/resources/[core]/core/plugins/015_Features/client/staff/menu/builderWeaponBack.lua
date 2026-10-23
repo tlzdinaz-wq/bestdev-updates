@@ -103,8 +103,15 @@ local function BuildWeaponBackMenu()
 
     Separator("ACTIONS RAPIDES")
 
+    local shownNames = {}
+    for _, cat in ipairs(categoryOrder) do
+        for _, w in ipairs(categorized[cat]) do
+            shownNames[#shownNames + 1] = w.name
+        end
+    end
+
     Button("Tout activer", totalAllowed .. (totalAllowed > 1 and " armes autorisées" or " arme autorisée"), nil, "check", false, function()
-        local success = TriggerServerCallback("vfw:weaponBack:setAll", true)
+        local success = TriggerServerCallback("vfw:weaponBack:setAll", true, shownNames)
         if success then
             VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Armes dans le dos', message = "Toutes les armes activées." })
             Wait(200)

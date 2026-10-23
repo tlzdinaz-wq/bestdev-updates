@@ -491,7 +491,11 @@ end)
 RegisterNetEvent("core:getPlayerMoneyData", function()
     local source = source
     local xPlayer = player(source)
-    if not xPlayer then return end
+    if not xPlayer then
+        -- Le client attend deux secondes cette reponse : autant la lui donner.
+        TriggerClientEvent("core:moneyDataResponse", source, 0, 0)
+        return
+    end
     local societyMoney = 0
     if xPlayer.job and xPlayer.job.name and Feat27 and Feat27.Society and Feat27.Society.GetAddonNumber then
         societyMoney = Feat27.Society.GetAddonNumber(xPlayer.job.name, "money", 0) or 0
@@ -499,10 +503,19 @@ RegisterNetEvent("core:getPlayerMoneyData", function()
     TriggerClientEvent("core:moneyDataResponse", source, xPlayer.getMoney and xPlayer.getMoney() or 0, societyMoney)
 end)
 
+-- Le client ouvre son menu puis attend cette reponse pour l afficher. Un retour sans
+-- reponse le laissait en attente pour toujours : son drapeau « menu ouvert » restait
+-- leve, et toutes les tentatives suivantes etaient ignorees d'entree. Le joueur
+-- cliquait sur « passer une commande » et il ne se passait plus jamais rien.
+--
+-- Chaque chemin repond donc, meme pour refuser.
 RegisterNetEvent("core:requestShopData", function()
     local source = source
     local xPlayer = player(source)
-    if not xPlayer or not xPlayer.job then return end
+    if not xPlayer or not xPlayer.job then
+        TriggerClientEvent("core:sendShopData", source, nil, "Vos informations de métier sont indisponibles.")
+        return
+    end
     local market = getMarket(xPlayer.job.name)
     if not market or market.enabled ~= true then
         TriggerClientEvent("core:sendShopData", source, nil, "Votre entreprise n'a pas accès au Market.")

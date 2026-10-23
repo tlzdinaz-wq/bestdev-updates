@@ -394,6 +394,24 @@ function OpenShopMenu()
 
     -- Request shop data from server (server will trigger back the sendShopData event)
     TriggerServerEvent(RES .. ":requestShopData")
+
+    -- Si la reponse n'arrive pas, `showMenu` resterait leve et le magasin ne se
+    -- rouvrirait plus jamais : OpenShopMenu renonce d'entree quand il est leve. On
+    -- le rabaisse apres un delai, pour que le joueur puisse au moins reessayer.
+    local attempt = showMenu and GetGameTimer() or 0
+    _spacemarket_openAttempt = attempt
+
+    CreateThread(function()
+        Wait(8000)
+        if showMenu and not _spacemarket_shopDisplayed and _spacemarket_openAttempt == attempt then
+            showMenu = false
+            VFW.Nui.Focus(false)
+            VFW.ShowNotification({
+                type = "ROUGE",
+                content = "Le marché n'a pas répondu. Réessayez dans un instant.",
+            })
+        end
+    end)
 end
 
 -- Fonction pour fermer l'interaction
@@ -425,6 +443,7 @@ end
 -- Fonction pour fermer le menu
 function CloseShopMenu()
     showMenu = false
+    _spacemarket_shopDisplayed = false
     VFW.Nui.Focus(false)
     _spacemarket_playerMoney = nil
     _spacemarket_playerBank = nil
@@ -442,6 +461,7 @@ end)
 -- Callback NUI pour fermer le menu
 RegisterNUICallback('closeShop', function(data, cb)
     showMenu = false
+    _spacemarket_shopDisplayed = false
     VFW.Nui.Focus(false)
     cb('ok')
 end)
@@ -536,6 +556,7 @@ end)
 RegisterNetEvent(RES .. ":sendShopData")
 AddEventHandler(RES .. ":sendShopData", function(shopData, errorMsg)
     if not showMenu then return end
+    _spacemarket_shopDisplayed = true
     local pm = _spacemarket_playerMoney or 0
     local pb = _spacemarket_playerBank or 0
     _spacemarket_playerMoney = nil

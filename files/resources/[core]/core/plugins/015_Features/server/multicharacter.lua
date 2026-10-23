@@ -39,6 +39,13 @@ local function buildSelectionEntry(row)
         end
     end
 
+    -- La photo (mugshot) s affiche dans la case du slot : un chemin relatif du CDN devient un lien complet.
+    local mugshot = row.mugshot
+    if type(mugshot) == "string" and mugshot ~= "" and not mugshot:match("^https?://") and not mugshot:match("^data:") and VFW.CdnUrl then
+        local ok, url = pcall(VFW.CdnUrl, mugshot)
+        if ok and type(url) == "string" and url ~= "" then mugshot = url end
+    end
+
     return {
         id = row.id,
         charId = row.id,
@@ -46,7 +53,7 @@ local function buildSelectionEntry(row)
         info = row.address ~= "" and row.address or nil,
         firstname = row.firstname,
         lastname = row.lastname,
-        mugshot = row.mugshot,
+        mugshot = mugshot,
         jobLabel = job.label,
         factionLabel = faction and faction.label or "",
         cash = cash,

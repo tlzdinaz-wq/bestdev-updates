@@ -2,6 +2,10 @@
 --- Renders public catalog interaction points for societies of type "ltd"
 --- and opens a VUI menu listing items and their resell prices.
 
+if not LTDDelivery.Config.EnableSocietyCatalog then
+    return
+end
+
 local VUI = exports["VUI"]
 local catalogBanner = VFW.CDN.Get("banners/catalogue_ltd.png")
 

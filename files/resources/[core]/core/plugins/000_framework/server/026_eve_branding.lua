@@ -199,6 +199,34 @@ local function encodeOverridesJson(data)
     return table.concat(lines, "\n") .. "\n"
 end
 
+local VARIABLE <const> = "branding_overrides"
+
+--- La charte est doublee en base de donnees.
+---
+--- Elle ne vivait que dans ce fichier, a l interieur de la ressource. Un client qui
+--- remplace le dossier `core` en entier pour se mettre a jour — ce que nos propres
+--- consignes d installation demandaient — effaçait du meme coup le nom du serveur,
+--- son logo, sa banniere, son ecran de chargement et ses couleurs. Tout revenait aux
+--- valeurs par defaut, sans moyen de revenir en arriere.
+---
+--- Le fichier reste la source lue a chaud ; la base n'en est que la copie de secours,
+--- relue quand le fichier a disparu.
+---@param data table
+local function mirrorToDatabase(data)
+    if not VFW.Variables or not VFW.Variables.SetVariable then return end
+    pcall(VFW.Variables.SetVariable, VARIABLE, data)
+end
+
+---@return table|nil charte, boolean consultee
+local function readFromDatabase()
+    if not VFW.Variables or not VFW.Variables.GetVariable then return nil, false end
+
+    local ok, stored = pcall(VFW.Variables.GetVariable, VARIABLE)
+    if not ok then return nil, false end
+    if type(stored) ~= "table" or not next(stored) then return nil, true end
+    return stored, true
+end
+
 local function writeOverridesFile(data)
     local body = encodeOverridesJson(data)
     local resource = GetCurrentResourceName()
@@ -213,6 +241,7 @@ local function writeOverridesFile(data)
         return false
     end
     jsonCache = data
+    mirrorToDatabase(data)
     return true
 end
 
@@ -226,6 +255,20 @@ local function loadOverridesFile()
             return jsonCache
         end
     end
+    -- Fichier absent ou illisible : la copie en base prend le relais, et on la
+    -- rend au fichier pour que le prochain demarrage n ait plus a la chercher.
+    local stored, consulted = readFromDatabase()
+    if stored then
+        jsonCache = stored
+        console.warn("[Branding] " .. JSON_FILE .. " manquant : charte restauree depuis la base.")
+        pcall(writeOverridesFile, stored)
+        return jsonCache
+    end
+
+    -- Base pas encore joignable : ne rien retenir, sinon ce vide ferait office de
+    -- charte pour toute la duree du serveur et la copie ne serait jamais relue.
+    if not consulted then return {} end
+
     jsonCache = {}
     return jsonCache
 end

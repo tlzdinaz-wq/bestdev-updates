@@ -374,7 +374,7 @@
     <link rel="modulepreload" crossorigin href="./assets/vendor-lucide-DRdRLwNR.js">
     <link rel="modulepreload" crossorigin href="./assets/vendor-charts-CIjIfHho.js">
     <link rel="modulepreload" crossorigin href="./assets/vendor-dnd-BcC72jcB.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-yMOrF4qJ.css?v=8">
+    <link rel="stylesheet" crossorigin href="./assets/index-yMOrF4qJ.css?v=10">
     <link rel="stylesheet" href="./tablet3d/tablet3d.css?v=3">
     <link rel="stylesheet" href="./skin/boss-panel.css?v=2">
     <style>
@@ -463,8 +463,9 @@
     <link rel="stylesheet" href="./skin/char-creator.css?v=4">
     <link rel="stylesheet" href="./skin/clothing-shop.css?v=2">
     <link rel="stylesheet" href="./skin/salon.css?v=1">
-    <link rel="stylesheet" href="./skin/inventory.css?v=5">
+    <link rel="stylesheet" href="./skin/inventory.css?v=6">
     <link rel="stylesheet" href="./skin/nui-fallbacks.css?v=22">
+    <link rel="stylesheet" href="./skin/deathscreen-report.css?v=1">
   </head>
   <body style="background: transparent !important;">
     <div id="root" style="background: transparent !important;"></div>
@@ -1104,7 +1105,7 @@
     </script>
     <script>
       (function () {
-        var GESTION_ACTIONS = ['gestion:open', 'gestion:close', 'gestion:cover', 'gestion:uncover', 'gestion:minimize', 'gestion:restore', 'gestion:vui', 'gestion:textInput', 'gestion:policeAlerts:sync', 'gestion:images:sync', 'gestion:images:capture', 'gestion:images:progress', 'gestion:images:generateDone', 'gestion:notifs:sync', 'core:branding:apply'];
+        var GESTION_ACTIONS = ['gestion:open', 'gestion:close', 'gestion:cover', 'gestion:uncover', 'gestion:minimize', 'gestion:restore', 'gestion:vui', 'gestion:toast', 'gestion:textInput', 'gestion:policeAlerts:sync', 'gestion:images:sync', 'gestion:images:capture', 'gestion:images:progress', 'gestion:images:generateDone', 'gestion:notifs:sync', 'core:branding:apply'];
         var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;z-index:9999;';
         var HIDDEN = BASE + 'display:none;pointer-events:none;';
         var SHOWN = BASE + 'display:block;pointer-events:auto;';
@@ -1221,6 +1222,63 @@
       })();
     </script>
     <script>
+      // Menu de garage : page dédiée (interface/garage/) qui remplace l'écran du bundle. Les messages
+      // nui:vehicleStorage:* lui sont transmis et ne parviennent plus au bundle (stopImmediatePropagation : ce script
+      // est enregistré avant le module React). Les callbacks NUI du Lua des garages n'ont pas changé.
+      // display:none par défaut : un iframe plein écran, même transparent, masquerait #root.
+      (function () {
+        var ACTIONS = ['nui:vehicleStorage:open', 'nui:vehicleStorage:refreshGangVehicles'];
+        var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;z-index:10012;';
+        var HIDDEN = BASE + 'display:none;pointer-events:none;';
+        var SHOWN = BASE + 'display:block;pointer-events:auto;';
+        var ready = false;
+        var pending = [];
+        var frame = document.createElement('iframe');
+        frame.id = 'garage-menu';
+        frame.src = '../garage/index.html';
+        frame.setAttribute('scrolling', 'no');
+        frame.style.cssText = HIDDEN;
+        frame.addEventListener('load', function () {
+          ready = true;
+          while (pending.length) {
+            var queued = pending.shift();
+            if (frame.contentWindow) frame.contentWindow.postMessage(queued, '*');
+          }
+        });
+        window.__nuiAppend(frame);
+        window.__uiDev.register(frame, 'garage', function () { ready = false; });
+
+        function send(d) {
+          if (ready && frame.contentWindow) frame.contentWindow.postMessage(d, '*');
+          else pending.push(d);
+        }
+        function passive() {
+          frame.style.cssText = HIDDEN;
+          frame.blur();
+          window.focus();
+        }
+
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || typeof d.action !== 'string') return;
+          if (d.action === 'garagemenu:passive') {
+            if (e.source === frame.contentWindow) passive();
+            return;
+          }
+          if (d.action === 'core:branding:apply') { send(d); return; }
+          if (ACTIONS.indexOf(d.action) === -1) return;
+          send(d);
+          e.stopImmediatePropagation();
+          if (d.action === 'nui:vehicleStorage:open') {
+            frame.style.cssText = SHOWN;
+            setTimeout(function () {
+              if (frame.contentWindow) frame.contentWindow.focus();
+            }, 0);
+          }
+        });
+      })();
+    </script>
+    <script>
       (function () {
         var PAUSE_ACTIONS = ['pausemenu:open', 'pausemenu:close', 'pausemenu:reportResult', 'core:branding:apply'];
         var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;z-index:10020;';
@@ -1259,6 +1317,50 @@
               if (frame.contentWindow) frame.contentWindow.focus();
             }, 0);
           } else if (d.action === 'pausemenu:close') {
+            frame.style.cssText = HIDDEN;
+            frame.blur();
+            window.focus();
+          }
+        });
+      })();
+    </script>
+    <script>
+      // Centre d'emploi (intérim) : page dédiée (interface/interimcenter/), affichée par-dessus le jeu à l'ouverture
+      // et masquée à la fermeture. display:none par défaut : un iframe plein écran, même transparent, masquerait #root.
+      (function () {
+        var ACTIONS = ['interimcenter:open', 'interimcenter:close', 'core:branding:apply'];
+        var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;z-index:10015;';
+        var HIDDEN = BASE + 'display:none;pointer-events:none;';
+        var SHOWN = BASE + 'display:block;pointer-events:auto;';
+        var ready = false;
+        var pending = [];
+        var frame = document.createElement('iframe');
+        frame.id = 'interim-center';
+        frame.src = '../interimcenter/index.html';
+        frame.setAttribute('scrolling', 'no');
+        frame.style.cssText = HIDDEN;
+        frame.addEventListener('load', function () {
+          ready = true;
+          while (pending.length) {
+            var queued = pending.shift();
+            if (frame.contentWindow) frame.contentWindow.postMessage(queued, '*');
+          }
+        });
+        window.__nuiAppend(frame);
+        window.__uiDev.register(frame, 'interimcenter', function () { ready = false; });
+
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || typeof d.action !== 'string') return;
+          if (ACTIONS.indexOf(d.action) === -1) return;
+          if (ready && frame.contentWindow) frame.contentWindow.postMessage(d, '*');
+          else pending.push(d);
+          if (d.action === 'interimcenter:open') {
+            frame.style.cssText = SHOWN;
+            setTimeout(function () {
+              if (frame.contentWindow) frame.contentWindow.focus();
+            }, 0);
+          } else if (d.action === 'interimcenter:close') {
             frame.style.cssText = HIDDEN;
             frame.blur();
             window.focus();
@@ -1545,10 +1647,13 @@
       })();
     </script>
     <!-- Options d'affichage de l'inventaire (voir skin/inventory-options.js) -->
-    <script src="./skin/inventory-options.js?v=2" defer></script>
+    <script src="./skin/inventory-options.js?v=4" defer></script>
 
     <!-- Musique de l'écran de création de personnage (voir skin/char-music.js) -->
     <script src="./skin/char-music.js?v=1" defer></script>
+
+    <!-- Bouton de signalement de l'écran de mort (voir skin/deathscreen-report.js) -->
+    <script src="./skin/deathscreen-report.js?v=1" defer></script>
 
     <!-- Châssis 3D des tablettes (voir interface/build/tablet3d/) -->
     <script src="./tablet3d/tablet3d.js?v=3" defer></script>

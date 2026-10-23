@@ -243,7 +243,9 @@ Inv.RegisterCallback("vfw:chest:put-item", function(source, chestId, info)
 
     if moved > 0 then
         dirty[chestId] = true
-        Inv.RefreshChestViewers(chestId, source)
+        -- Le joueur qui dépose ou prend reçoit lui aussi le contenu à jour : sans ça, la liste qu'il garde du coffre
+        -- (celle de l'ouverture) est réaffichée telle quelle après l'action, et l'objet déposé disparaît de l'écran.
+        Inv.RefreshChestViewers(chestId)
     end
 
     return Inv.Payload(xPlayer)
@@ -304,7 +306,9 @@ Inv.RegisterCallback("vfw:chest:take-item", function(source, chestId, info)
 
     if moved > 0 then
         dirty[chestId] = true
-        Inv.RefreshChestViewers(chestId, source)
+        -- Le joueur qui dépose ou prend reçoit lui aussi le contenu à jour : sans ça, la liste qu'il garde du coffre
+        -- (celle de l'ouverture) est réaffichée telle quelle après l'action, et l'objet déposé disparaît de l'écran.
+        Inv.RefreshChestViewers(chestId)
     end
 
     return Inv.Payload(xPlayer)

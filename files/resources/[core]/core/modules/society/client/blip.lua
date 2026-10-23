@@ -8,6 +8,9 @@ function Society.initBlip()
         SetBlipSprite(currentBlip, data.sprite)
         SetBlipColour(currentBlip, data.color)
         SetBlipScale(currentBlip, data.scale)
+        -- Courte portee : sans elle, les blips de toutes les societes restent colles au bord de la minimap
+        -- meme a l'autre bout de la map.
+        SetBlipAsShortRange(currentBlip, true)
 
         BeginTextCommandSetBlipName('STRING')
         AddTextComponentSubstringPlayerName(data.name)

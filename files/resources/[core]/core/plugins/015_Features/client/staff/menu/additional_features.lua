@@ -47,6 +47,11 @@ end
 -- Spectate Mode Feature (Enhanced)
 function StaffMenu.SpectatePlayer(targetSource, isRandomSpectate)
     if not targetSource then return end
+    targetSource = tonumber(targetSource)
+    if not targetSource or not StaffMenu.BeginSpectateRequest or not StaffMenu.BeginSpectateRequest(targetSource) then
+        VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Spectate', message = "Cette cible n'est pas valide." })
+        return
+    end
 
     -- Fermer le menu admin avant de passer en spectate
     if StaffMenu.main and StaffMenu.main.close then
@@ -59,7 +64,8 @@ function StaffMenu.SpectatePlayer(targetSource, isRandomSpectate)
     additionalFeatures.wasNoclipActive = VFW.IsNoclipActive()
 
     DoScreenFadeOut(250)
-    while not IsScreenFadedOut() do
+    local fadeDeadline = GetGameTimer() + 2000
+    while not IsScreenFadedOut() and GetGameTimer() < fadeDeadline do
         Wait(0)
     end
 
@@ -77,6 +83,21 @@ function StaffMenu.SpectatePlayer(targetSource, isRandomSpectate)
     SetEveryoneIgnorePlayer(PlayerId(), true)
 
     TriggerServerEvent("core:StaffSpectate", targetSource, true)
+
+    -- Le serveur ou le streaming peuvent exceptionnellement ne jamais répondre.
+    -- Dans ce cas, rendre la main au staff au lieu de le laisser sur un écran noir.
+    CreateThread(function()
+        Wait(12000)
+        if additionalFeatures.spectateMode
+            and additionalFeatures.spectateTarget == targetSource
+            and StaffMenu.IsSpectateReady
+            and not StaffMenu.IsSpectateReady() then
+            TriggerServerEvent("core:StaffSpectate", targetSource, false)
+            if StaffMenu.AbortSpectateLocally then
+                StaffMenu.AbortSpectateLocally("Le chargement du joueur a expiré.")
+            end
+        end
+    end)
 
     -- Afficher les instructional buttons selon le mode
     if isRandomSpectate then
@@ -108,25 +129,17 @@ function StaffMenu.SpectatePlayer(targetSource, isRandomSpectate)
     end)
 end
 
--- Fonction pour arrêter le spectate (peut être appelée de n'importe où)
-function StaffMenu.StopSpectate()
-    if not additionalFeatures.spectateMode then return end
-
-    local spectateTarget = additionalFeatures.spectateTarget
+-- Synchronise l'interface avec le moteur de spectate défini dans events.lua.
+-- Cette fonction est aussi appelée lorsque le serveur refuse ou interrompt la cible.
+function StaffMenu.OnSpectateEnded(spectateTarget)
+    spectateTarget = tonumber(spectateTarget) or additionalFeatures.spectateTarget
     additionalFeatures.spectateMode = false
 
-    -- Supprimer les instructional buttons
     instructionalButtons[spectateButtonsId] = nil
 
-    -- Le handler de sortie gère le fondu et le retour. Ne pas Wait() ici :
-    -- cette fonction est aussi appelée par les callbacks VUI cross-resource.
-    DoScreenFadeOut(250)
-
-    StaffMenu._restoreNoclipAfterSpectate = additionalFeatures.wasNoclipActive == true
-        and (StaffMenu.adminChecked == true or StaffMenu.animatorModeEnabled == true)
-
-    if spectateTarget then
-        TriggerServerEvent("core:StaffSpectate", spectateTarget, false)
+    if additionalFeatures.wasNoclipActive ~= nil then
+        StaffMenu._restoreNoclipAfterSpectate = additionalFeatures.wasNoclipActive == true
+            and (StaffMenu.adminChecked == true or StaffMenu.animatorModeEnabled == true)
     end
 
     if StaffMenu.ResetOutilsSpectate then
@@ -169,14 +182,10 @@ function StaffMenu.SpectateNextRandom()
     local randomPlayer = validPlayers[math.random(1, #validPlayers)].source
     additionalFeatures.spectateTarget = randomPlayer
     StaffMenu.LastPlayerSource = randomPlayer
+    if StaffMenu.BeginSpectateRequest then StaffMenu.BeginSpectateRequest(randomPlayer) end
     TriggerServerEvent("core:StaffSpectate", randomPlayer, true)
 
     VFW.ShowNotification({ type = 'STAFF', variant = 'INFO', subtitle = 'Outils Staff', message = "Spectate joueur ID: " .. randomPlayer .. "." })
-end
-
--- Vérifie si le mode spectate est actif
-function StaffMenu.IsSpectating()
-    return additionalFeatures.spectateMode == true
 end
 
 -- Custom Teleportation System

@@ -1376,7 +1376,7 @@ local function summariseAccount(row, online, tigSet)
         time = humanPlaytime(row.playtime),
         isOnline = src ~= nil,
         onlineSource = src,
-        isBanned = tonumber(row.banned) == 1,
+        isBanned = VFW.DB.IsSet(row.banned),
         hasTig = tigSet[row.id] == true,
         color = 0xFFFFFF,
     }

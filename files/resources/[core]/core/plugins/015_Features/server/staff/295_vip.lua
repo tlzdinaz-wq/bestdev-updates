@@ -298,7 +298,7 @@ Staff29.Cb("vip:changePlate", function(source, data)
     if not row or row.owner ~= xPlayer.identifier then
         return { success = false, message = "Ce véhicule ne vous appartient pas" }
     end
-    if row.stored ~= 1 then
+    if not VFW.DB.IsSet(row.stored) then
         return { success = false, message = "Le véhicule doit être rangé au garage" }
     end
 

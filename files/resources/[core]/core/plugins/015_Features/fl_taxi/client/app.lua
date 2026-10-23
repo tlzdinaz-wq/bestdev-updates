@@ -93,7 +93,7 @@ CreateThread(function()
     end
 
     local waited = 0
-    while GetResourceState("lb-phone") ~= "started" do
+    while not VFW.PhoneResource() do
         waited = waited + 1
         if waited > 60 then return end
         Wait(500)
@@ -104,7 +104,7 @@ CreateThread(function()
 end)
 
 AddEventHandler("onResourceStart", function(resourceName)
-    if resourceName ~= "lb-phone" then return end
+    if not VFW.IsPhoneResource(resourceName) then return end
     Wait(2000)
     RegisterTaxiApp()
 end)

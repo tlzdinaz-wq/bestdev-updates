@@ -95,13 +95,24 @@ RegisterNetEvent("garage:exitVehicle", function(garageId, plate, spawnCoords, re
         return
     end
 
-    if row.stored ~= 1 then
+    -- Le véhicule est réservé d'un seul coup, par la base : « stored = 1 » est jugé par SQL et non par le
+    -- code, qui lisait cette colonne de travers (une colonne TINYINT(1) revient en vrai/faux : tous les
+    -- véhicules rangés étaient « déjà sortis »). Et deux appuis sur E de suite ne font plus sortir deux
+    -- exemplaires : le second ne réserve rien.
+    local claimed = MySQL.update.await("UPDATE owned_vehicles SET stored = 0 WHERE plate = ? AND stored = 1", { normalized })
+    if (tonumber(claimed) or 0) < 1 then
         Vehicles.Notify(source, "ROUGE", "Garage", "Ce véhicule est déjà sorti.")
         return
     end
 
+    -- Toute sortie qui n'aboutit pas remet le véhicule dans le garage.
+    local function release()
+        MySQL.update.await("UPDATE owned_vehicles SET stored = 1 WHERE plate = ?", { normalized })
+    end
+
     local coords = pickSpawnCoords(garage, spawnCoords)
     if not coords then
+        release()
         Vehicles.Notify(source, "ROUGE", "Garage", "Aucune place de spawn disponible.")
         return
     end
@@ -115,6 +126,7 @@ RegisterNetEvent("garage:exitVehicle", function(garageId, plate, spawnCoords, re
                 ok = Vehicles.Charge(xPlayer, "cash", price, "garage-reparation")
             end
             if not ok then
+                release()
                 Vehicles.Notify(source, "ROUGE", "Garage", "Fonds insuffisants pour la réparation.")
                 return
             end
@@ -129,6 +141,7 @@ RegisterNetEvent("garage:exitVehicle", function(garageId, plate, spawnCoords, re
     local props = Vehicles.BuildProps(row)
     local vehicle, netId = Vehicles.Spawn(source, row.vehName, coords, coords.w, props)
     if not vehicle or not netId then
+        release()
         Vehicles.Notify(source, "ROUGE", "Garage", "Impossible de faire sortir le véhicule.")
         return
     end

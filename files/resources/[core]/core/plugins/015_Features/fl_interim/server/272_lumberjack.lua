@@ -128,8 +128,8 @@ end)
 RegisterServerCallback("interim:lumberjack:requestvehicle", function(source)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer then return false end
-    if not InterimServer.HasJob(xPlayer, JOB) then return false end
     if not Feat27.RateLimit(source, "interim:lj:veh", 3000) then return false end
+    if not InterimServer.EnsureJob(source, xPlayer, JOB) then return false end
 
     local bag = InterimServer.Vehicle(source)
     if bag[JOB] and Feat27.EntityFromNet(bag[JOB]) then return bag[JOB] end

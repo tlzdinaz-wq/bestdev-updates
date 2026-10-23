@@ -419,12 +419,12 @@ local function AccessFor(laboId, xPlayer)
         local entry = list[i]
         if entry.access_type == "faction" and entry.faction_name == factionName and factionName ~= "" then
             result.has = true
-            if entry.chest_access == 1 then result.chest = true end
-            if entry.management_access == 1 then result.management = true end
+            if VFW.DB.IsSet(entry.chest_access) then result.chest = true end
+            if VFW.DB.IsSet(entry.management_access) then result.management = true end
         elseif entry.access_type == "player" and entry.player_identifier == xPlayer.identifier then
             result.has = true
-            if entry.chest_access == 1 then result.chest = true end
-            if entry.management_access == 1 then result.management = true end
+            if VFW.DB.IsSet(entry.chest_access) then result.chest = true end
+            if VFW.DB.IsSet(entry.management_access) then result.management = true end
         end
     end
 
@@ -857,7 +857,7 @@ LB.RegisterCallback("labo:toggleChestAccess", function(source, accessId)
     local access = AccessFor(laboId, xPlayer)
     if not access.owner and not access.management then return false end
 
-    local newValue = entry.chest_access == 1 and 0 or 1
+    local newValue = VFW.DB.IsSet(entry.chest_access) and 0 or 1
     LB.Execute("UPDATE labo_access SET chest_access = ? WHERE id = ?", { newValue, id })
     entry.chest_access = newValue
     return true
@@ -874,7 +874,7 @@ LB.RegisterCallback("labo:toggleManagementAccess", function(source, accessId)
     local access = AccessFor(laboId, xPlayer)
     if not access.owner then return false end
 
-    local newValue = entry.management_access == 1 and 0 or 1
+    local newValue = VFW.DB.IsSet(entry.management_access) and 0 or 1
     LB.Execute("UPDATE labo_access SET management_access = ? WHERE id = ?", { newValue, id })
     entry.management_access = newValue
     return true
@@ -934,8 +934,8 @@ LB.RegisterCallback("labo:getFactionMembers", function(source, laboId)
             identifier = row.identifier,
             name = row.name or "Inconnu",
             grade = Int(row.grade_level, 0),
-            chestAccess = grant ~= nil and grant.chest_access == 1,
-            managementAccess = grant ~= nil and grant.management_access == 1,
+            chestAccess = grant ~= nil and VFW.DB.IsSet(grant.chest_access),
+            managementAccess = grant ~= nil and VFW.DB.IsSet(grant.management_access),
         }
     end
     return out

@@ -111,8 +111,8 @@ local function withinRange(source, entity, range)
 end
 
 local function statusOf(row)
-    if tonumber(row.pounded) == 1 then return "fourriere" end
-    if tonumber(row.stored) == 1 then return "garage" end
+    if VFW.DB.IsSet(row.pounded) then return "fourriere" end
+    if VFW.DB.IsSet(row.stored) then return "garage" end
     return "sorti"
 end
 
@@ -373,7 +373,7 @@ local function spawnOwnedVehicle(source, xPlayer, plate, targetSource)
         return
     end
 
-    if tonumber(row.pounded) == 1 then
+    if VFW.DB.IsSet(row.pounded) then
         notify(source, "ERROR", "Ce véhicule est en fourrière. Sortez-le de la fourrière avant de le faire apparaître.")
         return
     end
@@ -751,9 +751,32 @@ RegisterServerCallback("vfw:vehicle:changePlate", function(source, oldPlate, new
     return true
 end)
 
+--- Le joueur est-il le locataire de ce véhicule ? Une voiture louée n'est pas dans `owned_vehicles`
+--- (elle vit dans `vehicle_rental_active`) : sans ce test, son locataire n'aurait aucune clé.
+---@param xPlayer table
+---@param trimmed string
+---@param normalized string
+---@return boolean
+local function isRenter(xPlayer, trimmed, normalized)
+    local active = VFW.Rental and VFW.Rental.active
+    if type(active) ~= "table" then return false end
+
+    for i = 1, #active do
+        local entry = active[i]
+        if entry.owner == xPlayer.identifier and (entry.sPlate == trimmed or entry.sPlate == normalized) then
+            return true
+        end
+    end
+    return false
+end
+
 --- Le joueur a-t-il les clés de ce véhicule ? (propriétaire, véhicule de son job / sa faction,
---- objet « keys », clé temporaire job / staff, double de clé concession). Un véhicule inconnu
---- de la base (PNJ, spawn staff) est considéré accessible à tous.
+--- locataire, objet « keys », clé temporaire job / staff, double de clé concession.)
+---
+--- Un véhicule absent de la base (PNJ de la circulation, voiture de décor) n'a PAS de clé : il
+--- était auparavant « accessible à tous », et n'importe qui pouvait verrouiller et déverrouiller
+--- les voitures des PNJ. Seuls y échappent les détenteurs d'une clé (objet, clé temporaire de job
+--- ou de staff, locataire) et le staff habilité à gérer les véhicules.
 ---@param source number
 ---@param plate string
 ---@return boolean
@@ -768,20 +791,24 @@ function Staff29.PlayerHasVehicleKey(source, plate)
     if not api then return false end
 
     local row = api.GetByPlate(normalized) or api.GetByPlate(trimmed)
-    if not row then return true end
 
-    if api.OwnsVehicle(xPlayer, row) then return true end
+    if row then
+        if api.OwnsVehicle(xPlayer, row) then return true end
 
-    local groupType = row.group_type
-    if type(groupType) == "string" and groupType ~= "" then
-        local groupName = tostring(row.group_name or "")
-        if groupName ~= "" then
-            if groupType == "society" and api.GetJob(xPlayer) == groupName then return true end
-            if groupType ~= "society" then
-                local factionName = api.GetFaction(xPlayer)
-                if factionName ~= "" and factionName == groupName then return true end
+        local groupType = row.group_type
+        if type(groupType) == "string" and groupType ~= "" then
+            local groupName = tostring(row.group_name or "")
+            if groupName ~= "" then
+                if groupType == "society" and api.GetJob(xPlayer) == groupName then return true end
+                if groupType ~= "society" then
+                    local factionName = api.GetFaction(xPlayer)
+                    if factionName ~= "" and factionName == groupName then return true end
+                end
             end
         end
+    else
+        if isRenter(xPlayer, trimmed, normalized) then return true end
+        if xPlayer.hasPermission("alt_vehicle_management") then return true end
     end
 
     local inventory = xPlayer.inventory
@@ -1147,7 +1174,7 @@ RegisterNetEvent("vfw:staff:deleteSpawnedVehicle", function(plate)
     DeleteEntity(entity)
 
     local row = findRow(plate)
-    if row and tonumber(row.pounded) ~= 1 then
+    if row and not VFW.DB.IsSet(row.pounded) then
         MySQL.update.await("UPDATE owned_vehicles SET stored = 1 WHERE plate = ?", { row.plate })
     end
 

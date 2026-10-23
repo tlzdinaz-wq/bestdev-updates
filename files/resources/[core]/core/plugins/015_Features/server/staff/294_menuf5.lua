@@ -209,7 +209,7 @@ Staff29.Cb("garage:getAllPlayerVehicles", function(source)
             model = rows[i].vehName,
             vehName = rows[i].vehName,
             label = rows[i].label,
-            stored = rows[i].stored == 1,
+            stored = VFW.DB.IsSet(rows[i].stored),
         }
     end
     return out

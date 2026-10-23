@@ -87,6 +87,15 @@ end)
 StaffMenu = StaffMenu or {}
 local spectateTargetId = nil
 local spectateWatcher = false
+local spectateActive = false
+
+local function fadeOutWithTimeout(duration, timeout)
+    if not IsScreenFadedOut() then DoScreenFadeOut(duration or 250) end
+    local deadline = GetGameTimer() + (timeout or 2000)
+    while not IsScreenFadedOut() and GetGameTimer() < deadline do
+        Wait(0)
+    end
+end
 
 local function restorePed(playerPed, playerId)
     FreezeEntityPosition(playerPed, false)
@@ -100,10 +109,51 @@ function StaffMenu.IsSpectating()
     return spectateTargetId ~= nil
 end
 
+function StaffMenu.IsSpectateReady()
+    return spectateActive
+end
+
+function StaffMenu.BeginSpectateRequest(targetId)
+    targetId = tonumber(targetId)
+    if not targetId then return false end
+    spectateTargetId = targetId
+    spectateActive = false
+    return true
+end
+
 --- Demande au serveur d'arrêter le spectate (il renvoie la position d'origine).
 function StaffMenu.StopSpectate()
     if not spectateTargetId then return end
-    TriggerServerEvent("core:StaffSpectate", spectateTargetId, false)
+    local targetId = spectateTargetId
+    if StaffMenu.OnSpectateEnded then
+        StaffMenu.OnSpectateEnded(targetId)
+    end
+    TriggerServerEvent("core:StaffSpectate", targetId, false)
+end
+
+function StaffMenu.AbortSpectateLocally(message)
+    local targetId = spectateTargetId
+    local playerPed = PlayerPedId()
+    NetworkSetInSpectatorMode(false, playerPed)
+    ClearFocus()
+    spectateTargetId = nil
+    spectateActive = false
+    restorePed(playerPed, PlayerId())
+
+    if StaffMenu.OnSpectateEnded then
+        StaffMenu.OnSpectateEnded(targetId)
+    end
+    if StaffMenu._restoreNoclipAfterSpectate
+        and (StaffMenu.adminChecked or StaffMenu.animatorModeEnabled) then
+        StaffMenu._restoreNoclipAfterSpectate = false
+        VFW.ToggleNoclip()
+    else
+        StaffMenu._restoreNoclipAfterSpectate = false
+    end
+    if message then
+        VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Spectate', message = message })
+    end
+    if IsScreenFadedOut() or IsScreenFadingOut() then DoScreenFadeIn(250) end
 end
 
 -- Surveillance pendant le spectate : aide à l'écran, touche de sortie, et arrêt
@@ -150,10 +200,13 @@ RegisterNetEvent("core:StaffSpectate", function(coords, id, isSpectating)
             return
         end
 
-        DoScreenFadeOut(250)
-        while not IsScreenFadedOut() do
-            Wait(0)
+        if spectateTargetId and tonumber(id) ~= spectateTargetId then
+            TriggerServerEvent("core:StaffSpectate", id, false)
+            return
         end
+        spectateTargetId = tonumber(id)
+
+        fadeOutWithTimeout(250, 2000)
 
         playerPed = PlayerPedId()
         FreezeEntityPosition(playerPed, true)
@@ -166,6 +219,8 @@ RegisterNetEvent("core:StaffSpectate", function(coords, id, isSpectating)
         if coords and coords.x then
             SetEntityCoordsNoOffset(playerPed, coords.x, coords.y, coords.z, false, false, false)
             SetEntityVelocity(playerPed, 0.0, 0.0, 0.0)
+            SetFocusPosAndVel(coords.x, coords.y, coords.z, 0.0, 0.0, 0.0)
+            RequestCollisionAtCoord(coords.x, coords.y, coords.z)
         end
 
         local targetPed = 0
@@ -184,15 +239,15 @@ RegisterNetEvent("core:StaffSpectate", function(coords, id, isSpectating)
                     break
                 end
             end
+            if coords and coords.x then RequestCollisionAtCoord(coords.x, coords.y, coords.z) end
             Wait(100)
             timeout = timeout - 1
         end
 
         if not targetPed or targetPed == 0 or not DoesEntityExist(targetPed)
             or NetworkGetNetworkIdFromEntity(targetPed) == 0 then
-            VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Gestion Events', message = "Joueur non trouvé ou hors de portée." })
-            spectateTargetId = tonumber(id)
-            StaffMenu.StopSpectate()
+            TriggerServerEvent("core:StaffSpectate", id, false)
+            StaffMenu.AbortSpectateLocally("Joueur non trouvé ou hors de portée réseau.")
             return
         end
 
@@ -200,6 +255,8 @@ RegisterNetEvent("core:StaffSpectate", function(coords, id, isSpectating)
 
         NetworkSetInSpectatorMode(true, targetPed)
         spectateTargetId = tonumber(id)
+        spectateActive = true
+        ClearFocus()
         startSpectateWatcher()
 
         DoScreenFadeIn(250)
@@ -207,15 +264,19 @@ RegisterNetEvent("core:StaffSpectate", function(coords, id, isSpectating)
     end
 
     -- ── Sortie ──
-    DoScreenFadeOut(250)
-    while not IsScreenFadedOut() do
-        Wait(0)
-    end
+    fadeOutWithTimeout(250, 2000)
 
     playerPed = PlayerPedId()
     NetworkSetInSpectatorMode(false, playerPed)
+    ClearFocus()
     SetEveryoneIgnorePlayer(playerId, false)
+    local previousTargetId = spectateTargetId or tonumber(id)
     spectateTargetId = nil
+    spectateActive = false
+
+    if StaffMenu.OnSpectateEnded then
+        StaffMenu.OnSpectateEnded(previousTargetId)
+    end
 
     -- Retour à la position d'avant le spectate : réactiver le noclip au-dessus d'un autre
     -- joueur déclenche le crash GTA5+8EC6A8.

@@ -173,23 +173,20 @@ Inv.RegisterCallback("vfw:useItem", function(source, name, meta, slot)
         return payload(xPlayer)
     end
 
-    local data = def and def.data or {}
-    local isConsumable = (tonumber(data.hunger) or 0) > 0
-        or (tonumber(data.thirst) or 0) > 0
-        or def.type == "food"
-        or def.type == "drink"
+    -- Fiche de l'item, catalogue partagé et description réunis (voir 25_01_core).
+    local consumable = Inv.ConsumableData(name, def)
 
-    if isConsumable then
+    if consumable then
         local removed = Inv.RemoveFromSlot(list, entry.slot, 1)
         if not removed then
             return payload(xPlayer)
         end
 
         if VFW.AddStatus then
-            VFW.AddStatus(source, tonumber(data.hunger) or 0, tonumber(data.thirst) or 0)
+            VFW.AddStatus(source, tonumber(consumable.hunger) or 0, tonumber(consumable.thirst) or 0)
         end
 
-        TriggerClientEvent("core:UseConsumable", source, name, data)
+        TriggerClientEvent("core:UseConsumable", source, name, consumable)
         return payload(xPlayer)
     end
 

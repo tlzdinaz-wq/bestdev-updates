@@ -29,7 +29,7 @@ local function Here()
     return {
         x = pos.x + 0.0,
         y = pos.y + 0.0,
-        z = (pos.z - 0.99) + 0.0,
+        z = pos.z + 0.0,
         h = heading,
         heading = heading,
         w = heading,
@@ -64,7 +64,7 @@ RegisterNuiCallback("gestion:supermarket:teleport", function(data, cb)
         return
     end
     local ped = PlayerPedId()
-    SetEntityCoords(ped, x, y, z + 0.99, false, false, false, false)
+    SetEntityCoords(ped, x, y, z, false, false, false, false)
     if data.heading or data.h or data.w then
         SetEntityHeading(ped, (tonumber(data.heading or data.h or data.w) or 0.0) + 0.0)
     end

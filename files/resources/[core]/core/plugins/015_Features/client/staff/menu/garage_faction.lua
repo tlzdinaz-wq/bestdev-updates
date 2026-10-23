@@ -183,9 +183,9 @@ StaffMenu.createGarageFactionData.OnOpen(function()
 
     local spawnCount = garageSelected.spawnPosition[1] and (#garageSelected.spawnPosition .. (#garageSelected.spawnPosition > 1 and " points" or " point")) or "Non défini"
   StaffMenu.createGarageFactionData.Button("Spawn des véhicules", "", spawnCount, "chevron", false, function()
-        StaffMenu.createGarageFactionData.close()
-        local exitCoords <const> = Garage:SetExitPoint(garageSelected.vehType)
-        StaffMenu.createGarageFactionData.open()
+        local exitCoords = StaffMenu.PlaceInWorld(StaffMenu.createGarageFactionData, function()
+            return Garage:SetExitPoint(garageSelected.vehType)
+        end)
 
         garageSelected.spawnPosition = exitCoords
         StaffMenu.createGarageFactionData.refresh()
@@ -353,9 +353,9 @@ StaffMenu.modifyGarageFactionData.OnOpen(function()
 
     local spawnCount = garageSelected.spawnPosition[1] and (#garageSelected.spawnPosition .. (#garageSelected.spawnPosition > 1 and " points" or " point")) or "Non défini"
   StaffMenu.modifyGarageFactionData.Button("Spawn des véhicules", "", spawnCount, "chevron", false, function()
-        StaffMenu.modifyGarageFactionData.close()
-        local exitCoords <const> = Garage:SetExitPoint(garageSelected.vehType)
-        StaffMenu.modifyGarageFactionData.open()
+        local exitCoords = StaffMenu.PlaceInWorld(StaffMenu.modifyGarageFactionData, function()
+            return Garage:SetExitPoint(garageSelected.vehType)
+        end)
 
         garageSelected.spawnPosition = exitCoords
         StaffMenu.modifyGarageFactionData.refresh()

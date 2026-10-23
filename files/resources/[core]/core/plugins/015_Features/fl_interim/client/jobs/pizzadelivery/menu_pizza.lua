@@ -197,11 +197,6 @@ end
 local function takePizza()
     if not checkNPCDistance() then return end
 
-    if PlayerData.job and PlayerData.job.name and PlayerData.job.name ~= "unemployed" then
-        notify("ROUGE", "Vous devez être sans emploi pour faire ce métier d'intérim.")
-        return
-    end
-
     if isCarryingPizza then
         notify("ROUGE", "Vous transportez déjà une pizza.")
         return
@@ -265,11 +260,6 @@ end
 
 local function startDelivery()
     if not checkNPCDistance() then return end
-
-    if PlayerData.job and PlayerData.job.name and PlayerData.job.name ~= "unemployed" then
-        notify("ROUGE", "Vous devez être sans emploi pour faire ce métier d'intérim.")
-        return
-    end
 
     if StartPizzaDelivery and StartPizzaDelivery() then
         if PizzaMenu then

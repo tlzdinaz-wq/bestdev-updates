@@ -528,8 +528,21 @@ end
 
 VFW.KeybindToggle("LMENU", "openContext", "Context menu", function()
     if mouseActive then return end
-    -- Only block if cursor is visible (not just keyboard focus)
-    if VFW.Nui._hasCursor then return end
+
+    -- Ne pas voler le curseur a une interface ouverte. Mais `_hasCursor` n'est qu'un
+    -- suivi tenu en Lua : une interface qui se ferme de son cote sans le dire le
+    -- laisse bloque a vrai, et le menu ALT ne s'ouvre alors plus jamais — c'est ce
+    -- qu'on observait apres une demande de renfort.
+    --
+    -- Le jeu connait l'etat reel : on le lui demande avant de renoncer. Tant qu'une
+    -- interface a vraiment le focus, on cede la place comme avant.
+    if VFW.Nui._hasCursor then
+        if IsNuiFocused() then return end
+
+        VFW.Nui._hasCursor = false
+        VFW.Nui._hasFocus = false
+    end
+
     openContextMenu()
 end, function()
     closeContextMenu()

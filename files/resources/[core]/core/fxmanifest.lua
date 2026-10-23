@@ -26,6 +26,12 @@ files {
     "interface/pausemenu/**/*",
     "interface/boutique/index.html",
     "interface/boutique/**/*",
+    -- Centre d'emploi (intérim)
+    "interface/interimcenter/index.html",
+    "interface/interimcenter/**/*",
+    -- Menu de garage
+    "interface/garage/index.html",
+    "interface/garage/**/*",
     "interface/documents/index.html",
     "interface/documents/**/*",
     -- Écran 3D des pompes à essence (DUI posé sur un scaleform)

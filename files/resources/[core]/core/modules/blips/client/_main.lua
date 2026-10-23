@@ -26,7 +26,9 @@ function Blips.create(blipData)
     SetBlipDisplay(blip, 4)
     SetBlipColour(blip, math.floor(tonumber(blipData.color) or 0))
     SetBlipScale(blip, (tonumber(blipData.scale) or 0.8) + 0.0)
-    SetBlipAsShortRange(blip, false)
+    -- Courte portee : sur la minimap un blip n'apparait qu'a proximite. En longue portee, il reste colle au
+    -- bord de la minimap meme a l'autre bout de la map.
+    SetBlipAsShortRange(blip, true)
     SetBlipHighDetail(blip, true)
     SetBlipPriority(blip, 10)
 

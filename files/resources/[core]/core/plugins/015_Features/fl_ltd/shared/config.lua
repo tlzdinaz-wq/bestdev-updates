@@ -1,6 +1,12 @@
 LTDDelivery = LTDDelivery or {}
 
 LTDDelivery.Config = {
+    -- Le LTD fonctionne maintenant comme une boutique publique classique.
+    -- L'ancien métier, son catalogue de société et ses missions sont désactivés.
+    EnableJobSystem = false,
+    EnableSocietyCatalog = false,
+    SimpleShopMode = true,
+
     BoxProp = "prop_cs_cardbox_01",
     BoxAnim = {
         dict = "anim@heists@box_carry@",

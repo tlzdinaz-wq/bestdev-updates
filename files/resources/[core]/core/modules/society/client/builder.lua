@@ -199,7 +199,8 @@ modifyJob.OnOpen(function()
     end)
 
     for _, v in ipairs(sorted) do
-        if modifyJobQuery == nil or string.find(string.lower(v.name), string.lower(modifyJobQuery)) or string.find(string.lower(v.label), string.lower(modifyJobQuery)) then
+        local isDisabledLTD = LTDDelivery.Config.SimpleShopMode and v.type == "ltd"
+        if not isDisabledLTD and (modifyJobQuery == nil or string.find(string.lower(v.name), string.lower(modifyJobQuery)) or string.find(string.lower(v.label), string.lower(modifyJobQuery))) then
             modifyJob.Button(("%s (%s)"):format(v.label, v.name), ("Type: %s"):format(v.type), nil, "chevron", false,
                 function()
                     jobInModification = TriggerServerCallback("core:get:societyData", v.name)

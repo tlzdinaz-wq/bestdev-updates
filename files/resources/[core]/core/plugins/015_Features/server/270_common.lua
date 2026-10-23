@@ -145,21 +145,33 @@ function Feat27.SpawnObject(model, coords, heading)
     return NetworkGetNetworkIdFromEntity(object), object
 end
 
-function Feat27.SpawnVehicle(model, coords, heading, vehicleType)
+--- `source` : le joueur dont le client donne le type du modèle (sans lui, c'est le premier joueur de la liste,
+--- qui peut être en plein chargement et répondre « automobile » pour un scooter).
+function Feat27.SpawnVehicle(model, coords, heading, vehicleType, source)
     local hash = type(model) == "string" and joaat(model) or tonumber(model)
     local pos = Feat27.Vec3(coords)
     if not hash or not pos then return nil end
 
     local kind = vehicleType
     if not kind and VFW and VFW.GetVehicleType then
-        local ok, res = pcall(VFW.GetVehicleType, hash)
+        local ok, res = pcall(VFW.GetVehicleType, hash, source)
         if ok and res then kind = res end
     end
 
-    local vehicle = CreateVehicleServerSetter(hash, kind or "automobile", pos.x, pos.y, pos.z, tonumber(heading) or 0.0)
-    if not Feat27.WaitEntity(vehicle) then return nil end
-    SetEntityOrphanMode(vehicle, 2)
-    return NetworkGetNetworkIdFromEntity(vehicle), vehicle
+    -- Un véhicule créé avec le mauvais type n'apparaît jamais (un scooter « automobile », par exemple) :
+    -- on essaie d'abord le type attendu, puis les deux types les plus courants.
+    local tried = {}
+    for _, candidate in ipairs({ kind or "automobile", "bike", "automobile" }) do
+        if not tried[candidate] then
+            tried[candidate] = true
+            local vehicle = CreateVehicleServerSetter(hash, candidate, pos.x, pos.y, pos.z, tonumber(heading) or 0.0)
+            if Feat27.WaitEntity(vehicle) then
+                SetEntityOrphanMode(vehicle, 2)
+                return NetworkGetNetworkIdFromEntity(vehicle), vehicle
+            end
+        end
+    end
+    return nil
 end
 
 Feat27.Inv = {}

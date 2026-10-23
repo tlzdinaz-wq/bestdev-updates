@@ -10,7 +10,7 @@ RegisterNetEvent("vfw:playerLoaded", function(playerData)
 end)
 
 RegisterNetEvent("vfw:setJob", function(job)
-    PlayerData.job = job
+    if PlayerData then PlayerData.job = job end
 end)
 
 function InterimVehicleMenu.new(jobId, opts, outfits)
@@ -129,11 +129,6 @@ function InterimVehicleMenu:build()
     local p = toggleProps(vehicleOut)
     m.Button(p.title, nil, nil, p.icon, false, function()
         if not self:_cooldownReady() then return end
-
-        if PlayerData.job and PlayerData.job.name and PlayerData.job.name ~= "unemployed" then
-            VFW.ShowNotification({ type = "JAUNE", content = "Vous ne pouvez pas effectuer cette action en tant que travailleur." })
-            return
-        end
 
         if vehicleOut then
             if self.onStore then

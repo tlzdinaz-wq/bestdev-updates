@@ -9,9 +9,10 @@
 -- d'autres reglages de la base. La liste d'origine sert de depart au premier demarrage,
 -- pour ne rien perdre de ce qui marchait.
 --
--- A part : lire une video sur un ecran passe par la ressource externe `ptelevision`,
--- qui n'est pas fournie avec la base (voir server.cfg). Ce fichier ne decrit que les
--- modeles ; sans `ptelevision`, aucun ecran ne lira quoi que ce soit.
+-- A part : lire une video sur un ecran est le travail de la ressource `ptelevision`
+-- (resources/[standalone]/ptelevision, a lancer dans server.cfg). Ce fichier ne decrit que les
+-- modeles ; elle les lit par l'export `TelevisionModels` ci-dessous. Sans elle, le menu
+-- contextuel d'une television s'affiche mais aucun ecran ne lit quoi que ce soit.
 
 local VARIABLE <const> = "television_models"
 local PERMISSION <const> = "builder_television"
@@ -169,4 +170,9 @@ RegisterNetEvent("television:deleteModel", function(model)
 
     table.remove(models, index)
     saveModels(models)
+end)
+
+-- Lu par la ressource ptelevision : la liste complete, reglages compris.
+exports("TelevisionModels", function()
+    return loadModels()
 end)

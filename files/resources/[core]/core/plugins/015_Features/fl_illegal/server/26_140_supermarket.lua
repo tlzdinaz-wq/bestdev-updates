@@ -8,6 +8,7 @@ local Supermarket = {
 }
 
 local BUILDER_PERM = "builder_supermarket"
+local SIMPLE_SHOP_MODE = LTDDelivery.Config.SimpleShopMode == true
 local DEFAULT_SETTINGS = {
     apuCooldown = 1800,
     safeCooldown = 3600,
@@ -39,11 +40,11 @@ local function LoadStores()
             pos = { x = IL.Num(row.pos_x, 0.0), y = IL.Num(row.pos_y, 0.0), z = IL.Num(row.pos_z, 0.0) },
             apuPos = { x = IL.Num(row.apu_x, 0.0), y = IL.Num(row.apu_y, 0.0), z = IL.Num(row.apu_z, 0.0), h = IL.Num(row.apu_h, 0.0) },
             safePos = { x = IL.Num(row.safe_x, 0.0), y = IL.Num(row.safe_y, 0.0), z = IL.Num(row.safe_z, 0.0), h = IL.Num(row.safe_h, 0.0) },
-            storeType = row.store_type or "automatic",
+            storeType = SIMPLE_SHOP_MODE and "automatic" or (row.store_type or "automatic"),
             zoneRadius = IL.Num(row.zone_radius, 3.0),
             active = IL.Bool(row.active),
             blipEnabled = IL.Bool(row.blip_enabled),
-            canRob = IL.Bool(row.can_rob),
+            canRob = not SIMPLE_SHOP_MODE and IL.Bool(row.can_rob),
             apuLastRobbed = IL.Int(row.apu_last_robbed, 0),
             safeLastRobbed = IL.Int(row.safe_last_robbed, 0),
         }
@@ -95,6 +96,110 @@ local function ApuTimeLeft(storeId)
     return math.max(0, window - IL.Now())
 end
 
+local function InventoryModule()
+    local inventory = VFW and VFW.Inventory
+    if inventory
+        and inventory.Normalize
+        and inventory.AddToList
+        and inventory.ListWeight
+        and inventory.GivePlayerItem
+        and inventory.TakePlayerItem then
+        return inventory
+    end
+    return nil
+end
+
+local function RefreshMissingItems(lines)
+    local missing = false
+    for i = 1, #lines do
+        if not IL.ItemExists(lines[i].name) then
+            missing = true
+            break
+        end
+    end
+
+    if missing and VFW and VFW.DB and VFW.DB.RefreshItemsCatalog then
+        local ok, err = pcall(VFW.DB.RefreshItemsCatalog)
+        if not ok then
+            console.warn(("[supermarket] Impossible d'actualiser le catalogue d'items : %s"):format(tostring(err)))
+        end
+    end
+
+    for i = 1, #lines do
+        if not IL.ItemExists(lines[i].name) then
+            return false, lines[i].name
+        end
+    end
+    return true
+end
+
+local function CanCarryPurchase(xPlayer, lines)
+    local itemsOk, missingName = RefreshMissingItems(lines)
+    if not itemsOk then
+        return false, ("L'article '%s' n'est pas configuré dans l'inventaire."):format(missingName), nil
+    end
+
+    local inventory = InventoryModule()
+    if not inventory then
+        for i = 1, #lines do
+            if not xPlayer.canCarryItem(lines[i].name, lines[i].quantity) then
+                return false, "Votre inventaire est plein", nil
+            end
+        end
+        return true, nil, nil
+    end
+
+    -- Simuler le panier complet. Tester chaque ligne contre l'inventaire courant
+    -- autorisait auparavant plusieurs lignes qui dépassaient ensemble la capacité.
+    local preview = inventory.Normalize(xPlayer.inventory, inventory.PlayerMaxSlots)
+    for i = 1, #lines do
+        local line = lines[i]
+        if inventory.AddToList(preview, line.name, line.quantity, nil, inventory.PlayerMaxSlots) < line.quantity then
+            return false, "Votre inventaire ne dispose pas d'assez d'emplacements", inventory
+        end
+    end
+
+    local maxWeight = tonumber(xPlayer.maxWeight) or tonumber(Config and Config.MaxWeight) or 0
+    if inventory.ListWeight(preview) > maxWeight then
+        return false, "Votre inventaire est plein", inventory
+    end
+
+    return true, nil, inventory
+end
+
+local function GivePurchase(xPlayer, lines, inventory)
+    local granted = {}
+
+    for i = 1, #lines do
+        local line = lines[i]
+        local added
+        if inventory then
+            added = inventory.GivePlayerItem(xPlayer, line.name, line.quantity, nil, false)
+        else
+            added = IL.GiveItem(xPlayer, line.name, line.quantity, false) and line.quantity or 0
+        end
+
+        if added < line.quantity then
+            if added > 0 then
+                granted[#granted + 1] = { name = line.name, quantity = added }
+            end
+            for j = #granted, 1, -1 do
+                local rollback = granted[j]
+                if inventory then
+                    inventory.TakePlayerItem(xPlayer, rollback.name, rollback.quantity, false)
+                else
+                    IL.TakeItem(xPlayer, rollback.name, rollback.quantity)
+                end
+            end
+            return false
+        end
+
+        granted[#granted + 1] = line
+    end
+
+    return true
+end
+
 local function Purchase(source, purchaseData, total, paymentMethod)
     local xPlayer = IL.Player(source)
     if not xPlayer then return { success = false, message = "Joueur introuvable" } end
@@ -123,21 +228,23 @@ local function Purchase(source, purchaseData, total, paymentMethod)
 
     if realTotal <= 0 then return { success = false, message = "Votre panier n'est pas valide" } end
 
-    for i = 1, #lines do
-        if not xPlayer.canCarryItem(lines[i].name, lines[i].quantity) then
-            return { success = false, message = "Votre inventaire est plein" }
-        end
-    end
+    local canCarry, carryError, inventory = CanCarryPurchase(xPlayer, lines)
+    if not canCarry then return { success = false, message = carryError } end
 
     if not IL.TakeMoney(xPlayer, account, realTotal, "supermarket") then
         return { success = false, message = "Fonds insuffisants" }
     end
 
-    for i = 1, #lines do
-        IL.GiveItem(xPlayer, lines[i].name, lines[i].quantity, false)
+    if not GivePurchase(xPlayer, lines, inventory) then
+        IL.GiveMoney(xPlayer, account, realTotal, "supermarket-refund")
+        return { success = false, message = "Achat annulé : impossible d'ajouter les articles" }
     end
 
-    return { success = true }
+    return {
+        success = true,
+        cash = IL.AccountMoney(xPlayer, "money"),
+        bank = IL.AccountMoney(xPlayer, "bank"),
+    }
 end
 
 IL.OnReady(function()
@@ -239,6 +346,10 @@ RegisterNetEvent("shops:close", function()
 end)
 
 IL.RegisterCallback("core:supermarket:canRobAPU", function(source, supermarketId)
+    if SIMPLE_SHOP_MODE then
+        return false, "Cette supérette est uniquement disponible à l'achat"
+    end
+
     local xPlayer = IL.Player(source)
     if not xPlayer then return false, "Joueur introuvable" end
 
@@ -292,6 +403,8 @@ IL.RegisterCallback("core:supermarket:getAPUState", function(source, supermarket
 end)
 
 RegisterNetEvent("core:supermarket:startAPURobbery", function(supermarketId)
+    if SIMPLE_SHOP_MODE then return end
+
     local source = source
     local xPlayer = IL.Player(source)
     if not xPlayer then return end
@@ -325,6 +438,8 @@ RegisterNetEvent("core:supermarket:cancelAPURobbery", function(supermarketId, re
 end)
 
 RegisterNetEvent("core:supermarket:completeAPURobbery", function(supermarketId)
+    if SIMPLE_SHOP_MODE then return end
+
     local source = source
     local xPlayer = IL.Player(source)
     if not xPlayer then return end
@@ -354,6 +469,8 @@ RegisterNetEvent("core:supermarket:completeAPURobbery", function(supermarketId)
 end)
 
 RegisterNetEvent("core:supermarket:startSafeRobbery", function(supermarketId)
+    if SIMPLE_SHOP_MODE then return end
+
     local source = source
     local xPlayer = IL.Player(source)
     if not xPlayer then return end
@@ -369,6 +486,8 @@ RegisterNetEvent("core:supermarket:startSafeRobbery", function(supermarketId)
 end)
 
 RegisterNetEvent("core:supermarket:completeSafeRobbery", function(supermarketId)
+    if SIMPLE_SHOP_MODE then return end
+
     local source = source
     local xPlayer = IL.Player(source)
     if not xPlayer then return end
@@ -475,6 +594,12 @@ local function StoreRows()
         row.canRob = row.can_rob
         row.storeType = row.store_type
         row.zoneRadius = IL.Num(row.zone_radius, 2.0)
+        if SIMPLE_SHOP_MODE then
+            row.can_rob = false
+            row.canRob = false
+            row.store_type = "automatic"
+            row.storeType = "automatic"
+        end
     end
     return rows
 end
@@ -540,6 +665,7 @@ local function SaveStore(data)
     if canRob == nil then canRob = data.can_rob end
     if canRob == nil then canRob = true end
     canRob = IL.Bool(canRob)
+    if SIMPLE_SHOP_MODE then canRob = false end
     local active = data.active
     if active == nil then active = true end
     local blip = data.blipEnabled

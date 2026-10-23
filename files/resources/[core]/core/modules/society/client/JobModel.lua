@@ -12,6 +12,8 @@ JobModel.types = {
     ["craft"] = { label = "Points de récolte", submenu = "manageCraft" },
     ["concess"] = { label = "Options personnalisées", submenu = "manageConcess" },
     ["ltd"] = { label = "Gestion Livraisons", submenu = "manageLTD" },
+    -- Aussi utilisé par Dynasty (jobs/dynasty/client/dynasty.lua) : sans ce type, activateBuilder("catalog") lève
+    -- « Invalid builder type » au chargement et le client de Dynasty s'arrête là.
     ["catalog"] = { label = "Points Catalogue", submenu = "manageCatalog" },
     ["taxi"] = { label = "Gestion Taxi", submenu = "manageTaxi" }
 }

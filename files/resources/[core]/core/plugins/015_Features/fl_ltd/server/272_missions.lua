@@ -1,5 +1,9 @@
 Feat27 = Feat27 or {}
 
+if not LTDDelivery.Config.EnableJobSystem then
+    return
+end
+
 local missions = {}
 local BOX_ITEM = "ltd_box"
 

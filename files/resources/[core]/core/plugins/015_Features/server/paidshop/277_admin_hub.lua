@@ -172,18 +172,8 @@ end)
 
 RegisterServerCallback("paidshop:adminGetAllCategories", function(source)
     if not adminOf(source) then return false, {} end
-    local out = {}
-    if PaidShopConfig and PaidShopConfig.ConfigurableCategories then
-        for id, cfg in pairs(PaidShopConfig.ConfigurableCategories) do
-            out[#out + 1] = { id = id, label = cfg.label or id, enabled = cfg.enabled ~= false, order = cfg.order or 100 }
-        end
-    end
-    if PaidShopConfig and PaidShopConfig.VIPCategory then
-        local cfg = PaidShopConfig.VIPCategory
-        out[#out + 1] = { id = "vip", label = cfg.label or "VIP", enabled = cfg.enabled ~= false, order = cfg.order or 999 }
-    end
-    table.sort(out, function(a, b) return (a.order or 100) < (b.order or 100) end)
-    return true, out
+    -- la liste (avec icône, type, nombre d'articles...) est dans 279_categories.lua
+    return true, PaidShop.ListCategories()
 end)
 
 RegisterServerCallback("paidshop:adminSetCategoryEnabled", function(source, categoryId, enabled)

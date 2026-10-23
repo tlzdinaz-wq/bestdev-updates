@@ -174,7 +174,7 @@ Staff29.Cb("vfw:staff:sams:getReports", function(source)
     local out = {}
     for i = 1, #rows do
         local row = rows[i]
-        local deleted = tonumber(row.deleted) == 1
+        local deleted = VFW.DB.IsSet(row.deleted)
         out[i] = {
             id = row.id,
             hospital = row.hospital or "pillbox",
@@ -237,7 +237,7 @@ RegisterNetEvent("vfw:staff:sams:permanentDeleteReport", function(reportId)
         Staff29.Notify(source, "ERROR", "SAMS", "Ce rapport est introuvable.")
         return
     end
-    if tonumber(row.deleted) ~= 1 then
+    if not VFW.DB.IsSet(row.deleted) then
         Staff29.Notify(source, "ERROR", "SAMS", "Ce rapport doit d'abord être supprimé avant d'être effacé.")
         return
     end

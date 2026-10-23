@@ -49,6 +49,35 @@ local function normalizeSpawnName(categoryConfig, spawnName)
     return value
 end
 
+--- Ce que l'acheteur reçoit doit exister, sinon l'article s'achète mais ne se livre jamais
+--- (« Cet article n'existe pas dans l'inventaire » au retrait). Vérifie aussi la quantité donnée.
+---@return boolean ok, string|nil err
+local function checkGivenItem(categoryConfig, clean)
+    local kind = categoryConfig and categoryConfig.itemType
+
+    if kind == "weapon" or kind == "consumable" or kind == "personal" then
+        local given = clean.extra.claimItem
+        if given ~= nil then
+            if type(given) ~= "string" or not Feat27.Inv.Exists(given) then
+                return false, ("L'objet donné à l'achat n'existe pas dans l'inventaire : %s"):format(tostring(given))
+            end
+            local count = math.floor(tonumber(clean.extra.claimCount) or 1)
+            clean.extra.claimCount = math.max(1, math.min(count, 9999))
+        else
+            clean.extra.claimCount = nil
+            if not Feat27.Inv.Exists(clean.spawnName) then
+                return false, ("Cet objet n'existe pas dans l'inventaire : %s"):format(clean.spawnName)
+            end
+        end
+    elseif kind == "vehicle" or kind == "ped" then
+        if #clean.spawnName > 40 or not clean.spawnName:match("^[%w_%-]+$") then
+            return false, "Modèle invalide : lettres, chiffres et _ seulement."
+        end
+    end
+
+    return true
+end
+
 local function isDisabled(value)
     return value == false or value == 0 or value == "0"
 end
@@ -92,6 +121,9 @@ RegisterServerCallback("paidshop:addItemServer", function(source, item, category
 
     clean.spawnName = normalizeSpawnName(categoryConfig, clean.spawnName)
     if not clean.name or clean.name == "" then clean.name = clean.spawnName end
+
+    local given, givenErr = checkGivenItem(categoryConfig, clean)
+    if not given then return false, givenErr end
 
     local existing = MySQL.single.await([[
         SELECT `id`, `enabled` FROM paidshop_items

@@ -527,13 +527,23 @@ end
 local function UpdatePositionBlips(list)
     local activeIds = {}
     local myId = GetPlayerServerId(PlayerId())
+    local myCoords = GetEntityCoords(PlayerPedId())
+    local maxDistance = tonumber(Config.JobBlipMaxDistance) or 1000.0
+    local maxDistanceSquared = maxDistance * maxDistance
 
     for _, u in ipairs(list) do
         local id      = u.id
         local coords  = u.coords
         local ownerId = u.ownerId
+        local isNearby = false
 
-        if id and coords and ownerId ~= myId then
+        if coords and coords.x and coords.y then
+            local deltaX = coords.x - myCoords.x
+            local deltaY = coords.y - myCoords.y
+            isNearby = ((deltaX * deltaX) + (deltaY * deltaY)) <= maxDistanceSquared
+        end
+
+        if id and coords and ownerId ~= myId and isNearby then
             activeIds[id] = true
 
             local blip = PositionBlips[id]
@@ -545,7 +555,7 @@ local function UpdatePositionBlips(list)
                 SetBlipSprite(blip, sprite)
                 SetBlipColour(blip, color)
                 SetBlipScale(blip, scale)
-                SetBlipAsShortRange(blip, false)
+                SetBlipAsShortRange(blip, true)
 
                 BeginTextCommandSetBlipName("STRING")
                 AddTextComponentString(label)
@@ -556,6 +566,7 @@ local function UpdatePositionBlips(list)
                 SetBlipSprite(blip, sprite)
                 SetBlipColour(blip, color)
                 SetBlipScale(blip, scale)
+                SetBlipAsShortRange(blip, true)
                 SetBlipCoords(blip, coords.x + 0.0, coords.y + 0.0, coords.z + 0.0)
 
                 BeginTextCommandSetBlipName("STRING")

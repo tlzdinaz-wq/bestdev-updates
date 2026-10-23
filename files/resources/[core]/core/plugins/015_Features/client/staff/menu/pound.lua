@@ -1,4 +1,3 @@
-local bIsOpen = false
 local eCurrentVehicle = {}
 
 local function fcDeletePreview(iNumber)
@@ -22,10 +21,31 @@ local function fcSpawnPreview(sModel, tPos, iNumber)
     return eEntity
 end
 
+-- Menu.refresh() de VUI = close() puis open(), et chacun lance son gestionnaire (OnClose / OnOpen)
+-- dans un NOUVEAU thread, donc APRÈS le retour de refresh(). L'ancienne garde (un booléen levé
+-- seulement le temps de l'appel) était déjà retombée quand OnClose s'exécutait : chaque
+-- rafraîchissement remettait le brouillon à zéro — label, position, zone, catégorie, tout
+-- revenait à sa valeur par défaut, et rien ne pouvait être modifié.
+-- On note donc qu'une fermeture est attendue ; le premier OnClose qui suit la consomme.
+local iRefreshExpectedUntil = 0
+
 local function fcRefresh(Menu)
-    bIsOpen = true
+    if Menu.softRefresh then
+        Menu.softRefresh()
+        return
+    end
+
+    iRefreshExpectedUntil = GetGameTimer() + 1500
     Menu.refresh()
-    bIsOpen = false
+end
+
+--- Vrai si cette fermeture vient d'un rafraîchissement (et non de l'utilisateur) : on la consomme.
+local function fcIsRefreshClose()
+    if GetGameTimer() < iRefreshExpectedUntil then
+        iRefreshExpectedUntil = 0
+        return true
+    end
+    return false
 end
 
 local function fcGetIcon(args)
@@ -66,6 +86,17 @@ local function fcCloseMenu()
     end
 end
 
+--- Retourne au menu parent sans casser la pile des menus intégrés au hub Gestion.
+local function fcReturnToParent(currentMenu, parentMenu)
+    if exports["VUI"]:IsHubMode() then
+        exports["VUI"]:HandleBack()
+        return
+    end
+
+    currentMenu.close()
+    parentMenu.open()
+end
+
 local poundSelected = getPoundDefaultData()
 local pounds = {}
 local iCurrentCategory = 1
@@ -80,6 +111,21 @@ StaffMenu.modifyPound = VUI:CreateSubMenu(StaffMenu.createPound, "APERÇU MODIFI
 StaffMenu.createPound.OnOpen(function()
     StaffMenu.BuildCreatePoundMenu()
 end)
+
+local function fcAddSpawnPoint(Menu)
+    local ped <const> = PlayerPedId()
+    local pos <const> = GetEntityCoords(ped)
+    local idx = #poundSelected.spawnPositions + 1
+
+    poundSelected.spawnPositions[idx] = {
+        x = pos.x,
+        y = pos.y,
+        z = pos.z - 0.99,
+        w = GetEntityHeading(ped)
+    }
+    fcSpawnPreview("sultan", poundSelected.spawnPositions[idx], idx)
+    fcRefresh(Menu)
+end
 
 function StaffMenu.BuildCreatePoundMenu()
     pounds = TriggerServerCallback("core:getAllPounds") or {}
@@ -222,13 +268,7 @@ local function fcBuildPoundMenu(Menu)
         Menu.Separator("")
 
         Menu.Button("Ajouter un point de spawn", "Se placer à l'emplacement voulu", nil, "arrow", false, function()
-            local ped <const> = PlayerPedId()
-            local pos <const> = GetEntityCoords(ped)
-            local idx = #poundSelected.spawnPositions + 1
-
-            poundSelected.spawnPositions[idx] = { x = pos.x, y = pos.y, z = pos.z - 0.99, w = GetEntityHeading(ped) }
-            fcSpawnPreview("sultan", poundSelected.spawnPositions[idx], idx)
-            fcRefresh(Menu)
+            fcAddSpawnPoint(Menu)
         end)
     end
 end
@@ -236,43 +276,71 @@ end
 StaffMenu.createPoundData.OnOpen(function()
     fcBuildPoundMenu(StaffMenu.createPoundData)
 
+    -- Le point de spawn se trouvait uniquement dans la seconde catégorie : le bouton
+    -- de création indiquait le manque sans donner d'action visible pour le corriger.
+    if iCurrentCategory == 1 and #poundSelected.spawnPositions == 0 then
+        StaffMenu.createPoundData.Separator("EMPLACEMENT REQUIS")
+        StaffMenu.createPoundData.Button("Ajouter le premier point de spawn", "Placez-vous à l'emplacement de sortie du véhicule", nil, "pin", false, function()
+            fcAddSpawnPoint(StaffMenu.createPoundData)
+        end)
+    end
+
     StaffMenu.createPoundData.Separator("ACTIONS")
 
-    local sStatusMessage = ""
-  if not poundSelected.label then
-        sStatusMessage = "Label manquant"
-  elseif not poundSelected.position.x then
-        sStatusMessage = "Position manquante"
-  elseif #poundSelected.spawnPositions == 0 then
-        sStatusMessage = "Aucun point de spawn"
-  else
-        sStatusMessage = "Prêt à créer (" .. #poundSelected.spawnPositions .. (#poundSelected.spawnPositions > 1 and " spawns)" or " spawn)")
-  end
+    local tMissing = {}
+    if not poundSelected.label or poundSelected.label == "" then
+        tMissing[#tMissing + 1] = "label"
+    end
+    if not poundSelected.position.x then
+        tMissing[#tMissing + 1] = "position"
+    end
+    if #poundSelected.spawnPositions == 0 then
+        tMissing[#tMissing + 1] = "point de spawn"
+    end
+    if not poundSelected.useMarker and (not poundSelected.pedModel or poundSelected.pedModel == "") then
+        tMissing[#tMissing + 1] = "modèle du PNJ"
+    end
+    if poundSelected.price == nil or tonumber(poundSelected.price) == nil or tonumber(poundSelected.price) < 0 then
+        tMissing[#tMissing + 1] = "prix de sortie"
+    end
 
-    local bIsValid = poundSelected.label and poundSelected.position.x and #poundSelected.spawnPositions > 0
+    local bIsValid = #tMissing == 0
+    local sStatusMessage = bIsValid
+        and ("Prêt à créer (" .. #poundSelected.spawnPositions .. (#poundSelected.spawnPositions > 1 and " spawns)" or " spawn)"))
+        or ("Manque : " .. table.concat(tMissing, ", "))
     local sIcon = bIsValid and "check" or "lock"
 
-  StaffMenu.createPoundData.Button("Créer la fourrière", sStatusMessage, nil, sIcon, not bIsValid, function()
+  StaffMenu.createPoundData.Button("Créer la fourrière", sStatusMessage, nil, sIcon, false, function()
         if not bIsValid then
             VFW.ShowNotification({
                 type = 'STAFF', variant = 'ERROR', subtitle = 'Gestion Fourrière',
-                message = "Veuillez définir tous les paramètres avant de créer la fourrière."
+                message = "Création impossible. Il manque : " .. table.concat(tMissing, ", ") .. "."
           })
             return
         end
 
-        TriggerServerCallback("core:createPound", poundSelected)
+        local bCreated = TriggerServerCallback("core:createPound", poundSelected)
+        if not bCreated then
+            VFW.ShowNotification({
+                type = 'STAFF', variant = 'ERROR', subtitle = 'Gestion Fourrière',
+                message = "Le serveur a refusé la création de la fourrière. Vérifiez vos permissions et les données saisies."
+            })
+            return
+        end
+
+        VFW.ShowNotification({
+            type = 'STAFF', variant = 'SUCCESS', subtitle = 'Gestion Fourrière',
+            message = "Fourrière créée avec succès."
+        })
         fcCloseMenu()
         poundSelected = getPoundDefaultData()
         iCurrentCategory = 1
-        if VUI_MenuStack then table.remove(VUI_MenuStack) end
-        StaffMenu.createPoundData.close()
-        StaffMenu.createPound.open()
+        fcReturnToParent(StaffMenu.createPoundData, StaffMenu.createPound)
     end)
 end)
 
 StaffMenu.createPoundData.OnClose(function()
-    if bIsOpen then return end
+    if fcIsRefreshClose() then return end
     fcCloseMenu()
     poundSelected = getPoundDefaultData()
     iCurrentCategory = 1
@@ -334,7 +402,7 @@ StaffMenu.modifyPound.OnOpen(function()
 end)
 
 StaffMenu.modifyPound.OnClose(function()
-    if bIsOpen then return end
+    if fcIsRefreshClose() then return end
     fcCloseMenu()
     poundSelected = getPoundDefaultData()
     iCurrentCategory = 1

@@ -53,6 +53,9 @@ Config.JobBlips = {
     },
 }
 
+-- Les unités trop éloignées ne doivent pas encombrer la minimap.
+Config.JobBlipMaxDistance = 1000.0
+
 Config.TrackedVehicles = {
     
     default = {

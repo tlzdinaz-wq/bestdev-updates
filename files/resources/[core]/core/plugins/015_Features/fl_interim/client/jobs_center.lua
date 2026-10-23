@@ -36,11 +36,12 @@ CreateThread(function()
     end
 end)
 
+-- Page dédiée interface/interimcenter (iframe de l'interface de core) ; remplace l'ancien écran du bundle.
 RegisterNetEvent("nui:interimjobscenter:open", function(data)
     VFW.Nui.Focus(true)
 
     SendNUIMessage({
-        action = "nui:interimjobscenter:open",
+        action = "interimcenter:open",
         data = data
     })
 end)
@@ -48,12 +49,13 @@ end)
 RegisterNetEvent("nui:interimjobscenter:close", function()
     VFW.Nui.Focus(false)
     SendNUIMessage({
-        action = "nui:interimjobscenter:close"
+        action = "interimcenter:close"
     })
 end)
 
 RegisterNUICallback("interimjobscenter:close", function(data, cb)
     VFW.Nui.Focus(false)
+    SendNUIMessage({ action = "interimcenter:close" })
     cb("ok")
 end)
 

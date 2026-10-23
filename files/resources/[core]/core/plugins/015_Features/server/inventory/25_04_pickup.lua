@@ -100,12 +100,20 @@ function Inv.CreatePickup(coords, label)
     return pickupId, pickup
 end
 
+--- Pose des objets au sol.
+---
+--- Rend aussi la raison d'un echec : sans elle, un objet qu'on ne peut pas jeter
+--- revenait simplement dans le sac, sans un mot, et le joueur ne pouvait que
+--- constater que « ça ne marche pas ».
+---@return number added, string|nil pickupId, string|nil raison
 function Inv.DropToGround(coords, name, count, meta, label)
     local pickupId, pickup = Inv.FindNearbyPickup(coords)
     if not pickup then
         pickupId, pickup = Inv.CreatePickup(coords, label)
     end
-    if not pickup then return 0 end
+    if not pickup then
+        return 0, nil, "Impossible de poser un objet ici."
+    end
 
     local added = Inv.AddToList(pickup.items, name, count, meta, Inv.PickupMaxSlots)
     pickup.createdAt = GetGameTimer()
@@ -113,6 +121,10 @@ function Inv.DropToGround(coords, name, count, meta, label)
     if added > 0 then
         Inv.RefreshPickupViewers(pickupId)
         refreshNearbyFor(pickup.coords)
+    end
+
+    if added <= 0 then
+        return 0, pickupId, "Le tas d'objets au sol est plein, eloignez-vous un peu."
     end
 
     return added, pickupId
@@ -135,10 +147,22 @@ Inv.RegisterCallback("vfw:dropItem", function(source, info)
 
     local coords = Inv.PlayerCoords(source)
     if not coords then
+        Inv.Toast(source, "Votre position est introuvable : reessayez dans un instant.")
         return Inv.Payload(xPlayer)
     end
 
     local entries = Inv.ParseInfo(info)
+
+    -- Rien de reconnaissable dans la demande : la boucle ne tournait pas, aucun objet
+    -- ne tombait, et rien ne s'affichait. C'est le silence le plus trompeur des trois,
+    -- parce qu'il ressemble exactement a « le bouton ne marche pas ».
+    if #entries == 0 then
+        Inv.Toast(source, "Cet objet n'a pas pu etre identifie : rouvrez votre inventaire.")
+        console.warn(("[inventaire] jet refuse pour %s : aucune case reconnue dans la demande.")
+            :format(tostring(source)))
+        return Inv.Payload(xPlayer)
+    end
+
     local dropped = 0
 
     for i = 1, #entries do
@@ -147,7 +171,9 @@ Inv.RegisterCallback("vfw:dropItem", function(source, info)
         local list = Inv.PlayerList(xPlayer)
         local request = entries[i]
         local entry = Inv.FindSlot(list, request.slot)
-        if entry then
+        if not entry then
+            Inv.Toast(source, "Cette case est vide : rouvrez votre inventaire.")
+        else
             local def = Inv.Def(entry.name)
             if def and def.canRemove == false then
                 Inv.Toast(source, "Cet objet ne peut pas etre jete.")
@@ -157,9 +183,10 @@ Inv.RegisterCallback("vfw:dropItem", function(source, info)
 
                 local taken = Inv.RemoveFromSlot(list, request.slot, quantity)
                 if taken then
-                    local added = Inv.DropToGround(coords, taken.name, taken.count, taken.meta)
+                    local added, _, reason = Inv.DropToGround(coords, taken.name, taken.count, taken.meta)
                     if added < taken.count then
                         Inv.AddToList(Inv.PlayerList(xPlayer), taken.name, taken.count - added, taken.meta, Inv.PlayerMaxSlots)
+                        if reason then Inv.Toast(source, reason) end
                     end
                     dropped = dropped + added
                 end

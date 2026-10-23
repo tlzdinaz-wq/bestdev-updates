@@ -48,9 +48,23 @@ else
             Dof          = true,
             DofStrength  = 0.35,
             Freeze       = true,
-            Animation    = { dict = "anim@mp_corona_idles@male_c@idle_a", anim = "idle_a" },
             Light        = { r = 255, g = 236, b = 214, range = 7.0, intensity = 1.6 }
         }
+    }
+
+    -- Animations du personnage affiché à l'écran de sélection (voir client/multicharacter/modules/clone_animations.lua).
+    -- Il fait un geste à son arrivée, puis alterne des poses d'attente et des gestes, tirés dans un paquet mélangé
+    -- (jamais deux fois la même de suite, tout le paquet passe avant qu'une animation revienne). Tout est facultatif :
+    --   Enabled       : false pour le laisser immobile
+    --   Greeting      : un geste tiré au hasard à l'arrivée du personnage
+    --   Interval      : { min, max } en ms, durée d'une pose d'attente
+    --   GestureChance : % de chances d'un geste entre deux poses
+    --   Idles / Gestures : { male = { { dict = "...", anim = "..." }, ... }, female = { ... } } pour remplacer les listes
+    Config.Multicharacter.Animations = {
+        Enabled = true,
+        Greeting = true,
+        Interval = { 6000, 10000 },
+        GestureChance = 55,
     }
 
     -- Activer le re-log sans recharger la page (ajustez vos ressources en conséquence)

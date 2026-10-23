@@ -5,9 +5,8 @@
 
 local menuOpen = false
 local allowNative = false
-local TILE_IDS = { "personnage", "carte", "boutique", "reglages", "support" }
+local TILE_IDS = { "carte", "boutique", "reglages", "support" }
 local tileImages = {
-    personnage = "",
     carte = "",
     boutique = "",
     reglages = "",
@@ -49,7 +48,7 @@ local function payload()
         lastName = pd.lastName or "",
         discord = discord,
         tiles = {
-            personnage = mugshot ~= "" and mugshot or (tileImages.personnage or ""),
+            personnage = mugshot,
             carte = tileImages.carte or "",
             boutique = tileImages.boutique or "",
             reglages = tileImages.reglages or "",

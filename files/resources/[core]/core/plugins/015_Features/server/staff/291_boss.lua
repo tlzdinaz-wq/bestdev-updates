@@ -46,7 +46,7 @@ function Boss.GetPermMatrix(jobName)
     for i = 1, #rows do
         local row = rows[i]
         matrix[row.grade_name] = matrix[row.grade_name] or {}
-        matrix[row.grade_name][row.perm_name] = row.enabled == 1
+        matrix[row.grade_name][row.perm_name] = VFW.DB.IsSet(row.enabled)
     end
 
     local job = VFW.Jobs[jobName]
@@ -171,7 +171,7 @@ Staff29.Cb("core:jobs:getMembers", function(source, jobName)
             lname = row.lastname or "",
             rank = (tonumber(row.job_grade) or 0) + 1,
             Information = {
-                onDuty = online and online.job.onDuty or (row.job_duty == 1),
+                onDuty = online and online.job.onDuty or VFW.DB.IsSet(row.job_duty),
                 mugshot = row.mugshot or "",
             },
             startDate = tostring(row.created_at or ""),

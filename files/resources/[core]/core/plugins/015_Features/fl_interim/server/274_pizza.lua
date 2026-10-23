@@ -110,32 +110,50 @@ RegisterServerCallback("interim:pizza:getVehicleNetId", function(source)
     return netId
 end)
 
+-- Dit au joueur pourquoi le scooter ne sort pas (avant : « Impossible de sortir le véhicule » sans autre mot).
+local function refuseVehicle(source, message)
+    InterimServer.Notify(source, "ROUGE", message)
+    console.warn(("[interim:pizza] sortie du scooter refusée pour %s : %s"):format(tostring(source), message))
+    return false
+end
+
 RegisterServerCallback("interim:pizza:requestvehicle", function(source)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer then return false end
-    if not InterimServer.HasJob(xPlayer, JOB) then return false end
     if not Feat27.RateLimit(source, "interim:pz:veh", 3000) then return false end
+    if not InterimServer.EnsureJob(source, xPlayer, JOB) then
+        return refuseVehicle(source, "Le métier « Livreur de Pizza » n'est pas disponible.")
+    end
 
     local existing = vehicleOf(source)
     if existing then return existing end
 
     local spots = pos().scooterSpots or {}
-    if #spots == 0 then return false end
+    if #spots == 0 then
+        return refuseVehicle(source, "Aucun emplacement de scooter n'est configuré pour ce métier.")
+    end
 
+    local model = cfg().vehicle or "faggio2"
+    local busy = 0
     for index = 1, #spots do
         if InterimServer.LockSpot(JOB, index, source) then
             local spot = spots[index]
-            local netId = Feat27.SpawnVehicle(cfg().vehicle or "faggio2", spot, tonumber(spot.w) or 0.0)
+            local netId = Feat27.SpawnVehicle(model, spot, tonumber(spot.w) or 0.0, cfg().vehicleType, source)
             if netId then
                 InterimServer.Vehicle(source)[JOB] = netId
                 stocks[source] = 0
                 return netId
             end
             InterimServer.ReleaseSpots(JOB, source)
+        else
+            busy = busy + 1
         end
     end
 
-    return false
+    if busy == #spots then
+        return refuseVehicle(source, "Tous les emplacements de scooter sont occupés, réessayez dans un instant.")
+    end
+    return refuseVehicle(source, ("Le scooter (%s) n'a pas pu être créé : vérifiez le nom du modèle."):format(tostring(model)))
 end)
 
 RegisterNetEvent("interim:pizza:unregisterVehicle", function(netId)

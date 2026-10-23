@@ -707,7 +707,7 @@ end
 
 -- Supermarket Builder Menu
 function StaffMenu.BuildSupermarketMenu()
-    StaffMenu.builderSupermarket.Separator("GESTION DES SUPÉRETTES")
+    StaffMenu.builderSupermarket.Separator("LTD / SUPÉRETTES")
 
     StaffMenu.builderSupermarket.Button(":plus: CRÉER UNE SUPÉRETTE", "Ajouter une nouvelle supérette", nil, "chevron", false, function()
     end, StaffMenu.CreateSuperMarket)
@@ -715,21 +715,10 @@ function StaffMenu.BuildSupermarketMenu()
     StaffMenu.builderSupermarket.Button(":box: LISTE DES SUPÉRETTES", "Gérer les supérettes existantes", nil, "chevron", false, function()
     end, StaffMenu.ListSuperMarket)
 
-    StaffMenu.builderSupermarket.Separator("CONFIGURATION GLOBALE")
+    StaffMenu.builderSupermarket.Separator("PRODUITS")
 
-    StaffMenu.builderSupermarket.Button(":cart: CATALOGUE DES ITEMS", "Gérer les items vendus dans toutes les LTD", nil, "chevron", false, function()
+    StaffMenu.builderSupermarket.Button(":cart: PRODUITS DU MAGASIN", "Gérer les produits vendus dans toutes les LTD", nil, "chevron", false, function()
     end, StaffMenu.SupermarketCatalog)
-
-    StaffMenu.builderSupermarket.Button(":settings: PARAMÈTRES GLOBAUX", "Cooldowns, récompenses, etc.", nil, "chevron", false, function()
-    end, StaffMenu.SupermarketSettings)
-
-    StaffMenu.builderSupermarket.Button(":clock: RÉINITIALISER LES COOLDOWNS", "Réinitialise tous les temps d'attente", nil, "arrow", false, function()
-        TriggerServerEvent('core:supermarket:resetCooldowns')
-        VFW.ShowNotification({
-            type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder',
-            message = "Cooldowns réinitialisés."
-      })
-    end)
 
     StaffMenu.builderSupermarket.Button(":refresh: RECHARGER DEPUIS BDD", "Recharge les supérettes depuis la base de données", nil, "arrow", false, function()
         TriggerServerEvent('core:supermarket:reloadFromDatabase')
@@ -1586,7 +1575,7 @@ end
 -- Variables globales pour le menu de création
 local supermarketData = {
     name = "",
-    canRob = false, -- Par défaut non braquable
+    canRob = false,
     active = true,
     blipEnabled = true,
     supermarketPos = nil,
@@ -1619,55 +1608,20 @@ function StaffMenu.BuildCreateSuperMarketMenu()
         StaffMenu.CreateSuperMarket.refresh()
     end)
 
-    -- Option braquable (si coché, demande position coffre en plus)
-    StaffMenu.CreateSuperMarket.Checkbox(":gun: BRAQUABLE", "Si activé, nécessite position coffre", false, supermarketData.canRob, function(value)
-        supermarketData.canRob = value
-        if not value then
-            -- Reset la position coffre si désactivé
-            supermarketData.safePos = nil
-        end
-        StaffMenu.CreateSuperMarket.refresh()
-    end)
-
     StaffMenu.CreateSuperMarket.Separator("POSITIONS")
 
-    StaffMenu.CreateSuperMarket.Button(":pin: POSITION SUPÉRETTE + ZONE", supermarketData.supermarketPos and "Définie (rayon: 2m)" or "Non définie", nil, "arrow", false, function()
-        local pos = GetEntityCoords(PlayerPedId())
+    StaffMenu.CreateSuperMarket.Button(":user: POSITION DU VENDEUR", supermarketData.apuPos and "Définie" or "Non définie", nil, "arrow", false, function()
+        local ped = PlayerPedId()
+        local pos = GetEntityCoords(ped)
+        local heading = GetEntityHeading(ped)
         supermarketData.supermarketPos = {x = pos.x, y = pos.y, z = pos.z}
-        VFW.ShowNotification({
-            type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder',
-            message = "Position de la supérette définie (zone de 2m)."
-      })
-        StaffMenu.CreateSuperMarket.refresh()
-    end)
-
-    -- Position APU toujours requise (braquable ou non)
-    StaffMenu.CreateSuperMarket.Button(":user: POSITION APU", supermarketData.apuPos and "Définie" or "Non définie", nil, "arrow", false, function()
-        local playerPed = PlayerPedId()
-        local pos = GetEntityCoords(playerPed)
-        local heading = GetEntityHeading(playerPed)
         supermarketData.apuPos = {x = pos.x, y = pos.y, z = pos.z, h = heading}
         VFW.ShowNotification({
             type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder',
-            message = "Position et orientation de l'APU définies."
+            message = "Position et orientation du vendeur définies."
       })
         StaffMenu.CreateSuperMarket.refresh()
     end)
-
-    -- Position coffre seulement si braquable
-    if supermarketData.canRob then
-        StaffMenu.CreateSuperMarket.Button(":lock: POSITION COFFRE", supermarketData.safePos and "Définie" or "Non définie", nil, "arrow", false, function()
-            local ped = PlayerPedId()
-            local pos = GetEntityCoords(ped)
-            local heading = GetEntityHeading(ped)
-            supermarketData.safePos = {x = pos.x, y = pos.y, z = pos.z, h = heading}
-            VFW.ShowNotification({
-                type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder',
-                message = "Position du coffre définie (direction enregistrée)."
-          })
-            StaffMenu.CreateSuperMarket.refresh()
-        end)
-    end
 
     StaffMenu.CreateSuperMarket.Separator("VALIDATION")
 
@@ -1688,35 +1642,25 @@ function StaffMenu.BuildCreateSuperMarketMenu()
             return
         end
 
-        -- APU position toujours requise
+        -- Le vendeur est le seul point : sans lui, rien à afficher ni à ouvrir.
         if not supermarketData.apuPos then
             VFW.ShowNotification({
                 type = 'STAFF', variant = 'ERROR', subtitle = 'Builder',
-                message = "Veuillez définir la position de l'APU."
+                message = "Veuillez définir la position du vendeur."
           })
             return
         end
 
-        -- Coffre position required for robbable stores
-        if supermarketData.canRob and not supermarketData.safePos then
-            VFW.ShowNotification({
-                type = 'STAFF', variant = 'ERROR', subtitle = 'Builder',
-                message = "Veuillez définir la position du coffre."
-          })
-            return
-        end
-
-        -- Toujours type robbable maintenant (APU présent dans tous les cas)
         TriggerServerEvent("core:supermarket:createSupermarket", {
             name = supermarketData.name,
             pos = supermarketData.supermarketPos,
             apuPos = supermarketData.apuPos,
-            safePos = supermarketData.canRob and supermarketData.safePos or nil,
-            canRob = supermarketData.canRob,
+            safePos = nil,
+            canRob = false,
             active = supermarketData.active,
             blipEnabled = supermarketData.blipEnabled,
-            storeType = "robbable", -- Toujours robbable car APU présent
-            zoneRadius = 2.0 -- Rayon fixé à 2m
+            storeType = "automatic",
+            zoneRadius = 2.0
         })
 
         -- Reset data
@@ -2464,11 +2408,9 @@ function StaffMenu.BuildListSuperMarketMenu()
     else
         for _, supermarket in ipairs(supermarkets) do
             local statusText = supermarket.active and "Active" or "Inactive"
-          local typeText = supermarket.canRob and "Braquable" or "Non-Braquable"
-
           StaffMenu.ListSuperMarket.Button(
                 supermarket.name,
-                statusText .. " | " .. typeText,
+                statusText .. " | Vendeur direct",
                 nil,
                 "chevron",
                 false,
@@ -2530,21 +2472,6 @@ function StaffMenu.BuildEditSuperMarketMenu()
       })
     end)
 
-    -- Braquable checkbox (ne change plus le type - tous les stores avec APU sont "robbable")
-    StaffMenu.EditSuperMarket.Checkbox(":gun: BRAQUABLE", nil, false, supermarket.canRob, function(value)
-        supermarket.canRob = value
-        -- storeType reste toujours "robbable" car tous les stores ont un APU maintenant
-        supermarket.storeType = "robbable"
-      TriggerServerEvent("core:supermarket:updateSupermarket", supermarket.id, "canRob", value)
-        TriggerServerEvent("core:supermarket:updateSupermarket", supermarket.id, "storeType", "robbable")
-        TriggerServerEvent("core:supermarket:updateSupermarket", supermarket.id, "zoneRadius", 2.0) -- Fixer à 2m
-        VFW.ShowNotification({
-            type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder',
-            message = value and "Braquage activé." or "Braquage désactivé."
-      })
-        StaffMenu.EditSuperMarket.refresh()
-    end)
-
     StaffMenu.EditSuperMarket.Separator("POSITIONS")
 
     StaffMenu.EditSuperMarket.Button(":pin: SE TÉLÉPORTER", "Aller à la supérette", nil, "arrow", false, function()
@@ -2557,45 +2484,32 @@ function StaffMenu.BuildEditSuperMarketMenu()
         end
     end)
 
-    StaffMenu.EditSuperMarket.Button(":pin: METTRE À JOUR POSITION", "Position actuelle", nil, "arrow", false, function()
+    StaffMenu.EditSuperMarket.Button(":pin: POSITION DU BLIP", "Position actuelle", nil, "arrow", false, function()
         local pos = GetEntityCoords(PlayerPedId())
         supermarket.pos = {x = pos.x, y = pos.y, z = pos.z}
         TriggerServerEvent("core:supermarket:updateSupermarket", supermarket.id, "pos", supermarket.pos)
         VFW.ShowNotification({
             type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder',
-            message = "Position mise à jour."
+            message = "Position du blip mise à jour."
       })
         StaffMenu.EditSuperMarket.refresh()
     end)
 
-    StaffMenu.EditSuperMarket.Button(":user: POSITION APU", supermarket.apuPos and "Définie" or "Non définie", nil, "arrow", false, function()
+    StaffMenu.EditSuperMarket.Button(":user: POSITION VENDEUR", supermarket.apuPos and "Définie" or "Non définie", nil, "arrow", false, function()
         local ped = PlayerPedId()
         local pos = GetEntityCoords(ped)
         local heading = GetEntityHeading(ped)
         supermarket.apuPos = {x = pos.x, y = pos.y, z = pos.z, h = heading}
         TriggerServerEvent("core:supermarket:updateSupermarket", supermarket.id, "apuPos", supermarket.apuPos)
+        -- Comme à la création : le blip et la zone suivent le vendeur.
+        supermarket.pos = {x = pos.x, y = pos.y, z = pos.z}
+        TriggerServerEvent("core:supermarket:updateSupermarket", supermarket.id, "pos", supermarket.pos)
         VFW.ShowNotification({
             type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder',
-            message = "Position APU mise à jour."
+            message = "Position du vendeur mise à jour."
       })
         StaffMenu.EditSuperMarket.refresh()
     end)
-
-    -- Bouton pour modifier la position du coffre (seulement si braquable)
-    if supermarket.canRob then
-        StaffMenu.EditSuperMarket.Button(":lock: POSITION COFFRE", supermarket.safePos and "Définie" or "Non définie", nil, "arrow", false, function()
-            local ped = PlayerPedId()
-            local pos = GetEntityCoords(ped)
-            local heading = GetEntityHeading(ped)
-            supermarket.safePos = {x = pos.x, y = pos.y, z = pos.z, h = heading}
-            TriggerServerEvent("core:supermarket:updateSupermarket", supermarket.id, "safePos", supermarket.safePos)
-            VFW.ShowNotification({
-                type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder',
-                message = "Position du coffre mise à jour (direction enregistrée)."
-          })
-            StaffMenu.EditSuperMarket.refresh()
-        end)
-    end
 
     StaffMenu.EditSuperMarket.Separator("DANGER")
 
@@ -2721,7 +2635,7 @@ end
 
 -- Supermarket Catalog Menu (Global items for all LTD stores)
 function StaffMenu.BuildSupermarketCatalogMenu()
-    StaffMenu.SupermarketCatalog.Separator("CATALOGUE GLOBAL LTD")
+    StaffMenu.SupermarketCatalog.Separator("PRODUITS VENDUS")
 
     -- Get items from server
     local items = TriggerServerCallback("core:supermarket:getGlobalItemsForBuilder") or {}

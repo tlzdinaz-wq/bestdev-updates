@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>ptelevision</title>
+<style>
+    html, body { margin: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+    #v { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; display: none; }
+    #yt { position: absolute; inset: 0; width: 100%; height: 100%; display: none; background: #000; }
+    #yt iframe { width: 100%; height: 100%; border: 0; }
+    #msg {
+        position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+        padding: 6%; box-sizing: border-box; background: #000; color: #fff; text-align: center;
+        font: 600 4vw/1.3 sans-serif;
+    }
+</style>
+</head>
+<body>
+<video id="v" playsinline></video>
+<div id="yt"><div id="ytp"></div></div>
+<div id="msg"></div>
+
+<script>
+(function () {
+    'use strict';
+
+    var video = document.getElementById('v');
+    var ytBox = document.getElementById('yt');
+    var msg = document.getElementById('msg');
+
+    var mode = null;          // 'video' | 'youtube'
+    var source = null;        // adresse du fichier, ou identifiant YouTube
+    var volume = 0;
+    var yt = null;
+    var ytReady = false;
+    var ytApi = 0;            // 0 : pas charge, 1 : en cours, 2 : pret
+    var ytPending = null;
+
+    var YT_ERRORS = {
+        2: 'lien invalide',
+        5: 'lecteur indisponible',
+        100: 'vidéo introuvable ou privée',
+        101: "lecture intégrée interdite par l'auteur",
+        150: "lecture intégrée interdite par l'auteur",
+        153: 'lecteur refusé par YouTube'
+    };
+
+    function clamp01(value) {
+        value = Number(value);
+        return isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+    }
+
+    function show(text) {
+        msg.textContent = text || '';
+        msg.style.display = text ? 'flex' : 'none';
+    }
+
+    // Retour vers le jeu (duree, erreur). Sans effet si le DUI ne relaie pas les callbacks NUI.
+    function report(payload) {
+        try {
+            fetch('https://ptelevision/ptv:report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                body: JSON.stringify(payload)
+            }).catch(function () {});
+        } catch (e) {}
+    }
+
+    function fail(code, label) {
+        show('Vidéo indisponible' + (label ? ' : ' + label : ''));
+        report({ error: code });
+    }
+
+    function duration() {
+        if (mode === 'video') return isFinite(video.duration) ? video.duration : 0;
+        if (mode === 'youtube' && ytReady && yt && yt.getDuration) return yt.getDuration() || 0;
+        return 0;
+    }
+
+    function stopAll() {
+        mode = null;
+        source = null;
+        show('');
+
+        try { video.pause(); } catch (e) {}
+        video.removeAttribute('src');
+        try { video.load(); } catch (e) {}
+        video.style.display = 'none';
+
+        if (yt && yt.destroy) {
+            try { yt.destroy(); } catch (e) {}
+        }
+        yt = null;
+        ytReady = false;
+        ytPending = null;
+        ytBox.style.display = 'none';
+        ytBox.innerHTML = '<div id="ytp"></div>';
+    }
+
+    function playVideo() {
+        var promise = video.play();
+        if (promise && promise.catch) {
+            // Lecture avec son refusee : on demarre muet plutot que de rester sur une image fixe.
+            promise.catch(function () {
+                video.muted = true;
+                video.play().catch(function () {});
+            });
+        }
+    }
+
+    function setVolume(value) {
+        volume = clamp01(value);
+        video.volume = volume;
+        if (mode === 'youtube' && ytReady && yt && yt.setVolume) yt.setVolume(Math.round(volume * 100));
+    }
+
+    // ---- fichier video ----------------------------------------------------------------------------------
+
+    function loadVideo(url, pos, paused, vol) {
+        stopAll();
+        mode = 'video';
+        source = url;
+        video.style.display = 'block';
+        setVolume(vol);
+
+        video.onloadedmetadata = function () {
+            if (pos > 0 && isFinite(video.duration)) {
+                try { video.currentTime = Math.min(pos, video.duration); } catch (e) {}
+            }
+            report({ duration: duration() });
+        };
+        video.onerror = function () {
+            fail(video.error ? 'media-' + video.error.code : 'media', 'lecture impossible');
+        };
+
+        video.src = url;
+        if (!paused) playVideo();
+    }
+
+    // ---- YouTube ----------------------------------------------------------------------------------------
+
+    function ensureYoutubeApi(callback) {
+        if (ytApi === 2) { callback(); return; }
+        ytPending = callback;
+        if (ytApi === 1) return;
+
+        ytApi = 1;
+        window.onYouTubeIframeAPIReady = function () {
+            ytApi = 2;
+            var run = ytPending;
+            ytPending = null;
+            if (run) run();
+        };
+
+        var tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        tag.onerror = function () {
+            ytApi = 0;
+            fail('yt-api', 'YouTube injoignable');
+        };
+        document.head.appendChild(tag);
+    }
+
+    function loadYoutube(id, pos, paused, vol) {
+        stopAll();
+        mode = 'youtube';
+        source = id;
+        ytBox.style.display = 'block';
+        volume = clamp01(vol);
+
+        ensureYoutubeApi(function () {
+            if (mode !== 'youtube' || source !== id) return;
+
+            yt = new YT.Player('ytp', {
+                videoId: id,
+                width: '100%',
+                height: '100%',
+                playerVars: {
+                    autoplay: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3,
+                    modestbranding: 1, playsinline: 1, rel: 0, enablejsapi: 1, start: Math.floor(pos)
+                },
+                events: {
+                    onReady: function (event) {
+                        ytReady = true;
+                        event.target.unMute();
+                        event.target.setVolume(Math.round(volume * 100));
+                        if (paused) event.target.pauseVideo(); else event.target.playVideo();
+                    },
+                    onStateChange: function (event) {
+                        if (event.data === 1) report({ duration: duration() });
+                    },
+                    onError: function (event) {
+                        fail(event.data, YT_ERRORS[event.data]);
+                    }
+                }
+            });
+        });
+    }
+
+    // ---- synchronisation --------------------------------------------------------------------------------
+
+    function applySync(pos, paused) {
+        var tolerance = paused ? 0.5 : 3;
+
+        if (mode === 'video') {
+            if (isFinite(video.duration) && Math.abs((video.currentTime || 0) - pos) > tolerance) {
+                try { video.currentTime = Math.min(pos, video.duration); } catch (e) {}
+            }
+            if (paused && !video.paused) video.pause();
+            if (!paused && video.paused && !video.ended) playVideo();
+        } else if (mode === 'youtube' && ytReady && yt && yt.getPlayerState) {
+            if (Math.abs((yt.getCurrentTime() || 0) - pos) > tolerance) yt.seekTo(pos, true);
+
+            var state = yt.getPlayerState();   // 1 lecture, 2 pause, 3 tampon, 5 pret, -1 non demarre
+            if (paused && state === 1) yt.pauseVideo();
+            if (!paused && (state === 2 || state === 5 || state === -1)) yt.playVideo();
+        }
+    }
+
+    function onLoad(data) {
+        var pos = Number(data.pos) || 0;
+        var paused = !!data.paused;
+
+        if (data.kind === 'youtube' && /^[\w-]{11}$/.test(String(data.id))) {
+            if (mode === 'youtube' && source === data.id) {
+                setVolume(data.volume);
+                applySync(pos, paused);
+            } else {
+                loadYoutube(data.id, pos, paused, data.volume);
+            }
+        } else if (data.kind === 'video' && /^https?:\/\//i.test(String(data.url))) {
+            if (mode === 'video' && source === data.url) {
+                setVolume(data.volume);
+                applySync(pos, paused);
+            } else {
+                loadVideo(data.url, pos, paused, data.volume);
+            }
+        }
+    }
+
+    window.addEventListener('message', function (event) {
+        var data = event.data;
+        if (typeof data === 'string') {
+            try { data = JSON.parse(data); } catch (e) { return; }
+        }
+        if (!data || typeof data !== 'object') return;
+
+        switch (data.action) {
+            case 'load': onLoad(data); break;
+            case 'sync': applySync(Number(data.pos) || 0, !!data.paused); break;
+            case 'volume': setVolume(data.value); break;
+            case 'stop': stopAll(); break;
+        }
+    });
+
+    // La duree n'est pas connue des le debut : on la renvoie tant qu'elle manque.
+    setInterval(function () {
+        if (!mode) return;
+        var length = duration();
+        if (length > 0) report({ duration: length });
+    }, 2000);
+})();
+</script>
+</body>
+</html>

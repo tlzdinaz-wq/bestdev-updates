@@ -17,9 +17,9 @@ FORCE=0; CHECK=0
 [ "$MODE" = "force" ] && FORCE=1
 [ "$MODE" = "check" ] && CHECK=1
 
-info()  { printf '\033[36m[update]\033[0m %s\n' "$*"; }
-warn()  { printf '\033[33m[update]\033[0m %s\n' "$*"; }
-fail()  { printf '\033[31m[update]\033[0m %s\n' "$*"; }
+info()  { printf '\033[36m[Aurora]\033[0m %s\n' "$*"; }
+warn()  { printf '\033[33m[Aurora]\033[0m %s\n' "$*"; }
+fail()  { printf '\033[31m[Aurora]\033[0m %s\n' "$*"; }
 
 command -v curl >/dev/null || { fail "curl est requis."; exit 1; }
 command -v sha256sum >/dev/null || { fail "sha256sum est requis."; exit 1; }

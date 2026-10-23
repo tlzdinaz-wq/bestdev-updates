@@ -56,12 +56,12 @@ function VFW.CreateExtendedPlayer(source, row, account)
     self.metadata = row.metadata or {}
     self.maxWeight = row.max_weight or Config.MaxWeight
     self.weight = 0
-    self.dead = row.is_dead == 1
+    self.dead = VFW.DB.IsSet(row.is_dead)
     self.group = row.group or "user"
     self.faction = row.faction or ""
 
     self.job = VFW.DB.BuildJob(row.job, row.job_grade)
-    self.job.onDuty = row.job_duty == 1
+    self.job.onDuty = VFW.DB.IsSet(row.job_duty)
     self.job2 = row.job2 ~= "" and VFW.DB.BuildJob(row.job2, row.job2_grade) or nil
 
     if VFW.HydrateNiveau6Permissions then

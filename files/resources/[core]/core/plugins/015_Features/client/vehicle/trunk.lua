@@ -417,8 +417,11 @@ local function mayHaveVehicleKeys(vehicle)
     local plate = VFW.Math.Trim(GetVehicleNumberPlateText(vehicle))
     if plate ~= "" and LocalPlayer.state["tempVehicleKey:" .. plate] ~= nil then return true end
     local state = Entity(vehicle).state
-    -- véhicule possédé / de groupe : le serveur tranche ; véhicule non enregistré : accessible
-    return state.OwnedVehicle == true or state.staffVehicle == true or not state.VehicleProperties
+    -- véhicule possédé / de groupe / loué : le serveur tranche. Un véhicule non enregistré (PNJ) n'a
+    -- pas de clé : le bouton n'apparaît que pour le staff habilité (le serveur applique la même règle).
+    if state.OwnedVehicle == true then return true end
+    local permissions = VFW.PlayerGlobalData and VFW.PlayerGlobalData.permissions
+    return permissions ~= nil and permissions["alt_vehicle_management"] == true
 end
 
 VFW.ContextAddButton("vehicle", ":lock: Verrouiller/Déverrouiller", function(vehicle)
@@ -680,6 +683,8 @@ function VFW.OpenTrunk(OwnedVehicle, plate, netId)
     local vehicleHash = GetEntityModel(veh)
     local vehicleModel = GetDisplayNameFromVehicleModel(vehicleHash)
     local chestId, inventory, weight, maxWeight, name = TriggerServerCallback("vfw:trunk:get", OwnedVehicle, plate, netId, vehicleModel, vehicleHash)
+    -- Le serveur dit pourquoi (véhicule trop loin ou introuvable) : on n'ouvre pas un coffre vide sans identifiant.
+    if not chestId then return end
     local dynamicMaxSlots = GetModelStorageSlots(veh, "trunk")
 
     -- Use server maxWeight (includes VIP bonus), fallback to client config
@@ -726,22 +731,54 @@ function VFW.OpenTrunkStaff(plate, netId)
     })
 end
 
+-- Dans un véhicule, la touche d'inventaire ouvre la boîte à gants à côté du sac. L'inventaire du joueur
+-- s'affiche TOUT DE SUITE, avec une boîte à gants encore vide ; son contenu le rejoint dès que le serveur
+-- répond. Avant, rien ne s'affichait tant que cette réponse n'était pas arrivée (jusqu'à 15 s de latence
+-- quand le serveur ne répondait pas).
 function VFW.OpenGloveBox(OwnedVehicle, plate, netId)
-    local chestId, inventory, weight, maxWeight, name = TriggerServerCallback("vfw:glovebox:get", OwnedVehicle, plate, netId)
     local veh = NetToVeh(netId)
     local dynamicMaxWeight = GetModelStorageWeight(veh, "glovebox")
     local dynamicMaxSlots = GetModelStorageSlots(veh, "glovebox")
 
+    -- Panneau d'attente : évite aussi la requête « Autour de moi », inutile ici puisque la boîte à gants
+    -- prend sa place.
     VFW.OpenInventory({
-        chestId = chestId,
-        inventory = inventory,
-        name = name,
-        maxWeight = dynamicMaxWeight,
-        weight = weight,
+        inventory = {},
+        name = "Boîte à gants",
+        maxWeight = 1000,
+        weight = 0,
         search = false,
         type = "glovebox",
         maxSlots = dynamicMaxSlots
     })
+
+    local chestId, inventory, weight, maxWeight, name = TriggerServerCallback("vfw:glovebox:get", OwnedVehicle, plate, netId)
+
+    -- Le joueur a refermé l'inventaire pendant l'attente : la boîte à gants ne doit pas rester suivie.
+    if not VFW.StateInventory() then
+        if chestId then TriggerServerEvent("vfw:chest:close", chestId) end
+        return
+    end
+
+    -- Pas de boîte à gants (le serveur a refusé et dit pourquoi) : on remet « Autour de moi ».
+    if not chestId then
+        VFW.PlayerData.target = nil
+        VFW.LoadInventories()
+        return
+    end
+
+    VFW.PlayerData.target = {
+        chestId = chestId,
+        inventory = inventory,
+        name = name,
+        -- La capacité vient du serveur (en unités de l'inventaire, comme le coffre) : celle du client est en kg.
+        maxWeight = maxWeight or dynamicMaxWeight,
+        weight = weight,
+        search = false,
+        type = "glovebox",
+        maxSlots = dynamicMaxSlots
+    }
+    VFW.LoadInventories(dynamicMaxSlots, false)
 end
 
 --endregion

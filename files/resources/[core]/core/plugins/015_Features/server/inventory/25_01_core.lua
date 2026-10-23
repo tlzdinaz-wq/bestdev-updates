@@ -7,7 +7,7 @@ Inv.DefaultChestMaxWeight = 200
 Inv.DefaultChestMaxSlots = 50
 Inv.PickupModel = joaat("prop_paper_bag_01")
 Inv.PickupRadius = 12.0
-Inv.PickupMaxWeight = 500
+Inv.PickupMaxWeight = 5000
 Inv.PickupMaxSlots = 100
 Inv.SearchDistance = 6.0
 Inv.GiveDistance = tonumber(Config and Config.DistanceGive) or 4.0
@@ -84,6 +84,100 @@ end
 
 function Inv.Exists(name)
     return Inv.Def(name) ~= nil
+end
+
+-- ── Consommables ────────────────────────────────────────────────
+--
+-- Trois sources décrivent un aliment ou une boisson, et elles ne disaient pas
+-- la même chose : la fiche de l'item en base (ce que règle Gestion > Items),
+-- le catalogue partagé `shared/consumables.lua` (faim, soif, animation et prop
+-- de tous les aliments du serveur) et la description du catalogue d'items
+-- (« Restaure 30% de soif »).
+--
+-- L'usage d'un item ne regardait que la fiche en base, où la faim et la soif ne
+-- sont renseignées nulle part à l'installation : pain, eau et café répondaient
+-- donc « item pas utilisable ». Les trois sources sont maintenant réunies ici,
+-- par ordre de priorité : la fiche d'abord — ce qu'un responsable règle n'est
+-- jamais écrasé — puis le catalogue partagé, puis la description.
+
+--- Valeurs reprises du catalogue partagé quand la fiche ne les porte pas.
+--- `type` et `label` en sont exclus : ils appartiennent à la fiche.
+local PRESET_FIELDS <const> = {
+    "hunger", "thirst", "duration",
+    "anim", "animName", "prop", "propBone", "propPlacement",
+    "secondProp", "secondPropBone", "secondPropPlacement",
+    "alcool",
+}
+
+local function truthy(value)
+    return value == true or value == 1 or value == "1"
+end
+
+--- Lit « Restaure 30% de soif » dans la description d'un item.
+---@param def table|nil
+---@return table|nil
+local function presetFromDescription(def)
+    local text = def and def.description
+    if type(text) ~= "string" then return nil end
+
+    local amount, kind = text:match("Restaure%s+(%d+)%s*%%%s+de%s+(%a+)")
+    amount = tonumber(amount)
+    if not amount or amount <= 0 then return nil end
+
+    if kind == "faim" then return { hunger = amount } end
+    if kind == "soif" then return { thirst = amount } end
+    return nil
+end
+
+--- Les valeurs connues pour un item, hors de sa fiche.
+---@param name string
+---@param def? table
+---@return table|nil
+function Inv.ConsumablePreset(name, def)
+    local preset = type(ConsumablesConfig) == "table" and ConsumablesConfig[name] or nil
+    if preset then return preset end
+    return presetFromDescription(def or Inv.Def(name))
+end
+
+--- Ce qu'il faut pour consommer un item, ou nil s'il ne se consomme pas.
+---
+--- Le retour sert à la fois d'autorisation et de données d'animation : il part
+--- tel quel au client, qui y lit l'animation, le prop et leur placement.
+---@param name string
+---@param def? table
+---@return table|nil
+function Inv.ConsumableData(name, def)
+    def = def or Inv.Def(name)
+    local data = (def and type(def.data) == "table") and def.data or {}
+    local preset = Inv.ConsumablePreset(name, def)
+
+    local declared
+    if data.consumable ~= nil then
+        -- Réponse explicite de Gestion > Items : elle tranche dans les deux sens.
+        declared = truthy(data.consumable)
+    else
+        declared = (tonumber(data.hunger) or 0) > 0
+            or (tonumber(data.thirst) or 0) > 0
+            or data.type == "consumable"
+            or (def and (def.type == "food" or def.type == "drink"))
+            or preset ~= nil
+    end
+
+    if not declared then return nil end
+
+    local merged = {}
+    for key, value in pairs(data) do merged[key] = value end
+
+    if preset then
+        for i = 1, #PRESET_FIELDS do
+            local key = PRESET_FIELDS[i]
+            if merged[key] == nil and preset[key] ~= nil then
+                merged[key] = preset[key]
+            end
+        end
+    end
+
+    return merged
 end
 
 local function canon(value)

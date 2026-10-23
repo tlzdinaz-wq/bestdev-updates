@@ -48,7 +48,7 @@ local function motelRow(row)
         duplicateKeyPrice = row.duplicate_key_price or 0,
         npcModel = row.npc_model,
         npcCoords = PS.Decode(row.npc_coords, { x = 0.0, y = 0.0, z = 0.0, h = 0.0 }),
-        blipEnabled = row.blip_enabled == 1,
+        blipEnabled = VFW.DB.IsSet(row.blip_enabled),
         blipSprite = row.blip_sprite or 475,
         blipColor = row.blip_color or 5,
         chestMaxWeight = row.chest_max_weight or 50,

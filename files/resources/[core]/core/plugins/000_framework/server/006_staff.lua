@@ -260,6 +260,10 @@ end)
 
 local staffMode = {}
 
+-- Declare ici, et non pres du mode animateur plus bas : les compteurs du bandeau
+-- staff le lisent, et une locale declaree apres eux leur serait invisible.
+local animatorMode = {}
+
 local function currentStaffModeList()
     local list, n = {}, 0
     for src in pairs(staffMode) do
@@ -269,8 +273,35 @@ local function currentStaffModeList()
     return list
 end
 
+--- Les compteurs du bandeau staff : combien de staff connectes, combien en service.
+---
+--- Le client ecoutait `vfw:staff:sendStaffsData` depuis toujours, mais personne ne
+--- l'emettait. Les deux compteurs restaient a zero, et l'affichage force 1 quand la
+--- valeur est nulle : le bandeau indiquait donc « 1 en ligne, 1 en service » quel que
+--- soit le nombre reel de staff.
+local function broadcastStaffCounts()
+    local online, inService = 0, 0
+
+    for _, xPlayer in pairs(VFW.GetExtendedPlayers()) do
+        if xPlayer.hasPermission("staff_menu") or xPlayer.hasPermission("menu_anim") then
+            online = online + 1
+            if staffMode[xPlayer.source] or animatorMode[xPlayer.source] then
+                inService = inService + 1
+            end
+        end
+    end
+
+    -- A tout le monde : seul le staff affiche ce bandeau, et le client sait deja
+    -- s'il doit le montrer.
+    TriggerClientEvent("vfw:staff:sendStaffsData", -1, {
+        onlineStaffs = online,
+        staffsInService = inService,
+    })
+end
+
 local function broadcastStaffMode()
     TriggerClientEvent("vfw:staff:syncStaffMode", -1, currentStaffModeList())
+    broadcastStaffCounts()
 end
 
 local function staffNotify(source, variant, subtitle, message)
@@ -326,6 +357,12 @@ end)
 
 AddEventHandler("playerDropped", function()
     local source = source
+
+    -- Un staff qui part fait baisser le nombre en ligne, meme s'il n'etait pas en
+    -- service. Le compte se fait apres coup : il figure encore dans la liste des
+    -- joueurs a cet instant.
+    SetTimeout(0, broadcastStaffCounts)
+
     if not staffMode[source] then return end
 
     staffMode[source] = nil
@@ -584,8 +621,6 @@ RegisterNetEvent("vfw:staff:freezeWeather", function(frozen)
     TriggerEvent("vfw:logs:staff", source, "freeze_weather", { frozen = state })
 end)
 
-local animatorMode = {}
-
 local function currentAnimatorModeList()
     local list, n = {}, 0
     for src in pairs(animatorMode) do
@@ -597,6 +632,7 @@ end
 
 local function broadcastAnimatorMode()
     TriggerClientEvent("vfw:animator:syncAnimatorMode", -1, currentAnimatorModeList())
+    broadcastStaffCounts()
 end
 
 RegisterNetEvent("vfw:animator:mode", function(enabled)
@@ -730,6 +766,8 @@ end)
 -- Un ID serveur peut être réutilisé : envoyer les nouvelles données aux staff
 -- réinitialise aussi le cache client qui masquait l'ancien joueur déconnecté.
 AddEventHandler("vfw:characterLoaded", function(source, xPlayer)
+    broadcastStaffCounts()
+
     local target = xPlayer or VFW.GetPlayerFromId(source)
     if not target or hiddenGamerTags[source] then return end
     local payload = gamerTagPayload(target)

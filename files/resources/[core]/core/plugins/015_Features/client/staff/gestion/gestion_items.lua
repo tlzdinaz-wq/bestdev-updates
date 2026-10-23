@@ -5,12 +5,12 @@
 function VFW.SendItemGestionData()
     local itemsList = {}
 
-    for itemName, item in pairs(VFW.Items) do
-        if type(item) == "table" and item.type and item.type ~= "keys" and item.type ~= "clothes" then
+    for itemName, item in pairs(VFW.Items or {}) do
+        if type(item) == "table" and item.type ~= "keys" and item.type ~= "clothes" then
             local itemData = type(item.data) == "table" and item.data or {}
             local typeI
-            if item.data then
-                if item.data.type == nil then
+            if type(item.data) == "table" then
+                if itemData.type == nil then
                     typeI = "objects"
               elseif item.data.type == "consumable" then
                     typeI = "consumable"
@@ -66,7 +66,17 @@ local bypassDelete = {
     ["bottom"] = true,
     ["shoe"] = true
 }
-RegisterNuiCallback("nui:server-gestion-items:save", function(data)
+RegisterNuiCallback("nui:server-gestion-items:save", function(data, cb)
+    if type(data) ~= "table" or #data == 0 then
+        if cb then cb({ ok = false, error = "Liste vide : aucune modification appliquee." }) end
+        return
+    end
+    for i = 1, #data do
+        if type(data[i]) ~= "table" or type(data[i].name) ~= "string" or data[i].name == "" then
+            if cb then cb({ ok = false, error = "Liste d'items invalide." }) end
+            return
+        end
+    end
     local changedItem = {}
 
     for i = 1, #data do
@@ -102,7 +112,6 @@ RegisterNuiCallback("nui:server-gestion-items:save", function(data)
                     ammoType = item.ammoType
                 }
             }
-            VFW.Items[item.name] = changedItem[item.name]
         else
             local editItem = {
                 label = item.label,
@@ -167,32 +176,21 @@ RegisterNuiCallback("nui:server-gestion-items:save", function(data)
 
             if change then
                 changedItem[item.name] = editItem
-                VFW.Items[item.name] = editItem
             end
         end
     end
 
-    for itemName, item in pairs(VFW.Items) do
-        if not bypassDelete[itemName] then
-            local found = false
-
-            for i = 1, #data do
-                if data[i].name == itemName then
-                    found = true
-                    break
-                end
-            end
-
-            if not found then
-                changedItem[itemName] = "delete"
-              VFW.Items[itemName] = nil
-            end
+    -- Une liste filtree/paginee n'est jamais une demande de suppression.
+    -- Seules les modifications explicites partent aux endpoints serveur controles.
+    for name, edit in pairs(changedItem) do
+        edit.data.image = edit.image
+        if VFW.Items[name] then
+            TriggerServerEvent("vfw:staff:saveItem", name, edit)
+        else
+            TriggerServerEvent("vfw:staff:createItem", name, edit.label, edit.weight, edit.data, edit.premium, edit.perm)
         end
     end
-
-    console.debug(json.encode(changedItem, {indent = true}))
-
-    TriggerServerEvent("vfw:staff:saveItems", changedItem)
+    if cb then cb({ ok = true, queued = true }) end
 end)
 
 RegisterNUICallback("nui:server-gestion-items:give", function(data)

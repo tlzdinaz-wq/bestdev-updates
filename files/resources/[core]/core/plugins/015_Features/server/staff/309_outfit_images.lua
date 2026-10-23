@@ -40,6 +40,30 @@ local function staffOk(source)
     return nil
 end
 
+local VARIABLE <const> = "outfit_images_manifest"
+
+--- La liste des images de tenues est doublee en base de donnees.
+---
+--- Elle ne vivait que dans ce fichier, a l interieur de la ressource. Un client qui
+--- remplace le dossier `core` pour se mettre a jour perdait toutes les images deja
+--- generees : il fallait tout refaire, piece par piece.
+---
+--- Le fichier reste ce qu'on lit ; la base n'en est que la copie de secours.
+local function mirrorToDatabase(data)
+    if not VFW.Variables or not VFW.Variables.SetVariable then return end
+    pcall(VFW.Variables.SetVariable, VARIABLE, data)
+end
+
+---@return table|nil liste, boolean consultee
+local function readFromDatabase()
+    if not VFW.Variables or not VFW.Variables.GetVariable then return nil, false end
+
+    local ok, stored = pcall(VFW.Variables.GetVariable, VARIABLE)
+    if not ok then return nil, false end
+    if type(stored) ~= "table" or not next(stored) then return nil, true end
+    return stored, true
+end
+
 local function loadManifest()
     if manifest then return manifest end
     manifest = {}
@@ -71,12 +95,32 @@ local function loadManifest()
             console.warn("[outfits] manifest.json illisible, liste repartie de zéro.")
         end
     end
+
+    -- Fichier absent : la copie en base prend le relais. Le fichier sera reecrit au
+    -- prochain enregistrement.
+    if not next(manifest) then
+        local stored, consulted = readFromDatabase()
+        if stored then
+            manifest = stored
+            console.warn("[outfits] manifest.json manquant : liste restauree depuis la base.")
+        elseif not consulted then
+            -- Base pas encore joignable : ne rien retenir, sinon cette liste vide
+            -- tiendrait lieu de verite pour toute la duree du serveur.
+            local empty = manifest
+            manifest = nil
+            return empty
+        end
+    end
+
     return manifest
 end
 
 local function saveManifest()
-    local ok = SaveResourceFile(GetCurrentResourceName(), MANIFEST_FILE, json.encode(loadManifest()), -1)
+    local data = loadManifest()
+    local ok = SaveResourceFile(GetCurrentResourceName(), MANIFEST_FILE, json.encode(data), -1)
     if not ok then console.error("[outfits] écriture de " .. MANIFEST_FILE .. " refusée.") end
+
+    mirrorToDatabase(data)
     return ok
 end
 

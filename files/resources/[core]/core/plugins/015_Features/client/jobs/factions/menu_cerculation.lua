@@ -115,13 +115,64 @@ local function startEnforcementThread()
     end)
 end
 
-local function refreshZoneCache()
-    local zones = TriggerServerCallback("core:jobs:traffic:get")
-    activeZones = zones or {}
-
-    if #activeZones > 0 then
-        startEnforcementThread()
+-- Chaque zone du cache garde le nœud de route créé CHEZ NOUS (nodeId), qui est ce qu'il faut retirer ; son
+-- identifiant en base (zone.id) sert, lui, à se retrouver entre joueurs et avec le serveur.
+local function resetSpeedLimit()
+    if not currentZoneSpeed then return end
+    local ped = PlayerPedId()
+    if IsPedInAnyVehicle(ped, false) then
+        SetVehicleMaxSpeed(GetVehiclePedIsIn(ped, false), 0.0)
     end
+    currentZoneSpeed = nil
+end
+
+local function findZone(id)
+    for i = 1, #activeZones do
+        if activeZones[i].id == id then return activeZones[i], i end
+    end
+    return nil
+end
+
+local function addZoneLocal(zone)
+    if type(zone) ~= "table" or type(zone.zonePos) ~= "table" then return end
+    -- Déjà connue : la diffusion du serveur arrive aussi chez le joueur qui vient de créer la zone.
+    if zone.id and findZone(zone.id) then return end
+
+    zone.nodeId = AddRoadNodeSpeedZone(
+        vector3(zone.zonePos.x + 0.0, zone.zonePos.y + 0.0, zone.zonePos.z + 0.0),
+        zone.zoneRadius + 0.0, zone.zoneSpeed + 0.0, true)
+    activeZones[#activeZones + 1] = zone
+    startEnforcementThread()
+end
+
+local function removeZoneLocal(id)
+    local zone, index = findZone(id)
+    if not zone then return end
+    if zone.nodeId then RemoveRoadNodeSpeedZone(zone.nodeId) end
+    table.remove(activeZones, index)
+    resetSpeedLimit()
+end
+
+--- Aligne le cache sur la liste du serveur (zones ajoutées ou supprimées entre-temps).
+local function syncZones(zones)
+    local wanted = {}
+    for i = 1, #zones do
+        if zones[i].id then wanted[zones[i].id] = true end
+    end
+    for i = #activeZones, 1, -1 do
+        local zone = activeZones[i]
+        if not wanted[zone.id] then
+            if zone.nodeId then RemoveRoadNodeSpeedZone(zone.nodeId) end
+            table.remove(activeZones, i)
+        end
+    end
+    for i = 1, #zones do
+        addZoneLocal(zones[i])
+    end
+end
+
+local function refreshZoneCache()
+    syncZones(TriggerServerCallback("core:jobs:traffic:get") or {})
 end
 
 -- ============================================================
@@ -160,7 +211,7 @@ end)
 
 RegisterNUICallback("nui:trafficZones:getData", function(_, cb)
     local zones = TriggerServerCallback("core:jobs:traffic:get") or {}
-    activeZones = zones -- update cache
+    syncZones(zones) -- update cache
     local playerCoords = GetEntityCoords(PlayerPedId())
     cb({
         zones = zones,
@@ -173,30 +224,27 @@ RegisterNUICallback("nui:trafficZones:getData", function(_, cb)
 end)
 
 RegisterNUICallback("nui:trafficZones:add", function(data, cb)
-    if not data.zoneRadius or data.zoneRadius <= 0 then
+    if not data.zoneRadius or data.zoneRadius <= 0 or type(data.zonePos) ~= "table" then
         cb(nil)
         return
     end
 
-    local pos = vector3(data.zonePos.x, data.zonePos.y, data.zonePos.z)
-    local id = AddRoadNodeSpeedZone(pos, data.zoneRadius + 0.0, data.zoneSpeed + 0.0, true)
-
-    local newZone = {
+    -- Le serveur enregistre la zone et rend son identifiant en base (zoneId), celui que le MDT renverra
+    -- pour la supprimer ; il la diffuse aussi aux autres joueurs.
+    local zone = TriggerServerCallback("core:jobs:traffic:create", {
         zoneName = data.zoneName or "Zone",
-        zonePos = { x = pos.x, y = pos.y, z = pos.z },
+        zonePos = { x = data.zonePos.x, y = data.zonePos.y, z = data.zonePos.z },
         zoneRadius = data.zoneRadius,
         zoneSpeed = data.zoneSpeed,
-        zoneId = id,
         zoneDuration = data.zoneDuration or 30
-    }
+    })
+    if type(zone) ~= "table" then
+        cb(nil)
+        return
+    end
 
-    TriggerServerEvent("core:jobs:traffic:add", newZone)
-
-    -- Update local cache
-    activeZones[#activeZones + 1] = newZone
-    startEnforcementThread()
-
-    cb(newZone)
+    addZoneLocal(zone)
+    cb(zone)
 end)
 
 RegisterNUICallback("nui:trafficZones:remove", function(data, cb)
@@ -205,26 +253,8 @@ RegisterNUICallback("nui:trafficZones:remove", function(data, cb)
         return
     end
 
-    RemoveRoadNodeSpeedZone(data.zoneId)
     TriggerServerEvent("core:jobs:traffic:remove", data.zoneId)
-
-    -- Update local cache
-    for i = #activeZones, 1, -1 do
-        if activeZones[i].zoneId == data.zoneId then
-            table.remove(activeZones, i)
-            break
-        end
-    end
-
-    -- Reset la limite du véhicule actuel si on était dans cette zone
-    if currentZoneSpeed then
-        local ped = PlayerPedId()
-        if IsPedInAnyVehicle(ped, false) then
-            local vehicle = GetVehiclePedIsIn(ped, false)
-            SetVehicleMaxSpeed(vehicle, 0.0)
-        end
-        currentZoneSpeed = nil
-    end
+    removeZoneLocal(data.zoneId)
 
     cb("ok")
 end)
@@ -235,33 +265,12 @@ end)
 
 ---@param zone any
 RegisterNetEvent("core:jobs:traffic:addclient", function(zone)
-    local pos = vector3(zone.zonePos.x + 0.0, zone.zonePos.y + 0.0, zone.zonePos.z + 0.0)
-    AddRoadNodeSpeedZone(pos, zone.zoneRadius + 0.0, zone.zoneSpeed + 0.0, true)
-    -- Update local cache for enforcement
-    activeZones[#activeZones + 1] = zone
-    startEnforcementThread()
+    addZoneLocal(zone)
 end)
 
 ---@param zoneId any
 RegisterNetEvent("core:jobs:traffic:removeclient", function(zoneId)
-    RemoveRoadNodeSpeedZone(zoneId)
-    -- Update local cache
-    for i = #activeZones, 1, -1 do
-        if activeZones[i].zoneId == zoneId then
-            table.remove(activeZones, i)
-            break
-        end
-    end
-
-    -- Reset la limite du véhicule actuel
-    if currentZoneSpeed then
-        local ped = PlayerPedId()
-        if IsPedInAnyVehicle(ped, false) then
-            local vehicle = GetVehiclePedIsIn(ped, false)
-            SetVehicleMaxSpeed(vehicle, 0.0)
-        end
-        currentZoneSpeed = nil
-    end
+    removeZoneLocal(zoneId)
 end)
 
 -- ============================================================

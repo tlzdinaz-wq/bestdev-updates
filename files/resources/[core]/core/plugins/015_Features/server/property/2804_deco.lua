@@ -41,7 +41,7 @@ local function sanitizeDeco(deco)
 end
 
 local function saveList(identifier)
-    local rows = MySQL.query.await("SELECT id, name, type, created_at FROM property_deco_saves WHERE identifier = ? ORDER BY id", { identifier }) or {}
+    local rows = MySQL.query.await("SELECT id, name, type, UNIX_TIMESTAMP(created_at) AS created_at FROM property_deco_saves WHERE identifier = ? ORDER BY id", { identifier }) or {}
     local out = {}
     for i = 1, #rows do
         out[#out + 1] = {
@@ -82,7 +82,7 @@ RegisterServerCallback("vfw:property:createSave", function(source, name, propert
         return existing
     end
 
-    MySQL.insert.await("INSERT INTO property_deco_saves (identifier, name, type, deco, created_at) VALUES (?, ?, ?, ?, ?)", {
+    MySQL.insert.await("INSERT INTO property_deco_saves (identifier, name, type, deco, created_at) VALUES (?, ?, ?, ?, FROM_UNIXTIME(?))", {
         xPlayer.identifier,
         saveName,
         row.property_name,

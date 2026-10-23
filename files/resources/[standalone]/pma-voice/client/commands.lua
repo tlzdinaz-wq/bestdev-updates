@@ -170,7 +170,7 @@ RegisterCommand('vsync', function()
 
 	handleInitialState()
 
-	print('[Vision] Synchronisation du vocal effectué...')
+	print('[Aurora] Synchronisation du vocal effectuée.')
 
 
 --[[ 	local newGrid = getGridZone()

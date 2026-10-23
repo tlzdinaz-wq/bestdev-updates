@@ -76,6 +76,7 @@ local directCategories = {
             { label = "Météo, heure et stats", desc = "Heure, gel du temps, statistiques serveur", icon = "clock", perm = "server_management", action = "server_panel", opens = "server" },
             { label = "Nettoyer la zone", desc = "Supprimer véhicules, peds et objets autour de vous", icon = "trash", perm = "clean_zone", action = "clear_zone" },
             { label = "Densité du monde", desc = "PNJ, trafic et véhicules garés — appliqué en direct à tous", icon = "globe", perm = "server_management", opens = "dev", dev = "density" },
+            { label = "Zones de circulation", desc = "Limites de vitesse par zone : voir, créer, modifier, supprimer", icon = "car", perm = "server_management", opens = "dev", dev = "traffic" },
             { label = "Gérer les images", desc = "Logo, bannière, pause, items, sociétés, mugshots", icon = "image", opens = "images" },
             { label = "Notifications périodiques", desc = "Notifications automatiques", icon = "megaphone", opens = "notifs" },
             { label = "Starter pack", desc = "Argent et items de départ des nouveaux joueurs", icon = "gift", opens = "dev", dev = "starterpack" },
@@ -87,6 +88,12 @@ local directCategories = {
             { label = "Antiban", desc = "Joueurs protégés contre ban / kick", icon = "shield", opens = "dev", dev = "antiban" },
             { label = "Reset sanctions", desc = "Supprimer l'historique de sanctions d'un joueur", icon = "trash", opens = "dev", dev = "sanctions" },
             { label = "Restauration inventaire", desc = "Restaurer un inventaire confisqué", icon = "refresh", perm = "restore_inventory", opens = "dev", dev = "invrestore" },
+        },
+    },
+    {
+        id = "interim", label = "INTÉRIM", icon = "briefcase", perm = { "builder_interim_economy", "server_management", "dev" },
+        items = {
+            { label = "Gestion de l'intérim", desc = "Métiers, points et PNJ, réglages, centre d'emploi", icon = "briefcase", opens = "dev", dev = "interim" },
         },
     },
     {
@@ -290,6 +297,20 @@ function StaffMenu.IsGestionHubMinimized()
     return hubOpen == true and hubMinimized == true
 end
 
+--- Affiche une notification au-dessus de la tablette Gestion.
+--- Retourne true lorsque la notification a été prise en charge par le hub.
+function StaffMenu.ShowGestionNotification(notification)
+    if not hubOpen or hubMinimized or type(notification) ~= "table" then
+        return false
+    end
+
+    SendNUIMessage({
+        action = "gestion:toast",
+        data = notification,
+    })
+    return true
+end
+
 local function ApplyWalkFocus()
     SetNuiFocus(false, false)
     SetNuiFocusKeepInput(false)
@@ -329,6 +350,38 @@ function StaffMenu.UncoverGestionHub()
     end
 end
 
+--- Saisie « dans le monde » (placer des points, viser un endroit...) lancée depuis un menu VUI.
+---
+--- Dans le hub de gestion, menu.close() TERMINE la chaîne de menus : le hub revient à la liste des outils et
+--- le menu rouvert ensuite n'est plus affiché (appuyer sur « Spawn des véhicules » renvoyait à la liste des
+--- outils). On garde donc le menu ouvert, on cache le hub et on rend les contrôles au jeu. Les touches de VUI
+--- sont inactives en mode hub : Entrée et Retour ne touchent pas au menu pendant la saisie.
+--- Hors du hub (menu F5), comportement d'origine : on ferme le menu, on saisit, on le rouvre.
+---@param menu table Le menu VUI qui lance la saisie
+---@param fn fun(): any La saisie (peut attendre) ; sa valeur de retour est rendue
+---@return any
+function StaffMenu.PlaceInWorld(menu, fn)
+    if StaffMenu.IsGestionHubOpen() then
+        -- Hub déjà réduit par le joueur : il marche déjà, rien à cacher.
+        if StaffMenu.IsGestionHubMinimized() then return fn() end
+
+        StaffMenu.CoverGestionHub()
+        VFW.Nui.Focus(false)
+        local ok, result = pcall(fn)
+        if StaffMenu.IsGestionHubOpen() then
+            StaffMenu.UncoverGestionHub()
+        end
+        if not ok then error(result, 0) end
+        return result
+    end
+
+    menu.close()
+    local ok, result = pcall(fn)
+    menu.open()
+    if not ok then error(result, 0) end
+    return result
+end
+
 --- Recolle le focus NUI sur le hub après un clavier / choix (sinon le curseur est perdu).
 function StaffMenu.RestoreGestionHubFocus()
     if not hubOpen then return end
@@ -355,6 +408,18 @@ end)
 
 AddEventHandler("vui:hub:focus", function()
     StaffMenu.RestoreGestionHubFocus()
+end)
+
+-- Retour commun des boutons de validation incomplets. Le système VUI ajoute la
+-- raison à tous les boutons Créer / Ajouter / Valider / Sauvegarder du hub.
+AddEventHandler("vui:validation:blocked", function(reason)
+    if not hubOpen then return end
+    StaffMenu.ShowGestionNotification({
+        type = 'STAFF',
+        variant = 'ERROR',
+        subtitle = 'Gestion',
+        message = tostring(reason or "Complétez les champs obligatoires du formulaire.")
+    })
 end)
 
 local OpenFromHub

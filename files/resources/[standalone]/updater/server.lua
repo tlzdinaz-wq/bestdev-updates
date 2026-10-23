@@ -32,9 +32,19 @@ local APPLY_HINT = IS_WINDOWS and "update.bat (double-clic à la racine du serve
 -- avec la base. L'adresse est locale par construction ; `update_tool_url` permet de la
 -- changer si vous le lancez sur un autre port ou une autre machine.
 
-local function log(msg) print("^5[update]^7 " .. msg) end
-local function warn(msg) print("^3[update]^7 " .. msg) end
-local function err(msg) print("^1[update]^7 " .. msg) end
+local consoleVersion = "?"
+
+local function setConsoleVersion(state)
+    consoleVersion = tostring((state and state.version) or "inconnue")
+end
+
+local function consolePrefix(color)
+    return ("%s[Aurora v%s]^7 "):format(color, consoleVersion)
+end
+
+local function log(msg) print(consolePrefix("^5") .. msg) end
+local function warn(msg) print(consolePrefix("^3") .. msg) end
+local function err(msg) print(consolePrefix("^1") .. msg) end
 
 -- Racine du serveur = dossier qui contient `resources`
 local function serverRoot()
@@ -373,6 +383,7 @@ local function command(args)
         local mode = (args[1] or ""):lower()
         local configured = GetConvar("update_url", ""):gsub("/+$", "")
         local state = readState()
+        setConsoleVersion(state)
         local root = serverRoot()
 
         if mode == "force" or mode == "restart" or mode == "apply" then
@@ -424,6 +435,7 @@ end, true)
 AddEventHandler("onResourceStart", function(res)
     if res ~= RES then return end
     local state = readState()
+    setConsoleVersion(state)
     log("version installée : " .. ((state and state.version) or "inconnue") .. ". `update` vérifie ; " .. APPLY_HINT .. " applique.")
     log(toolHint())
     local hint = pageHint()

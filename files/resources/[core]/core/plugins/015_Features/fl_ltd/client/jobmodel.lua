@@ -1,3 +1,7 @@
+if not LTDDelivery.Config.EnableJobSystem then
+    return
+end
+
 local model <const> = JobModel.new("ltd")
 :setLabel("LTD Livraison")
 :activateBuilder("ltd")

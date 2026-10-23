@@ -26,6 +26,40 @@ function InterimServer.StopAllServices(source)
     end
 end
 
+local UPSERT_STATE <const> = "INSERT INTO interim_player_state (`identifier`, `job`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `job` = VALUES(`job`)"
+
+--- Prend le métier d'intérim `jobId` (en quittant l'éventuel autre métier d'intérim).
+local function takeJob(source, xPlayer, jobId, label)
+    local previous = InterimServer.GetInterimJob(xPlayer)
+    if previous and previous ~= jobId then
+        InterimServer.StopService(source, previous)
+        InterimServer.ReleaseSpots(previous, source)
+    end
+
+    InterimServer.SetInterimJob(xPlayer, jobId)
+    MySQL.query.await(UPSERT_STATE, { xPlayer.identifier, jobId })
+
+    InterimServer.StartService(source, jobId)
+    InterimServer.Notify(source, "VERT", ("Vous êtes désormais intérimaire : %s."):format(label or jobId))
+end
+
+--- Le centre d'intérim ne fait que présenter les offres (et marquer leur lieu sur la carte) : rien n'y enregistre le
+--- métier choisi. Le métier se prend donc en commençant à travailler, au garage du métier (« Sortir le véhicule ») :
+--- si le joueur n'a pas ce métier d'intérim, il le prend, à la place de celui qu'il avait. Renvoie false si le métier
+--- n'existe pas ou est désactivé.
+function InterimServer.EnsureJob(source, xPlayer, jobId)
+    if InterimServer.HasJob(xPlayer, jobId) then return true end
+
+    local row = MySQL.single.await("SELECT `label` FROM interim_jobs WHERE `id` = ? AND `enabled` = 1", { jobId })
+    if not row then
+        InterimServer.Notify(source, "ROUGE", "Ce métier d'intérim n'est pas disponible.")
+        return false
+    end
+
+    takeJob(source, xPlayer, jobId, row.label)
+    return true
+end
+
 RegisterNetEvent("interim:chooseJob", function(jobId)
     local source = source
     if type(jobId) ~= "string" or jobId == "" or #jobId > 40 then return end
@@ -34,61 +68,26 @@ RegisterNetEvent("interim:chooseJob", function(jobId)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer then return end
 
-    if not InterimServer.IsUnemployed(xPlayer) then
-        InterimServer.Notify(source, "ROUGE", "Vous devez être sans emploi pour prendre un métier d'intérim.")
-        return
-    end
-
     local row = MySQL.single.await("SELECT `id`, `label` FROM interim_jobs WHERE `id` = ? AND `enabled` = 1", { jobId })
     if not row then
         InterimServer.Notify(source, "ROUGE", "Ce métier d'intérim n'existe pas.")
         return
     end
 
-    local previous = InterimServer.GetInterimJob(xPlayer)
-    if previous and previous ~= jobId then
-        InterimServer.StopService(source, previous)
-        InterimServer.ReleaseSpots(previous, source)
-    end
-
-    InterimServer.SetInterimJob(xPlayer, jobId)
-
-    MySQL.query.await(
-        "INSERT INTO interim_player_state (`identifier`, `job`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `job` = VALUES(`job`)",
-        { xPlayer.identifier, jobId }
-    )
-
-    InterimServer.StartService(source, jobId)
+    takeJob(source, xPlayer, jobId, row.label)
     InterimServer.SendFirstWaypoint(source, jobId)
-    InterimServer.Notify(source, "VERT", ("Vous êtes désormais intérimaire : %s."):format(row.label or jobId))
 end)
 
 AddEventHandler("vfw:playerLoaded", function(source, xPlayer)
     if not xPlayer then return end
     local jobId = InterimServer.GetInterimJob(xPlayer)
     if not jobId then return end
-    if not InterimServer.IsUnemployed(xPlayer) then return end
 
     SetTimeout(6000, function()
         if VFW.GetPlayerFromId(source) then
             InterimServer.StartService(source, jobId)
         end
     end)
-end)
-
-AddEventHandler("vfw:setJob", function(source, job)
-    local xPlayer = VFW.GetPlayerFromId(source)
-    if not xPlayer then return end
-
-    local jobId = InterimServer.GetInterimJob(xPlayer)
-    if not jobId then return end
-
-    if job and job.name ~= "unemployed" then
-        InterimServer.StopService(source, jobId)
-        InterimServer.ReleaseAll(source)
-        InterimServer.SetInterimJob(xPlayer, "")
-        InterimServer.Notify(source, "JAUNE", "Votre contrat d'intérim a pris fin.")
-    end
 end)
 
 AddEventHandler("vfw:playerDropped", function(source)
@@ -117,25 +116,35 @@ RegisterNetEvent("vfw:vehicle:open", function()
     if not coords then return end
 
     local vehicles = GetAllVehicles and GetAllVehicles() or {}
-    local closest, closestDist = nil, 6.0
+    local nearby = {}
 
     for i = 1, #vehicles do
         local vehicle = vehicles[i]
         if DoesEntityExist(vehicle) then
             local dist = #(coords - GetEntityCoords(vehicle))
-            if dist < closestDist then
-                closest, closestDist = vehicle, dist
-            end
+            if dist < 6.0 then nearby[#nearby + 1] = { vehicle = vehicle, dist = dist } end
         end
     end
 
-    if not closest then
+    if #nearby == 0 then
         Feat27.NotifyError(source, "Aucun véhicule à proximité.")
         return
     end
 
-    local plate = GetVehicleNumberPlateText(closest)
-    if not VFW.PlayerHasVehicleKey or not VFW.PlayerHasVehicleKey(source, plate) then
+    -- Le plus proche des véhicules dont le joueur a la clé : une voiture de PNJ garée contre la
+    -- sienne ne doit pas l'empêcher de verrouiller la sienne.
+    table.sort(nearby, function(a, b) return a.dist < b.dist end)
+
+    local closest
+    for i = 1, #nearby do
+        local plate = GetVehicleNumberPlateText(nearby[i].vehicle)
+        if VFW.PlayerHasVehicleKey and VFW.PlayerHasVehicleKey(source, plate) then
+            closest = nearby[i].vehicle
+            break
+        end
+    end
+
+    if not closest then
         Feat27.NotifyError(source, "Vous n'avez pas les clés de ce véhicule.")
         return
     end

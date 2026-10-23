@@ -97,8 +97,14 @@ function PS.SafeString(value, maxLen)
     return trimmed:sub(1, maxLen or 64)
 end
 
+-- Un client qui envoie GetEntityCoords() / GetEntityRotation() fait arriver un vector3, pas une table.
+local function isVectorLike(value)
+    local kind = type(value)
+    return kind == "table" or kind == "vector3" or kind == "vector4"
+end
+
 function PS.IsVec3(value)
-    return type(value) == "table" and PS.ToNumber(value.x) and PS.ToNumber(value.y) and PS.ToNumber(value.z)
+    return isVectorLike(value) and PS.ToNumber(value.x) and PS.ToNumber(value.y) and PS.ToNumber(value.z)
 end
 
 function PS.ReadVec3(value)
@@ -109,7 +115,14 @@ end
 function PS.ReadVec4(value)
     local v = PS.ReadVec3(value)
     if not v then return nil end
-    v.w = PS.ToNumber(value.w) or PS.ToNumber(value.h) or PS.ToNumber(value.heading) or 0.0
+    local kind = type(value)
+    if kind == "vector3" then
+        v.w = 0.0
+    elseif kind == "vector4" then
+        v.w = PS.ToNumber(value.w) or 0.0
+    else
+        v.w = PS.ToNumber(value.w) or PS.ToNumber(value.h) or PS.ToNumber(value.heading) or 0.0
+    end
     return v
 end
 
@@ -241,7 +254,7 @@ function PS.LoadAccess(propertyId)
         list[#list + 1] = {
             id = rows[i].id,
             identifier = rows[i].identifier,
-            hide = rows[i].hide_identity == 1,
+            hide = VFW.DB.IsSet(rows[i].hide_identity),
         }
     end
     PS.Access[pid] = list
@@ -516,7 +529,7 @@ function PS.RowFromSql(row)
         vehicle_pos = row.vehicle_pos and PS.Decode(row.vehicle_pos, nil) or nil,
         max_places = row.max_places,
         deco = PS.Decode(row.deco, nil),
-        is_perquisitioned = row.is_perquisitioned == 1,
+        is_perquisitioned = VFW.DB.IsSet(row.is_perquisitioned),
         contract_type = row.contract_type,
         total_price = row.total_price or 0,
         rent_price = row.rent_price or 0,
@@ -543,7 +556,7 @@ function PS.LoadProperties()
         PS.Access[pid][#PS.Access[pid] + 1] = {
             id = accessRows[i].id,
             identifier = accessRows[i].identifier,
-            hide = accessRows[i].hide_identity == 1,
+            hide = VFW.DB.IsSet(accessRows[i].hide_identity),
         }
     end
 

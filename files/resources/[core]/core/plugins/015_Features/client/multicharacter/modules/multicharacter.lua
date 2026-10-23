@@ -287,17 +287,10 @@ function Multicharacter:CreateCharacterClone()
     SetEntityAsMissionEntity(clone, true, true)
     SetEntityCollision(clone, false, false)
 
-    local animation = self.cameras.Animation
-    if animation then
-        RequestAnimDict(animation.dict)
-        local deadline = GetGameTimer() + 2000
-        while not HasAnimDictLoaded(animation.dict) and GetGameTimer() < deadline do
-            Wait(10)
-        end
-        if HasAnimDictLoaded(animation.dict) and DoesEntityExist(clone) then
-            TaskPlayAnim(clone, animation.dict, animation.anim, 4.0, -4.0, -1, 1, 0.0, false, false, false)
-        end
-    end
+    -- Le personnage salue, puis enchaîne des poses d'attente et des gestes (clone_animations.lua).
+    CloneAnimations.Start(clone, function()
+        return self.inSelection and self.characterClone == clone and DoesEntityExist(clone)
+    end)
 
     -- Apparition en fondu pour éviter le "pop" au changement de personnage.
     SetEntityAlpha(clone, 0, false)

@@ -272,7 +272,7 @@ function PaidShopConfig.RebuildCategoriesList()
     PaidShopConfig.Categories = {}
 
     for categoryId, config in pairs(PaidShopConfig.ConfigurableCategories) do
-        if config.enabled then
+        if config.enabled and not config.removed then
             table.insert(PaidShopConfig.Categories, {
                 id = categoryId,
                 label = config.label,

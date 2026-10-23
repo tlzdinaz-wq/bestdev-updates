@@ -37,8 +37,8 @@ function PS.LoadPrices()
         PS.Prices[category][rows[i].property_key] = {
             sell = rows[i].sell or 0,
             rent = rows[i].rent or 0,
-            enabled = rows[i].enabled == 1,
-            rentEnabled = rows[i].rent_enabled == 1,
+            enabled = VFW.DB.IsSet(rows[i].enabled),
+            rentEnabled = VFW.DB.IsSet(rows[i].rent_enabled),
         }
     end
 end

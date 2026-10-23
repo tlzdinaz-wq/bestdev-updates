@@ -294,6 +294,17 @@ function VFW.ShowNotification(notification)
         end
     end
 
+    -- L'iframe Gestion passe au-dessus du HUD principal. Quand elle est ouverte,
+    -- ses notifications simples doivent donc être rendues dans sa propre couche.
+    -- Les notifications interactives gardent le HUD classique pour préserver leur action.
+    if type(notification) == "table"
+        and not notification.actionId
+        and type(StaffMenu) == "table"
+        and type(StaffMenu.ShowGestionNotification) == "function"
+        and StaffMenu.ShowGestionNotification(notification) then
+        return
+    end
+
     table.insert(queuedNotifications, notification)
 end
 

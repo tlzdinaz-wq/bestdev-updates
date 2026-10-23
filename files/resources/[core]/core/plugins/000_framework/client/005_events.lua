@@ -438,8 +438,26 @@ end)
 
 ---@param items any
 RegisterNetEvent("vfw:loadItems", function(items)
+    if type(items) ~= "table" then return end
+    if next(items) == nil and type(VFW.Items) == "table" and next(VFW.Items) ~= nil then
+        console.warn("[items] Catalogue vide recu : conservation du catalogue precedent.")
+        return
+    end
     VFW.Items = items
 end)
+
+function VFW.EnsureItemCatalog(force)
+    if not force and type(VFW.Items) == "table" and next(VFW.Items) ~= nil then return true end
+    local ok, result = pcall(TriggerServerCallback, "vfw:items:getCatalog")
+    if not ok or type(result) ~= "table" or result.ok ~= true or type(result.items) ~= "table" or next(result.items) == nil then
+        local reason = type(result) == "table" and result.error
+            or "Aucune reponse du catalogue serveur. Remplacez aussi 302_items.lua puis redemarrez le serveur."
+        console.warn("[items] Synchronisation impossible : " .. tostring(reason))
+        return false, reason
+    end
+    VFW.Items = result.items
+    return true
+end
 
 ---@param nameItem string
 ---@param data table

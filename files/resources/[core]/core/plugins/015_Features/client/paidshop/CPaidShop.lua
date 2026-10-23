@@ -21,6 +21,27 @@ local testDriveButtonsId = nil
 -- statique de config/paidshop.lua (LoadItemsFromDB est server-side).
 local cachedShopItems = nil
 
+-- Les rayons créés, renommés ou supprimés en cours de partie n'existent que côté serveur : on recopie dans la
+-- config locale ceux que la boutique reçoit (nom, icône, type, aperçu) pour que l'essai d'un véhicule marche aussi
+-- dans un rayon créé par un administrateur.
+function PaidShopClient.SyncCategories(shopData)
+    if type(shopData) ~= 'table' or type(shopData.categories) ~= 'table' then return end
+    if type(PaidShopConfig) ~= 'table' or type(PaidShopConfig.ConfigurableCategories) ~= 'table' then return end
+    for _, category in ipairs(shopData.categories) do
+        if type(category.id) == 'string' and category.id ~= 'vip' then
+            local cfg = PaidShopConfig.ConfigurableCategories[category.id]
+            if not cfg then
+                cfg = { enabled = true, customFields = {} }
+                PaidShopConfig.ConfigurableCategories[category.id] = cfg
+            end
+            cfg.label = category.label or cfg.label
+            cfg.icon = category.icon or cfg.icon
+            cfg.itemType = category.itemType or cfg.itemType
+            cfg.requiresPreview = category.requiresPreview == true
+        end
+    end
+end
+
 -- Test drive location (aéroport LSIA piste)
 local TEST_DRIVE_COORDS = vector4(-1639.0, -3091.0, 13.94, 330.0)
 local TEST_DRIVE_DURATION = 60 -- secondes
@@ -109,6 +130,7 @@ function PaidShopClient.OpenUI()
 
         -- Get shop data
         local shopData = TriggerServerCallback('paidshop:getShopData')
+        PaidShopClient.SyncCategories(shopData)
         if not shopData then
             SendNUIMessage({ action = "paidshop:uiNotification", data = { type = "ERROR", message = "Impossible de charger la boutique", duration = 5 } })
             PaidShopClient.CloseUI()
@@ -664,6 +686,7 @@ RegisterNUICallback('paidshop:editItem', function(data, cb)
     if success then
         -- Refresh shop data after successful edit
         local shopData = TriggerServerCallback('paidshop:getShopData')
+        PaidShopClient.SyncCategories(shopData)
         if shopData then
             SendNUIMessage({
                 action = "paidshop:initializeData",
@@ -692,6 +715,7 @@ RegisterNUICallback('paidshop:deleteItem', function(data, cb)
     if success then
         -- Refresh shop data after successful delete
         local shopData = TriggerServerCallback('paidshop:getShopData')
+        PaidShopClient.SyncCategories(shopData)
         if shopData then
             SendNUIMessage({
                 action = "paidshop:initializeData",
@@ -720,6 +744,7 @@ RegisterNUICallback('paidshop:addItem', function(data, cb)
     if success then
         -- Refresh shop data after successful add
         local shopData = TriggerServerCallback('paidshop:getShopData')
+        PaidShopClient.SyncCategories(shopData)
         if shopData then
             SendNUIMessage({
                 action = "paidshop:initializeData",
@@ -736,9 +761,173 @@ RegisterNUICallback('paidshop:addItem', function(data, cb)
     cb({ success = success, message = message })
 end)
 
+-- Mode édition de la boutique : un seul point d'entrée pour toute l'administration, appelé depuis
+-- l'interface (interface/boutique). Chaque action passe par un callback serveur qui revérifie la
+-- permission `boutique` : `isAdmin` ici ne sert qu'à répondre vite.
+local function pushShopData()
+    local shopData = TriggerServerCallback('paidshop:getShopData')
+    PaidShopClient.SyncCategories(shopData)
+    if not shopData then return end
+    cachedShopItems = shopData.items
+    SendNUIMessage({
+        action = "paidshop:initializeData",
+        data = {
+            categories = shopData.categories,
+            items = shopData.items,
+            rarityColors = shopData.rarityColors,
+            isAdmin = isAdmin
+        }
+    })
+end
+
+local function adminResult(ok, msg)
+    if ok then
+        return { ok = true, message = type(msg) == "string" and msg or nil }
+    end
+    return { ok = false, error = type(msg) == "string" and msg or "Action impossible." }
+end
+
+--- Tout ce que le panneau d'administration affiche en dehors du catalogue.
+local function adminOverview()
+    local catOk, categories = TriggerServerCallback("paidshop:adminGetAllCategories")
+    local daily = TriggerServerCallback("paidshop:getDailyRewards") or {}
+    local streak = TriggerServerCallback("paidshop:adminGetDailyStreak") or {}
+    local displayed = TriggerServerCallback("paidshop:builder:getDisplayedCases") or {}
+    local available = TriggerServerCallback("paidshop:builder:getAvailableCases") or {}
+    local pourMoi = TriggerServerCallback("paidshop:adminGetPourMoiPool") or {}
+    return {
+        ok = true,
+        adminCategories = (catOk and categories) or {},
+        daily = daily,
+        streakSlots = (streak.success and streak.slots) or {},
+        displayedCases = displayed.displayedCases or {},
+        availableCases = available.availableCases or {},
+        pourMoi = pourMoi.pool or {},
+    }
+end
+
+--- Réponse d'une action qui change la configuration : le panneau repart avec les listes à jour.
+local function adminWithOverview(ok, msg)
+    local response = adminResult(ok, msg)
+    if not ok then return response end
+    local overview = adminOverview()
+    overview.message = response.message
+    return overview
+end
+
+-- Chaque action rend (réponse, rechargerLaBoutique).
+local ADMIN_OPS = {
+    overview = function() return adminOverview(), false end,
+
+    search = function(d)
+        return { ok = true, list = TriggerServerCallback('paidshop:searchCatalog', d.category, d.query) or {} }, false
+    end,
+
+    -- Véhicule ou animal à vendre : le modèle existe-t-il dans le jeu (et quel est son nom d'affichage) ?
+    model = function(d)
+        local name = type(d.name) == "string" and d.name:gsub("^%s+", ""):gsub("%s+$", "") or ""
+        if name == "" or #name > 40 or not name:match("^[%w_%-]+$") then return { ok = true, valid = false }, false end
+
+        local hash = GetHashKey(name)
+        if not IsModelInCdimage(hash) then return { ok = true, valid = false }, false end
+
+        if d.kind == "vehicle" then
+            if not IsModelAVehicle(hash) then return { ok = true, valid = false }, false end
+            local display = GetDisplayNameFromVehicleModel(hash)
+            local label = display and display ~= "CARNOTFOUND" and GetLabelText(display) or nil
+            if label == "NULL" then label = nil end
+            return { ok = true, valid = true, label = label or display }, false
+        end
+
+        return { ok = true, valid = IsModelAPed(hash) and true or false }, false
+    end,
+
+    edit = function(d)
+        return adminResult(TriggerServerCallback('paidshop:quickEditItem', d.category, d.spawnName, d.patch)), true
+    end,
+    add = function(d)
+        return adminResult(TriggerServerCallback('paidshop:addItemServer', d.item, d.category)), true
+    end,
+    delete = function(d)
+        return adminResult(TriggerServerCallback('paidshop:deleteItemServer', d.spawnName, d.category)), true
+    end,
+    featured = function(d)
+        return adminResult(TriggerServerCallback('paidshop:setFeaturedItem', d.category, d.spawnName)), true
+    end,
+
+    toggleCategory = function(d)
+        return adminWithOverview(TriggerServerCallback('paidshop:adminSetCategoryEnabled', d.id, d.enabled)), true
+    end,
+
+    coins = function(d)
+        local targetId = tonumber(d.targetId)
+        if d.action == "lookup" then
+            local ok, info = TriggerServerCallback('paidshop:getCoinsAdmin', targetId)
+            if not ok then return adminResult(false, info), false end
+            return { ok = true, coins = info }, false
+        end
+        local event = d.action == "remove" and 'paidshop:removeCoinsAdmin' or 'paidshop:addCoinsAdmin'
+        return adminResult(TriggerServerCallback(event, targetId, tonumber(d.amount))), false
+    end,
+    give = function(d)
+        return adminResult(TriggerServerCallback('paidshop:giveItemAdmin', d.mode, d.targetValue, d.spawnName, d.category, d.quantity)), false
+    end,
+
+    dailyAdd = function(d) return adminWithOverview(TriggerServerCallback('paidshop:addDailyReward', d.reward)), false end,
+    dailyEdit = function(d) return adminWithOverview(TriggerServerCallback('paidshop:editDailyReward', d.reward)), false end,
+    dailyDelete = function(d) return adminWithOverview(TriggerServerCallback('paidshop:deleteDailyReward', d.spawnName)), false end,
+    streakSave = function(d) return adminWithOverview(TriggerServerCallback('paidshop:adminEditDailyStreakSlot', d.slot, d.draft)), false end,
+
+    scannerSet = function(d)
+        local res = TriggerServerCallback('paidshop:builder:setDisplayedCases', d.list)
+        if not res or not res.success then return adminResult(false, res and res.error or "Erreur lors de la sauvegarde"), false end
+        return adminWithOverview(true), false
+    end,
+
+    -- Rayons : créer / modifier (id vide = création), ranger, supprimer, restaurer. Chaque réponse porte la liste à jour.
+    categorySave = function(d)
+        local ok, msg, categoryId = TriggerServerCallback('paidshop:adminSaveCategory', d.id, d.data)
+        local response = adminWithOverview(ok, msg)
+        if ok and categoryId then response.categoryId = categoryId end
+        return response, true
+    end,
+    categoryOrder = function(d)
+        return adminWithOverview(TriggerServerCallback('paidshop:adminReorderCategories', d.ids)), true
+    end,
+    categoryDelete = function(d)
+        return adminWithOverview(TriggerServerCallback('paidshop:adminDeleteCategory', d.id)), true
+    end,
+    categoryRestore = function(d)
+        return adminWithOverview(TriggerServerCallback('paidshop:adminRestoreCategory', d.id)), true
+    end,
+
+    pourMoiAdd = function(d)
+        return adminWithOverview(TriggerServerCallback('paidshop:adminAddPourMoiItem', d.sourceCategory, d.sourceSpawnName, d.rarity, d.reductionPercent)), true
+    end,
+    pourMoiUpdate = function(d)
+        return adminWithOverview(TriggerServerCallback('paidshop:adminUpdatePourMoiItem', d.sourceCategory, d.sourceSpawnName, d.rarity, d.reductionPercent)), true
+    end,
+    pourMoiRemove = function(d)
+        return adminWithOverview(TriggerServerCallback('paidshop:adminRemovePourMoiItem', d.sourceCategory, d.sourceSpawnName)), true
+    end,
+}
+
+RegisterNUICallback('paidshop:admin', function(data, cb)
+    local op = type(data) == "table" and ADMIN_OPS[data.op] or nil
+    if not isAdmin or not op then
+        cb({ ok = false, error = "Non autorisé" })
+        return
+    end
+
+    local response, reload = op(data)
+    if reload and response.ok then pushShopData() end
+    cb(response)
+end)
+
 -- Refresh Items
 RegisterNUICallback('paidshop:refreshItems', function(data, cb)
     local shopData = TriggerServerCallback('paidshop:getShopData')
+    PaidShopClient.SyncCategories(shopData)
     if not shopData then
         cb({success=false})
         return
