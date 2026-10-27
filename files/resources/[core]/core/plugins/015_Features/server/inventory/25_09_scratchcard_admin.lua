@@ -109,4 +109,64 @@ RegisterNetEvent("core:scratchcard:saveConfig", function(payload)
     end
 
     VFW.Variables.SetVariable(VARIABLE, { prizeTiers = tiers })
+    if VFW.Variables.Flush then VFW.Variables.Flush(VARIABLE) end
+end)
+
+-- ── Gestion > Tickets à gratter : le panneau du hub (montants et pourcentages de chaque palier) ──
+
+local function gestionOk(source)
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not xPlayer then return nil end
+    if xPlayer.hasPermission(PERM) or xPlayer.hasPermission("gestion") or xPlayer.hasPermission("server_management")
+        or xPlayer.hasPermission("dev") or xPlayer.hasPermission("admin") then
+        return xPlayer
+    end
+    return nil
+end
+
+local function currentTiers()
+    local stored = VFW.Variables and VFW.Variables.GetVariable and VFW.Variables.GetVariable(VARIABLE) or nil
+    if type(stored) == "table" and type(stored.prizeTiers) == "table" and #stored.prizeTiers > 0 then
+        local out = {}
+        for i = 1, #stored.prizeTiers do
+            out[i] = { amount = tonumber(stored.prizeTiers[i].amount) or 0, probability = tonumber(stored.prizeTiers[i].probability) or 0 }
+        end
+        return out
+    end
+    return copyDefaults()
+end
+
+RegisterServerCallback("gestion:scratch:get", function(source)
+    if not gestionOk(source) then return { ok = false, error = "Permission requise." } end
+    return { ok = true, tiers = currentTiers(), defaults = copyDefaults() }
+end)
+
+--- Enregistre les paliers { amount, probability } du panneau. Plus strict que l'ancien menu : le total ne doit
+--- pas dépasser 100 % (le tirage cumule les probabilités dans l'ordre : au-delà, les derniers paliers ne
+--- sortiraient jamais). Le reste jusqu'à 100 % est la chance de ne rien gagner.
+RegisterServerCallback("gestion:scratch:save", function(source, tiers)
+    if not gestionOk(source) then return { ok = false, error = "Permission requise." } end
+    if type(tiers) ~= "table" then return { ok = false, error = "Configuration invalide." } end
+
+    local clean, total = {}, 0.0
+    for _, tier in ipairs(tiers) do
+        local amount = math.floor(tonumber(type(tier) == "table" and tier.amount or nil) or 0)
+        local probability = tonumber(type(tier) == "table" and tier.probability or nil) or 0
+        if amount > 0 and probability > 0 then
+            if amount > 100000000 then return { ok = false, error = "Un gain ne peut pas dépasser 100 000 000 $." } end
+            if probability > 100 then return { ok = false, error = "Une probabilité ne peut pas dépasser 100 %." } end
+            clean[#clean + 1] = { amount = amount, probability = math.floor(probability * 10000 + 0.5) / 10000 }
+            total = total + probability
+        end
+        if #clean >= 30 then break end
+    end
+
+    if #clean == 0 then return { ok = false, error = "Il faut au moins un palier avec un montant et une probabilité positifs." } end
+    if total > 100.0000001 then
+        return { ok = false, error = ("Le total fait %.4f %% : il ne doit pas dépasser 100 %%."):format(total) }
+    end
+
+    VFW.Variables.SetVariable(VARIABLE, { prizeTiers = clean })
+    if VFW.Variables.Flush then VFW.Variables.Flush(VARIABLE) end
+    return { ok = true, tiers = clean, message = "Gains enregistrés : appliqués dès le prochain ticket." }
 end)

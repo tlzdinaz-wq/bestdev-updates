@@ -8,10 +8,9 @@ function Inv.GivePlayerItem(xPlayer, name, count, meta, notify)
 
     local added = Inv.AddToList(Inv.PlayerList(xPlayer), name, count, meta, Inv.PlayerMaxSlots)
     if added > 0 then
+        -- La notification « +N objet » est déjà affichée par le client à chaque mise à jour d'inventaire
+    -- (VFW.NotifyInventoryChange compare l'ancien et le nouvel inventaire) : l'envoyer aussi ici l'affichait deux fois.
         Inv.PushPlayer(xPlayer)
-        if notify ~= false then
-            TriggerClientEvent("vfw:showItemNotification", xPlayer.source, name, added, 1)
-        end
     end
     return added
 end
@@ -24,10 +23,9 @@ function Inv.TakePlayerItem(xPlayer, name, count, notify)
 
     local removed = Inv.RemoveByName(Inv.PlayerList(xPlayer), name, count)
     if removed > 0 then
+        -- La notification « +N objet » est déjà affichée par le client à chaque mise à jour d'inventaire
+    -- (VFW.NotifyInventoryChange compare l'ancien et le nouvel inventaire) : l'envoyer aussi ici l'affichait deux fois.
         Inv.PushPlayer(xPlayer)
-        if notify ~= false then
-            TriggerClientEvent("vfw:showItemNotification", xPlayer.source, name, removed, 0)
-        end
     end
     return removed
 end

@@ -10,7 +10,9 @@ if isServerSide then
 ---@class NeedSaves
         NeedSaves = {},
 ---@class SaveID
-        SaveID = {}
+        SaveID = {},
+        -- vrai une fois les variables lues en base : avant, GetVariable rend une table vide qui ne veut pas dire « rien d'enregistré »
+        Loaded = false
     }
 
 ---Get VFW.Variables.Variable
@@ -92,6 +94,14 @@ if isServerSide then
         end
     end)
 
+    -- Arrêt / redémarrage de core : ce qui n'a pas encore été vidé (cycle de 60 s) est écrit tout de suite.
+    AddEventHandler("onResourceStop", function(resource)
+        if resource ~= GetCurrentResourceName() or not VFW.Variables.Loaded then return end
+        for name in pairs(VFW.Variables.NeedSaves) do
+            pcall(VFW.Variables.Flush, name)
+        end
+    end)
+
     local CREATE_VARIABLES = [[
         CREATE TABLE IF NOT EXISTS variables (
             `name` VARCHAR(100) NOT NULL,
@@ -127,6 +137,7 @@ if isServerSide then
                     VFW.Variables.SaveID[name] = math.random(1, 9999)
                 end
             end
+            VFW.Variables.Loaded = true
             console.init("Variables", ("Toutes les variables chargees (%d)"):format(#result))
             TriggerEvent("vfw:variables:loaded")
             if VFW.Branding and VFW.Branding.Push then

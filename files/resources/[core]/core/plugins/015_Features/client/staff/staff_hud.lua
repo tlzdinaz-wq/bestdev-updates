@@ -235,3 +235,32 @@ VFW.RequireStaffMode("staffhud", function()
         })
     end
 end)
+
+-- Menu pause (carte, options) : les docks staff / animateurs sont une surcouche NUI qui se dessine par-dessus le menu
+-- natif du jeu. On les masque tant que le menu pause est ouvert, puis on les remet comme avant (les états
+-- staffHudVisible / IsAnimatorHUDVisible ne changent pas).
+CreateThread(function()
+    local wasPaused = false
+    while true do
+        Wait(250)
+        local paused = IsPauseMenuActive()
+        if paused ~= wasPaused then
+            wasPaused = paused
+            if paused then
+                if staffHudVisible then
+                    SendNUIMessage({ action = "staffHud:toggle", data = false })
+                end
+                if IsAnimatorHUDVisible and IsAnimatorHUDVisible() then
+                    SendNUIMessage({ action = "animatorHud:toggle", data = false })
+                end
+            else
+                if staffHudVisible then
+                    ToggleStaffHUD(true)
+                end
+                if IsAnimatorHUDVisible and IsAnimatorHUDVisible() then
+                    ToggleAnimatorHUD(true)
+                end
+            end
+        end
+    end
+end)

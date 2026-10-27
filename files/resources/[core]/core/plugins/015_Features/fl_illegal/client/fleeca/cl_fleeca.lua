@@ -920,7 +920,7 @@ AddEventHandler("core:fleeca:syncDrillingState", function(bankId, safeIndex, isD
 end)
 
 RegisterNetEvent("core:fleeca:createPoliceBlip")
-AddEventHandler("core:fleeca:createPoliceBlip", function(bankId)
+AddEventHandler("core:fleeca:createPoliceBlip", function(bankId, duration)
     if IsPoliceJob(VFW.PlayerData.job.name) then
         local bank = FleecaBanks[bankId]
         if bank then
@@ -935,7 +935,7 @@ AddEventHandler("core:fleeca:createPoliceBlip", function(bankId)
 
             table.insert(robberyBlips, blip)
 
-            SetTimeout(FleecaSettings.PoliceBlipDuration, function()
+            SetTimeout(tonumber(duration) or FleecaSettings.PoliceBlipDuration, function()
                 if DoesBlipExist(blip) then
                     RemoveBlip(blip)
                 end

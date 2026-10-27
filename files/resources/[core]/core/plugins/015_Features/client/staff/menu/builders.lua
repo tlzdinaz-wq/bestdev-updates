@@ -297,6 +297,10 @@ function StaffMenu.BuildZoneSafeMenu()
 
     StaffMenu.builderZoneSafe.Button(":map: CARTE ZONES SAFE", "Voir les zones safe sur la carte interactive", nil, "chevron", false, function()
         exports['VUI']:CloseAll()
+        -- Dans le hub de gestion, la carte s'ouvre à la place du hub (sinon il resterait affiché par-dessus).
+        if StaffMenu.IsGestionHubOpen and StaffMenu.IsGestionHubOpen() then
+            StaffMenu.CloseGestionHub()
+        end
         SetTimeout(200, function()
             exports['core']:OpenSafeZoneTablet()
         end)
@@ -5175,6 +5179,21 @@ function StaffMenu.BuildFleecaMenu()
 end
 
 -- Variables globales pour le menu de création Fleeca
+-- Dans la tablette Gestion (mode hub), menu.close() met fin à la chaîne : le hub revient à la liste des outils et le
+-- menu rouvert ensuite s'affiche en fond. On repasse alors par VUI (retour d'un cran) ; hors hub, comportement d'origine.
+local function fleecaGoBack(menu, reopenParent)
+    local inHub = false
+    pcall(function() inHub = exports['VUI']:IsHubMode() == true end)
+
+    if inHub then
+        exports['VUI']:HandleBack()
+        return
+    end
+
+    menu.close()
+    if reopenParent and menu.parent then menu.parent.open() end
+end
+
 local fleecaData = {
     name = "",
     canRob = true,
@@ -5273,6 +5292,15 @@ local function SelectDoorVisually()
     if VFW.DisableInterations then VFW.DisableInterations(false) end
 
     return selectedEntity, selectedCoords
+end
+
+-- Choix visuel de la porte du coffre : le menu est masqué pendant la visée (PlaceInWorld gère le hub et le menu F5).
+local function fleecaPickDoor(menu)
+    return StaffMenu.PlaceInWorld(menu, function()
+        local entity, coords = SelectDoorVisually()
+        if entity and coords then return { entity = entity, coords = coords } end
+        return nil
+    end)
 end
 
 -- Manage Fleeca Access Points Menu
@@ -5486,9 +5514,8 @@ function StaffMenu.BuildCreateFleecaBankMenu()
             subtitle = 'Mode Builder',
             message = "Mode sélection activé - Visez la porte et appuyez sur E."
       })
-        StaffMenu.CreateFleecaBank.close()
-
-        local entity, coords = SelectDoorVisually()
+        local picked = fleecaPickDoor(StaffMenu.CreateFleecaBank)
+        local entity, coords = picked and picked.entity, picked and picked.coords
 
         if coords and entity then
             fleecaData.vaultDoorPos = {
@@ -5508,7 +5535,6 @@ function StaffMenu.BuildCreateFleecaBankMenu()
           })
         end
 
-        StaffMenu.CreateFleecaBank.open()
         StaffMenu.CreateFleecaBank.refresh()
     end)
 
@@ -5585,8 +5611,7 @@ function StaffMenu.BuildCreateFleecaBankMenu()
                 message = "Banque Fleeca créée."
           })
 
-            StaffMenu.CreateFleecaBank.close()
-            StaffMenu.builderFleeca.open()
+            fleecaGoBack(StaffMenu.CreateFleecaBank, true)
         end
     end)
 
@@ -5761,9 +5786,8 @@ function StaffMenu.BuildEditFleecaBankMenu()
             subtitle = 'Mode Builder',
             message = "Mode sélection activé - Visez la porte et appuyez sur E."
       })
-        StaffMenu.EditFleecaBank.close()
-
-        local entity, coords = SelectDoorVisually()
+        local picked = fleecaPickDoor(StaffMenu.EditFleecaBank)
+        local entity, coords = picked and picked.entity, picked and picked.coords
 
         if coords and entity then
             local newPos = {
@@ -5842,7 +5866,8 @@ function StaffMenu.BuildEditFleecaBankMenu()
         local confirm = VFW.Nui.KeyboardInput(true, "Tapez 'CONFIRMER' pour supprimer définitivement cette banque", "")
         if confirm == "CONFIRMER" then
             TriggerServerEvent('core:fleeca:deleteBank', bank.id)
-            StaffMenu.EditFleecaBank.close()
+            Wait(400)
+            fleecaGoBack(StaffMenu.EditFleecaBank, false)
             StaffMenu.ListFleecaBank.refresh()
             VFW.ShowNotification({
                 type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder',

@@ -181,6 +181,16 @@ local function restoreEntryToDb(entry)
     })
 end
 
+--- La base fait foi.
+---
+--- Avant, le fichier config/concess_points.json PRIMAIT sur la base : il ecrasait le nom, les
+--- coordonnees et le metier de chaque concessionnaire, et SUPPRIMAIT de la base (avec leur
+--- stock et leurs logs) tous ceux qu'il ne listait pas. Quand quelqu'un remplacait le dossier
+--- `core` en entier, le fichier du developpeur arrivait avec et effacait les concessionnaires
+--- du serveur.
+---
+--- Maintenant le fichier n'est qu'une sauvegarde : on l'ecrit, et on ne le relit que pour
+--- remplir une base completement vide. Il ne supprime ni ne modifie jamais rien.
 function Concess.Load()
     local rows = JC.Query("SELECT * FROM concess ORDER BY id ASC")
     local out = {}
@@ -189,55 +199,14 @@ function Concess.Load()
         if entry.id then out[entry.id] = entry end
     end
 
-    -- Fichier JSON : complète / restaure les points manquants après reboot
-    local fromFile = loadPointsFile()
-    if fromFile then
-        local dbCount = 0
-        for _ in pairs(out) do dbCount = dbCount + 1 end
-        if dbCount == 0 then
+    if next(out) == nil then
+        local fromFile = loadPointsFile()
+        if fromFile and next(fromFile) then
             for id, entry in pairs(fromFile) do
                 out[id] = entry
                 restoreEntryToDb(entry)
             end
-            if next(fromFile) then
-                print("^2[concess]^7 points restaurés depuis " .. POINTS_FILE)
-            end
-        else
-            -- DB présente : le fichier prime sur les coords (catalog/preview/spawn/showcase)
-            for id, fileEntry in pairs(fromFile) do
-                local dbEntry = out[id]
-                if dbEntry then
-                    dbEntry.catalog = fileEntry.catalog
-                    dbEntry.preview = fileEntry.preview
-                    dbEntry.spawn = fileEntry.spawn
-                    dbEntry.showcase = fileEntry.showcase
-                    if fileEntry.name and fileEntry.name ~= "" then dbEntry.name = fileEntry.name end
-                    if fileEntry.job ~= nil then dbEntry.job = fileEntry.job end
-                    if fileEntry.concessType then dbEntry.concessType = fileEntry.concessType end
-                    if fileEntry.automatic ~= nil then dbEntry.automatic = fileEntry.automatic end
-                    if fileEntry.pedModel then dbEntry.pedModel = fileEntry.pedModel end
-                    Concess.Persist(dbEntry)
-                else
-                    out[id] = fileEntry
-                    restoreEntryToDb(fileEntry)
-                end
-            end
-            -- Un point retiré du fichier ne doit pas rester en base, sinon le PED revient.
-            if next(fromFile) then
-                local stale = {}
-                for id in pairs(out) do
-                    if not fromFile[id] then
-                        stale[#stale + 1] = id
-                    end
-                end
-                for i = 1, #stale do
-                    local id = stale[i]
-                    JC.Exec("DELETE FROM concess WHERE id = ?", { id })
-                    JC.Exec("DELETE FROM concess_stock WHERE concess_id = ?", { id })
-                    JC.Exec("DELETE FROM concess_logs WHERE concess_id = ?", { id })
-                    out[id] = nil
-                end
-            end
+            print("^2[concess]^7 base vide : points restaurés depuis " .. POINTS_FILE)
         end
     end
 

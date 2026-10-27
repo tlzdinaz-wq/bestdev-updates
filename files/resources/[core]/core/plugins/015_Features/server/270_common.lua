@@ -158,19 +158,52 @@ function Feat27.SpawnVehicle(model, coords, heading, vehicleType, source)
         if ok and res then kind = res end
     end
 
-    -- Un véhicule créé avec le mauvais type n'apparaît jamais (un scooter « automobile », par exemple) :
-    -- on essaie d'abord le type attendu, puis les deux types les plus courants.
+    local aliases = {
+        car = "automobile",
+        motorcycle = "bike",
+        motorbike = "bike",
+        moto = "bike",
+        bicycle = "bike",
+    }
+    kind = aliases[tostring(kind or ""):lower()] or kind
+
+    local function finish(vehicle)
+        if not vehicle or vehicle == 0 or not Feat27.WaitEntity(vehicle) then return nil end
+        SetEntityOrphanMode(vehicle, 2)
+        pcall(SetVehicleDoorsLocked, vehicle, 1)
+        local ok, state = pcall(function() return Entity(vehicle).state end)
+        if ok and state then state:set("doorsLocked", false, true) end
+        local netId = NetworkGetNetworkIdFromEntity(vehicle)
+        if not netId or netId <= 0 then
+            DeleteEntity(vehicle)
+            return nil
+        end
+        return netId, vehicle
+    end
+
+    -- Un véhicule créé avec le mauvais type n'apparaît jamais. Le léger décalage vertical
+    -- évite aussi que les points posés au niveau du sol créent le véhicule sous la chaussée.
     local tried = {}
     for _, candidate in ipairs({ kind or "automobile", "bike", "automobile" }) do
         if not tried[candidate] then
             tried[candidate] = true
-            local vehicle = CreateVehicleServerSetter(hash, candidate, pos.x, pos.y, pos.z, tonumber(heading) or 0.0)
-            if Feat27.WaitEntity(vehicle) then
-                SetEntityOrphanMode(vehicle, 2)
-                return NetworkGetNetworkIdFromEntity(vehicle), vehicle
+            local ok, vehicle = pcall(
+                CreateVehicleServerSetter,
+                hash, candidate, pos.x, pos.y, pos.z + 0.25, tonumber(heading) or 0.0
+            )
+            if ok then
+                local netId, entity = finish(vehicle)
+                if netId then return netId, entity end
             end
         end
     end
+
+    -- Dernier recours OneSync : cette création ne dépend pas du type calculé par le client.
+    local ok, vehicle = pcall(
+        CreateVehicle,
+        hash, pos.x, pos.y, pos.z + 0.25, tonumber(heading) or 0.0, true, true
+    )
+    if ok then return finish(vehicle) end
     return nil
 end
 

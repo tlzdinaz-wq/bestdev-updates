@@ -92,52 +92,94 @@ local function rollPrize()
     return 0
 end
 
-local function buildScratchConfig(prize)
-    local cells = {}
-    local winningIndexes = {}
+--- Nombre de tickets qu'il reste dans l'inventaire (affiché : « N tickets restants » + bouton Suivant).
+local function remainingTickets(xPlayer)
+    local total = 0
+    local list = Inv.PlayerList(xPlayer)
+    for i = 1, #list do
+        if list[i].name == SCRATCH_ITEM then total = total + (tonumber(list[i].count) or 1) end
+    end
+    return total
+end
 
-    if prize > 0 then
-        while #winningIndexes < 3 do
-            local index = math.random(1, 20)
-            local exists = false
-            for i = 1, #winningIndexes do
-                if winningIndexes[i] == index then exists = true break end
-            end
-            if not exists then winningIndexes[#winningIndexes + 1] = index end
+local function shuffled(from, to)
+    local out = {}
+    for n = from, to do out[#out + 1] = n end
+    for i = #out, 2, -1 do
+        local j = math.random(1, i)
+        out[i], out[j] = out[j], out[i]
+    end
+    return out
+end
+
+--- Le ticket tel que l'interface le lit : 3 numéros gagnants, 20 cases { value, prize }. Une case gagne si son
+--- numéro est l'un des numéros gagnants, et rapporte son montant. L'ancienne version envoyait un autre format
+--- (cells / winning) : l'interface ne trouvait aucune case, plantait au premier grattage, n'affichait aucun gain
+--- et laissait le joueur bloqué.
+--- Un ticket gagnant a UNE case gagnante (le montant tiré) ; un ticket perdant n'en a aucune.
+local function buildScratchConfig(prize, remaining)
+    local tiers = getPrizeTiers()
+    local amounts, maxPrize = {}, 0
+    for i = 1, #tiers do
+        local amount = math.floor(tonumber(tiers[i].amount) or 0)
+        if amount > 0 then
+            amounts[#amounts + 1] = amount
+            if amount > maxPrize then maxPrize = amount end
         end
     end
+    if #amounts == 0 then amounts[1] = 500; maxPrize = 500 end
 
-    local decoys = { 500, 1500, 3000, 10000, 30000, 50000, 100000, 500000 }
+    local numbers = shuffled(1, 60)
+    local winning = { numbers[1], numbers[2], numbers[3] }
 
+    local cells = {}
     for i = 1, 20 do
-        cells[i] = decoys[math.random(1, #decoys)]
+        cells[i] = { value = numbers[3 + i], prize = amounts[math.random(1, #amounts)] }
     end
 
-    for i = 1, #winningIndexes do
-        cells[winningIndexes[i]] = prize
+    if prize > 0 then
+        cells[math.random(1, 20)] = { value = winning[math.random(1, 3)], prize = prize }
+        if prize > maxPrize then maxPrize = prize end
     end
 
     return {
-        cells = cells,
-        winning = winningIndexes,
-        prize = prize,
-        prizeTiers = getPrizeTiers(),
+        winningNumbers = winning,
+        playerNumbers = cells,
+        maxPrize = maxPrize,
+        remainingTickets = remaining or 0,
     }
 end
 
+--- Un tirage : le ticket est consommé et le gain est versé tout de suite. Avant, il n'était versé qu'à la
+--- fermeture du ticket : un joueur qui se déconnectait ou dont l'écran se bloquait perdait son gain.
 local function startScratchCard(xPlayer, entry)
     if not consumeOne(xPlayer, entry) then return false end
 
     local prize = rollPrize()
-    local config = buildScratchConfig(prize)
+    if prize > 0 then
+        Inv.AddToList(Inv.PlayerList(xPlayer), "money", prize, nil, Inv.PlayerMaxSlots)
+    end
+    Inv.PushPlayer(xPlayer)
 
     Inv.ScratchSessions[xPlayer.source] = { prize = prize, startedAt = GetGameTimer() }
 
-    TriggerClientEvent("core:UseScratchCard", xPlayer.source, config)
+    TriggerClientEvent("core:UseScratchCard", xPlayer.source, buildScratchConfig(prize, remainingTickets(xPlayer)))
     return true
 end
 
+--- Le client refuse de gratter au volant : on ne consomme donc pas le ticket dans ce cas.
+local function isDriving(source)
+    local ped = GetPlayerPed(source)
+    if not ped or ped == 0 then return false end
+    local vehicle = GetVehiclePedIsIn(ped, false)
+    return vehicle ~= 0 and GetPedInVehicleSeat(vehicle, -1) == ped
+end
+
 Inv.RegisterUsableItem(SCRATCH_ITEM, function(xPlayer, entry)
+    if isDriving(xPlayer.source) then
+        Inv.Toast(xPlayer.source, "Vous ne pouvez pas gratter un ticket en conduisant.")
+        return
+    end
     startScratchCard(xPlayer, entry)
 end)
 
@@ -174,11 +216,7 @@ Inv.RegisterNet("core:scratchcard:close", function(data)
 
     Inv.ScratchSessions[source] = nil
 
-    if session.prize > 0 then
-        Inv.AddToList(Inv.PlayerList(xPlayer), "money", session.prize, nil, Inv.PlayerMaxSlots)
-        Inv.PushPlayer(xPlayer)
-        TriggerClientEvent("vfw:showItemNotification", source, "money", session.prize, 1)
-    end
+    -- le gain a été versé au tirage : la mise à jour d'inventaire l'a déjà annoncé
 
     if data.next ~= true then return end
 

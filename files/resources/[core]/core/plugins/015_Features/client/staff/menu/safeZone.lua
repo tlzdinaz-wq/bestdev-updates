@@ -11,6 +11,25 @@ local markerThread = nil
 local isMarkersActive = false
 local isNavigating = false
 
+--- Remonte d'un menu. Dans le hub de gestion, menu.close() TERMINE toute la chaîne de menus : le hub revient à la
+--- liste des outils et le menu rouvert ensuite s'affiche derrière le hub (c'est ce que voyait le staff en créant ou
+--- en supprimant une zone). On passe donc par le retour de VUI, qui reste dans le hub. Hors hub (menu F5) :
+--- comportement d'origine.
+---@param menu table Le menu qu'on quitte
+---@param reopenParent boolean Rouvrir le menu parent hors hub (sinon on ferme tout)
+local function goBack(menu, reopenParent)
+    local inHub = false
+    pcall(function() inHub = exports['VUI']:IsHubMode() == true end)
+
+    if inHub then
+        exports['VUI']:HandleBack()
+        return
+    end
+
+    menu.close()
+    if reopenParent and menu.parent then menu.parent.open() end
+end
+
 local controlDisabled <const> = {
     { label = "Sauter", control = 22},
     { label = "Accroupi", control = 36},
@@ -376,14 +395,13 @@ function StaffMenu.BuildCreateZoneSafeMenu()
                 message = "Zone safe créée"
           })
             isNavigating = true
-            StaffMenu.CreateZoneSafe.close()
-            StaffMenu.CreateZoneSafe.parent.open()
+            goBack(StaffMenu.CreateZoneSafe, true)
         end)
 
         StaffMenu.CreateZoneSafe.Button(":x: ANNULER", nil, nil, "chevron", false, function()
             stopMarkerThread()
             resetZoneData()
-            StaffMenu.CreateZoneSafe.close()
+            goBack(StaffMenu.CreateZoneSafe, false)
         end)
     end
 end
@@ -484,8 +502,7 @@ function StaffMenu.BuildManageZoneSafeMenu()
       })
 
         isNavigating = true
-        StaffMenu.ManageZoneSafe.close()
-        StaffMenu.ManageZoneSafe.parent.open()
+        goBack(StaffMenu.ManageZoneSafe, true)
     end)
 end
 

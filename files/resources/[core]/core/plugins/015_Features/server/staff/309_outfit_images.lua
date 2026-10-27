@@ -42,21 +42,26 @@ end
 
 local VARIABLE <const> = "outfit_images_manifest"
 
---- La liste des images de tenues est doublee en base de donnees.
+--- La liste des images de tenues vit en base de donnees ; le fichier n'en est qu'une copie.
 ---
 --- Elle ne vivait que dans ce fichier, a l interieur de la ressource. Un client qui
 --- remplace le dossier `core` pour se mettre a jour perdait toutes les images deja
 --- generees : il fallait tout refaire, piece par piece.
 ---
---- Le fichier reste ce qu'on lit ; la base n'en est que la copie de secours.
+--- La base fait foi ; un fichier arrive avec une mise a jour ne prend pas sa place, et
+--- n'est lu que pour remplir une base encore vide.
 local function mirrorToDatabase(data)
     if not VFW.Variables or not VFW.Variables.SetVariable then return end
     pcall(VFW.Variables.SetVariable, VARIABLE, data)
+    -- tout de suite : la sauvegarde periodique ne passe qu'une fois par minute
+    if VFW.Variables.Flush then pcall(VFW.Variables.Flush, VARIABLE) end
 end
 
 ---@return table|nil liste, boolean consultee
 local function readFromDatabase()
     if not VFW.Variables or not VFW.Variables.GetVariable then return nil, false end
+    -- tant que les variables ne sont pas lues, GetVariable rend une table vide : ce n'est pas « rien d'enregistre »
+    if VFW.Variables.Loaded ~= true then return nil, false end
 
     local ok, stored = pcall(VFW.Variables.GetVariable, VARIABLE)
     if not ok then return nil, false end
@@ -64,64 +69,74 @@ local function readFromDatabase()
     return stored, true
 end
 
-local function loadManifest()
-    if manifest then return manifest end
-    manifest = {}
-    local raw = LoadResourceFile(GetCurrentResourceName(), MANIFEST_FILE)
-    if type(raw) == "string" and raw ~= "" then
-        local ok, decoded = pcall(json.decode, raw)
-        if ok and type(decoded) == "table" then
-            for sex, kinds in pairs(decoded) do
-                if SEXES[sex] and type(kinds) == "table" then
-                    for kind, folders in pairs(kinds) do
-                        if FOLDERS[kind] and type(folders) == "table" then
-                            for folder, files in pairs(folders) do
-                                if type(files) == "table" then
-                                    for filename, url in pairs(files) do
-                                        if type(filename) == "string" and type(url) == "string" and url:match("^https://") then
-                                            manifest[sex] = manifest[sex] or {}
-                                            manifest[sex][kind] = manifest[sex][kind] or {}
-                                            manifest[sex][kind][folder] = manifest[sex][kind][folder] or {}
-                                            manifest[sex][kind][folder][filename] = url
-                                        end
-                                    end
+--- Ne garde que ce qu'on sait lire : { sexe = { type = { dossier = { fichier = url https } } } }
+local function sanitizeManifest(decoded)
+    local out = {}
+    for sex, kinds in pairs(decoded) do
+        if SEXES[sex] and type(kinds) == "table" then
+            for kind, folders in pairs(kinds) do
+                if FOLDERS[kind] and type(folders) == "table" then
+                    for folder, files in pairs(folders) do
+                        if type(files) == "table" then
+                            for filename, url in pairs(files) do
+                                if type(filename) == "string" and type(url) == "string" and url:match("^https://") then
+                                    out[sex] = out[sex] or {}
+                                    out[sex][kind] = out[sex][kind] or {}
+                                    out[sex][kind][folder] = out[sex][kind][folder] or {}
+                                    out[sex][kind][folder][filename] = url
                                 end
                             end
                         end
                     end
                 end
             end
-        else
-            console.warn("[outfits] manifest.json illisible, liste repartie de zéro.")
         end
     end
+    return out
+end
 
-    -- Fichier absent : la copie en base prend le relais. Le fichier sera reecrit au
-    -- prochain enregistrement.
-    if not next(manifest) then
-        local stored, consulted = readFromDatabase()
-        if stored then
-            manifest = stored
-            console.warn("[outfits] manifest.json manquant : liste restauree depuis la base.")
-        elseif not consulted then
-            -- Base pas encore joignable : ne rien retenir, sinon cette liste vide
-            -- tiendrait lieu de verite pour toute la duree du serveur.
-            local empty = manifest
-            manifest = nil
-            return empty
-        end
+local function readManifestFile()
+    local raw = LoadResourceFile(GetCurrentResourceName(), MANIFEST_FILE)
+    if type(raw) ~= "string" or raw == "" then return nil end
+    local ok, decoded = pcall(json.decode, raw)
+    if not ok or type(decoded) ~= "table" then
+        console.warn("[outfits] manifest.json illisible, il est ignoré.")
+        return nil
+    end
+    return sanitizeManifest(decoded)
+end
+
+local function loadManifest()
+    if manifest then return manifest end
+
+    local stored, consulted = readFromDatabase()
+    if stored then
+        manifest = sanitizeManifest(stored)
+        return manifest
     end
 
+    local fromFile = readManifestFile()
+
+    -- Base pas encore lue : on s'en sert sans le retenir, sinon cette liste tiendrait lieu de
+    -- verite pour toute la duree du serveur.
+    if not consulted then return fromFile or {} end
+
+    manifest = fromFile or {}
+    if next(manifest) then
+        -- premiere fois : le fichier existant devient la copie de la base
+        mirrorToDatabase(manifest)
+        console.warn("[outfits] liste reprise depuis manifest.json et enregistrée en base.")
+    end
     return manifest
 end
 
 local function saveManifest()
     local data = loadManifest()
-    local ok = SaveResourceFile(GetCurrentResourceName(), MANIFEST_FILE, json.encode(data), -1)
-    if not ok then console.error("[outfits] écriture de " .. MANIFEST_FILE .. " refusée.") end
-
+    -- la base d'abord : c'est elle qui compte, meme si le dossier de la ressource n'est pas inscriptible
     mirrorToDatabase(data)
-    return ok
+    local ok = SaveResourceFile(GetCurrentResourceName(), MANIFEST_FILE, json.encode(data), -1)
+    if not ok then console.warn("[outfits] écriture de " .. MANIFEST_FILE .. " refusée (la liste reste enregistrée en base).") end
+    return true
 end
 
 local function manifestSet(sex, kind, folder, filename, url)

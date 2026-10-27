@@ -246,9 +246,17 @@ local function extractYouTubeId(url)
 end
 
 -- Start video playback
+local lastVideoStart = { id = nil, at = 0 }
+
 RegisterNetEvent("vfw:staff:startVideo", function(videoLink, placementType, launcher)
     local videoId = extractYouTubeId(videoLink)
     if not videoId then return end
+
+    -- La même vidéo reçue deux fois d'affilée (double envoi, ou un écouteur en double) ne doit pas lancer deux
+    -- lecteurs : on aurait deux images et le son en double.
+    local now = GetGameTimer()
+    if lastVideoStart.id == videoId and now - lastVideoStart.at < 2500 then return end
+    lastVideoStart.id, lastVideoStart.at = videoId, now
 
     if currentVideoFrame then
         SendNUIMessage({ action = "nui:video:stop" })

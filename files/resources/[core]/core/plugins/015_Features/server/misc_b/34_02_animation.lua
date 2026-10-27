@@ -2,6 +2,17 @@ local phase = {}
 local lastEmote = {}
 local emoteProps = {}
 local sharedRequests = {}
+-- Emote partagée en cours : partners[a] = b et partners[b] = a
+local partners = {}
+
+local function unlinkPartner(source)
+    local partner = partners[source]
+    partners[source] = nil
+    if partner and partners[partner] == source then
+        partners[partner] = nil
+    end
+    return partner
+end
 
 local function clearProps(source)
     local slots = emoteProps[source]
@@ -33,6 +44,10 @@ AddEventHandler("vfw:playerDropped", function(source)
     end
     lastEmote[source] = nil
     sharedRequests[source] = nil
+    local partner = unlinkPartner(source)
+    if partner and VFW.GetPlayerFromId(partner) then
+        TriggerClientEvent("vfw:newanim:forceCancel", partner)
+    end
 end)
 
 RegisterNetEvent("vfw:newanim:phaseStart", function(animDict, animName, duration, inheritFrom)
@@ -186,6 +201,11 @@ RegisterNetEvent("vfw:newanim:acceptShared", function(askerId, emote)
     local xAsker = VFW.GetPlayerFromId(asker)
     if not xAsker then return end
 
+    unlinkPartner(source)
+    unlinkPartner(asker)
+    partners[source] = asker
+    partners[asker] = source
+
     TriggerClientEvent("nSyncPlayEmote", source, pending.emote, asker)
     TriggerClientEvent("nSyncPlayEmoteSource", asker, pending.emote, source)
 end)
@@ -202,11 +222,21 @@ RegisterNetEvent("vfw:newanim:refuseShared", function(askerId)
     VFW.ShowNotification(asker, { type = "ROUGE", content = "Votre demande d'animation a ete refusee." })
 end)
 
+-- Le joueur a déjà arrêté son emote chez lui (VFW.CancelEmote) ou en lance une autre (alsoTarget = true).
+-- Ici : nettoyage serveur, et arrêt du partenaire d'une emote partagée (il n'était jamais prévenu).
 RegisterNetEvent("vfw:newanim:cancelSharedAnim", function(alsoTarget)
     local source = source
     clearPhase(source)
     clearProps(source)
     lastEmote[source] = nil
+
+    local partner = unlinkPartner(source)
+    if partner and VFW.GetPlayerFromId(partner) then
+        clearPhase(partner)
+        clearProps(partner)
+        lastEmote[partner] = nil
+        TriggerClientEvent("vfw:newanim:forceCancel", partner)
+    end
 
     if alsoTarget == true then
         for target, pending in pairs(sharedRequests) do

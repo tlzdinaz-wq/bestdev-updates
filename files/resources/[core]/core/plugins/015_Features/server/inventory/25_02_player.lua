@@ -316,8 +316,8 @@ Inv.RegisterCallback("vfw:giveMoney", function(source, targetServerId, amount)
     Inv.RemoveByName(list, "money", value)
     Inv.AddToList(Inv.PlayerList(target), "money", value, nil, Inv.PlayerMaxSlots)
 
+    -- la notification « +N Money » vient de la mise à jour d'inventaire (pas besoin de l'envoyer aussi)
     Inv.PushPlayer(target)
-    TriggerClientEvent("vfw:showItemNotification", target.source, "money", value, 1)
 
     return payload(xPlayer)
 end)

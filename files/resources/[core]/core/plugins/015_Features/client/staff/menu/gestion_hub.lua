@@ -25,14 +25,28 @@ end
 -- Appel avec `:` obligatoire : le proxy d'exports FiveM est `function(self, ...)`,
 -- un appel avec `.` décale les arguments (openFn devient self).
 local function OpenVuiInHub(openFn, returnFn)
-    if not IsCallable(openFn) then return end
-    exports["VUI"]:OpenInHub(openFn, returnFn)
+    if not IsCallable(openFn) then return false, "fonction d'ouverture absente" end
+
+    local ok, err = pcall(function()
+        exports["VUI"]:OpenInHub(openFn, returnFn)
+    end)
+    if not ok then return false, err end
+
+    local modeOk, inHub = pcall(function()
+        return exports["VUI"]:IsHubMode()
+    end)
+    if not modeOk or inHub ~= true then
+        return false, "le menu ne s'est pas ouvert"
+    end
+    return true
 end
 
 local hubOpen = false
 local hubMinimized = false
 local hubData = nil
 local hubTextInput = nil
+local hubVuiOpenSerial = 0
+local hubVuiReadySerial = 0
 
 local function HasPerm(perms, need)
     if VFW.HasStaffPerm then
@@ -94,6 +108,12 @@ local directCategories = {
         id = "interim", label = "INTÉRIM", icon = "briefcase", perm = { "builder_interim_economy", "server_management", "dev" },
         items = {
             { label = "Gestion de l'intérim", desc = "Métiers, points et PNJ, réglages, centre d'emploi", icon = "briefcase", opens = "dev", dev = "interim" },
+        },
+    },
+    {
+        id = "scratch", label = "TICKETS À GRATTER", icon = "gift", perm = { "builder_scratch_card", "server_management", "dev" },
+        items = {
+            { label = "Gains et probabilités", desc = "Montants gagnés et pourcentage de chance de chaque palier", icon = "gift", opens = "dev", dev = "scratch" },
         },
     },
     {
@@ -203,7 +223,7 @@ local function BuildHubData()
                 else
                     group = nil
                 end
-            elseif group and e.label and (HasPerm(perms, e.perm) or (e.altPerm and perms[e.altPerm])) then
+            elseif group and e.label and not e.hubHidden and (HasPerm(perms, e.perm) or (e.altPerm and perms[e.altPerm])) then
                 local icon, text = SplitLabel(e.label)
                 group.items[#group.items + 1] = {
                     index = i, label = text, desc = e.desc or "", icon = icon,
@@ -393,8 +413,30 @@ function StaffMenu.RestoreGestionHubFocus()
 end
 
 --- Relais des messages VUI (mode hub) vers le NUI de gestion.
+local function ResetHubVuiLoading(reason)
+    -- Le front passe en `loading` dès le clic. Sans message de fermeture, une erreur
+    -- Lua/VUI le laisserait définitivement sur « Chargement du menu… ».
+    SendNUIMessage({
+        action = "gestion:vui",
+        data = { action = "vui:menu:close" },
+    })
+
+    if reason and reason ~= "" then
+        StaffMenu.ShowGestionNotification({
+            type = 'STAFF',
+            variant = 'ERROR',
+            subtitle = 'Gestion',
+            message = "Ce menu n'a pas pu être chargé. Réessayez.",
+        })
+        console.error("[GestionHub] " .. tostring(reason))
+    end
+end
+
 local function RelayVuiToHub(msg)
     if not hubOpen then return end
+    if type(msg) == "table" and msg.action ~= "vui:menu:close" then
+        hubVuiReadySerial = hubVuiOpenSerial
+    end
     SendNUIMessage({ action = "gestion:vui", data = msg })
 end
 
@@ -403,6 +445,7 @@ exports("GestionHubVuiMessage", RelayVuiToHub)
 
 AddEventHandler("vui:hub:ended", function()
     if not hubOpen then return end
+    ResetHubVuiLoading()
     StaffMenu.RestoreGestionHubFocus()
 end)
 
@@ -546,16 +589,37 @@ OpenFromHub = function(menu, onClick, state)
         local ok, err = pcall(onClick)
         if not ok then
             console.error("[GestionHub] onClick error: " .. tostring(err))
+            ResetHubVuiLoading("Erreur avant l'ouverture : " .. tostring(err))
+            return
         end
     end
 
+    hubVuiOpenSerial = hubVuiOpenSerial + 1
+    local serial = hubVuiOpenSerial
+    hubVuiReadySerial = 0
+
     SetTimeout(0, function()
         if not hubOpen then return end
-        OpenVuiInHub(menu.open, function()
+        local opened, err = OpenVuiInHub(menu.open, function()
             if hubOpen then
                 StaffMenu.RestoreGestionHubFocus()
             else
                 StaffMenu.OpenGestionHub(state)
+            end
+        end)
+
+        if not opened then
+            if serial == hubVuiOpenSerial then
+                ResetHubVuiLoading("Ouverture VUI impossible : " .. tostring(err))
+            end
+            return
+        end
+
+        -- Garde-fou pour les menus qui s'ouvrent sans jamais envoyer leur premier rendu.
+        SetTimeout(5000, function()
+            if hubOpen and serial == hubVuiOpenSerial and hubVuiReadySerial ~= serial then
+                pcall(function() exports["VUI"]:CloseAll() end)
+                ResetHubVuiLoading("Aucune réponse du menu après 5 secondes")
             end
         end)
     end)
@@ -612,7 +676,10 @@ end)
 
 RegisterNuiCallback("gestion:select", function(data, cb)
     cb({})
-    if not hubOpen or type(data) ~= "table" then return end
+    if not hubOpen or type(data) ~= "table" then
+        if hubOpen then ResetHubVuiLoading("Sélection NUI invalide") end
+        return
+    end
 
     local perms = (VFW.PlayerGlobalData and VFW.PlayerGlobalData.permissions) or {}
     local state = { category = data.category }
@@ -623,28 +690,52 @@ RegisterNuiCallback("gestion:select", function(data, cb)
         local lookup = catId and directItemLookup[catId]
         if lookup then
             local item = lookup[idx]
-            if not item then return end
-            for i = 1, #directCategories do
-                if directCategories[i].id == catId and not HasPerm(perms, directCategories[i].perm) then return end
+            if not item then
+                ResetHubVuiLoading("Outil de gestion introuvable")
+                return
             end
-            if item.perm and not HasPerm(perms, item.perm) then return end
+            for i = 1, #directCategories do
+                if directCategories[i].id == catId and not HasPerm(perms, directCategories[i].perm) then
+                    ResetHubVuiLoading("Permission de catégorie refusée")
+                    return
+                end
+            end
+            if item.perm and not HasPerm(perms, item.perm) then
+                ResetHubVuiLoading("Permission d'outil refusée")
+                return
+            end
             if item.action then
                 RunHubAction(item.action)
                 return
             end
             if item.submenu then
                 OpenFromHub(StaffMenu[item.submenu], item.onClick, state)
+            else
+                ResetHubVuiLoading("Aucun gestionnaire pour cet outil")
             end
             return
         end
 
         local entries = StaffMenu.builderEntries
         local e = entries and entries[idx]
-        if not e or not e.label or e.separator then return end
-        if not perms["builder_menu"] or (e.perm and not perms[e.perm]) then return end
+        if not e or not e.label or e.separator then
+            ResetHubVuiLoading("Entrée builder introuvable")
+            return
+        end
+        if not perms["builder_menu"]
+            or (e.perm and not HasPerm(perms, e.perm) and not (e.altPerm and perms[e.altPerm]))
+        then
+            ResetHubVuiLoading("Permission builder refusée")
+            return
+        end
 
         if e.submenu then
-            OpenFromHub(StaffMenu[e.submenu], e.onClick, state)
+            local submenu = StaffMenu[e.submenu]
+            if submenu then
+                OpenFromHub(submenu, e.onClick, state)
+            else
+                ResetHubVuiLoading("Sous-menu builder indisponible : " .. tostring(e.submenu))
+            end
         elseif e.openFn then
             OpenFromHub({ open = e.openFn }, e.onClick, state)
         else

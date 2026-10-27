@@ -141,7 +141,7 @@ local builderEntries = {
     { separator = ":pickaxe: CRAFT & ACTIVITÉS" },
     { label = ":building: STATIONS DE CRAFT", desc = "Stations de craft avec restriction job", submenu = "builderLegal", perm = "builder_legal_craft" },
     { label = ":leaf: ACTIVITÉS LÉGALES", desc = "Positions vendeurs et prix (pêche, chasse, plongée)", submenu = "builderLegalActivities", perm = "legal_activities_builder" },
-    { label = ":gamepad: TICKETS À GRATTER", desc = "Configurer les probabilités de gain", submenu = "builderScratchCard", perm = "builder_scratch_card" },
+    { label = ":gamepad: TICKETS À GRATTER", desc = "Configurer les probabilités de gain", submenu = "builderScratchCard", perm = "builder_scratch_card", hubHidden = true },
 
     -- BRAQUAGES
     { separator = ":mask: CATÉGORIE BRAQUAGES" },

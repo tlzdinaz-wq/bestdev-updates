@@ -105,19 +105,24 @@ end
 
 local VARIABLE <const> = "ui_layout"
 
---- La disposition de l'interface est doublee en base de donnees.
+--- La disposition de l'interface vit en base de donnees ; le fichier n'en est qu'une copie.
 ---
---- Elle ne vivait que dans ce fichier, a l interieur de la ressource. Un client qui
---- remplace le dossier `core` pour se mettre a jour retrouvait la disposition par
---- defaut, et devait tout repositionner.
+--- Elle ne vivait que dans ce fichier, a l interieur de la ressource : un client qui
+--- remplace le dossier `core` pour se mettre a jour retrouvait la disposition par defaut.
+--- La base fait foi ; un fichier arrive avec une mise a jour ne prend pas sa place, et
+--- n'est lu que pour remplir une base encore vide.
 local function mirrorToDatabase(data)
     if not VFW.Variables or not VFW.Variables.SetVariable then return end
     pcall(VFW.Variables.SetVariable, VARIABLE, data)
+    -- tout de suite : la sauvegarde periodique ne passe qu'une fois par minute
+    if VFW.Variables.Flush then pcall(VFW.Variables.Flush, VARIABLE) end
 end
 
 ---@return table|nil disposition, boolean consultee
 local function readFromDatabase()
     if not VFW.Variables or not VFW.Variables.GetVariable then return nil, false end
+    -- tant que les variables ne sont pas lues, GetVariable rend une table vide : ce n'est pas « rien d'enregistre »
+    if VFW.Variables.Loaded ~= true then return nil, false end
 
     local ok, stored = pcall(VFW.Variables.GetVariable, VARIABLE)
     if not ok then return nil, false end
@@ -125,43 +130,51 @@ local function readFromDatabase()
     return stored, true
 end
 
+local function readFile()
+    local raw = LoadResourceFile(GetCurrentResourceName(), JSON_FILE)
+    if type(raw) ~= "string" or raw == "" then return nil end
+    local ok, decoded = pcall(json.decode, raw)
+    if ok and type(decoded) == "table" then return sanitize(decoded) end
+    return nil
+end
+
 local function loadFile()
     if cache then
         return cache
     end
-    local raw = LoadResourceFile(GetCurrentResourceName(), JSON_FILE)
-    if type(raw) == "string" and raw ~= "" then
-        local ok, decoded = pcall(json.decode, raw)
-        if ok and type(decoded) == "table" then
-            cache = sanitize(decoded)
-            return cache
-        end
-    end
-    -- Fichier absent : la copie en base prend le relais, avant de retomber sur les
-    -- valeurs par defaut.
+
     local stored, consulted = readFromDatabase()
     if stored then
         cache = sanitize(stored)
         return cache
     end
 
-    -- Base pas encore joignable : ne rien retenir, sinon ces valeurs par defaut
-    -- tiendraient lieu de disposition pour toute la duree du serveur.
-    if not consulted then return defaults() end
+    local fromFile = readFile()
+
+    -- Base pas encore lue : on s'en sert sans le retenir, sinon ces valeurs tiendraient lieu
+    -- de disposition pour toute la duree du serveur.
+    if not consulted then return fromFile or defaults() end
+
+    if fromFile then
+        -- premiere fois : le fichier existant devient la copie de la base
+        cache = fromFile
+        mirrorToDatabase(cache)
+        return cache
+    end
 
     cache = defaults()
     return cache
 end
 
 local function saveFile(data)
-    local body = encode(data)
-    local ok = SaveResourceFile(GetCurrentResourceName(), JSON_FILE, body, -1)
-    if not ok then
-        return false
-    end
-
+    -- la base d'abord : c'est elle qui compte, meme si le dossier de la ressource n'est pas inscriptible
     cache = sanitize(data)
     mirrorToDatabase(cache)
+
+    local ok = SaveResourceFile(GetCurrentResourceName(), JSON_FILE, encode(data), -1)
+    if not ok then
+        console.warn("[UiLayout] Impossible d'écrire " .. JSON_FILE .. " (la disposition reste enregistrée en base).")
+    end
     return true
 end
 

@@ -169,6 +169,8 @@ end)
 --- isVehAllowed
 ---@return boolean
 local function isVehAllowed()
+    if not VFW.PlayerData.vehicle or VFW.PlayerData.vehicle == 0 then return false end
+
     if VFW.PlayerData.seat ~= -1 or GetVehicleClass(VFW.PlayerData.vehicle) ~= 18 or IsPedInAnyHeli(VFW.PlayerData.vehicle) or IsPedInAnyPlane(VFW.PlayerData.vehicle) then
         return false
     end
@@ -190,8 +192,9 @@ local function Thread(veh, seat)
                 local _, positionLight, roadLight = GetVehicleLightsState(veh)
                 local fuel = GetVehicleFuelLevel(veh)
                 local health = GetVehicleEngineHealth(veh) / 10
-                local indicator = GetVehicleIndicatorLights(VFW.PlayerData.vehicle)
-                local sirenState = Entity(VFW.PlayerData.vehicle).state
+                local indicator = GetVehicleIndicatorLights(veh)
+                -- Entity(...).state est nil pour un véhicule non réseau (ou déjà sorti) : on lit celui du thread, avec un repli.
+                local sirenState = Entity(veh).state or {}
                 
                 SendNUIMessage({
                     action = "nui:speedometer:visible",

@@ -130,6 +130,9 @@ VUI_HubMode = false
 VUI_Switching = false
 -- Proxy « retour au hub » : ne pas remonter vers le menu F5 (MENU ADMINISTRATION).
 VUI_HubReturnProxy = nil
+-- Fin de chaîne en attente : menu.close() en mode hub n'arrête pas le hub tout de suite (voir menu.close).
+VUI_HubEndToken = 0
+local HUB_END_DELAY <const> = 250
 -- Menus VUI du menu staff : un retour hub ne doit jamais les rouvrir.
 local HUB_BLOCKED_PARENTS <const> = {
     ["MENU ADMINISTRATION"] = true,
@@ -1176,6 +1179,7 @@ function CreateMenu(title, banner, autoRefresh)
         end
         VUI_CurrentMenu = menu
         VUI_CurrentMenu.opened = true
+        VUI_HubEndToken = VUI_HubEndToken + 1 -- un menu s'ouvre : toute fin de chaîne hub en attente est annulée
         menu._openGen = (menu._openGen or 0) + 1
         local openGen = menu._openGen
 
@@ -1264,9 +1268,17 @@ function CreateMenu(title, banner, autoRefresh)
     end
 
     menu.close = function()
-        SendNUIMessage({
-            action = "vui:menu:close"
-        })
+        -- Mode hub : un menu qui se ferme puis en rouvre un autre (close() suivi de parent.open(), très courant dans
+        -- les builders) ne doit PAS terminer la chaîne. Sinon le hub retourne à la liste des outils, VUI repasse en
+        -- rendu natif et le menu suivant s'ouvre derrière la tablette (double menu). La fin est donc différée :
+        -- si un menu s'ouvre dans l'intervalle, la chaîne continue ; sinon elle se termine comme avant.
+        local hubDeferred = VUI_HubMode and not VUI_Switching and not VUI_IsExitingMenu
+
+        if not hubDeferred then
+            SendNUIMessage({
+                action = "vui:menu:close"
+            })
+        end
 
         -- Fermer le menu courant s'il est différent de celui-ci
         if VUI_CurrentMenu and VUI_CurrentMenu ~= menu and VUI_CurrentMenu._closeInternal then
@@ -1288,7 +1300,17 @@ function CreateMenu(title, banner, autoRefresh)
         VUI_CurrentMenu = nil
 
         -- Mode hub : la chaîne de menus est terminée (pas un simple changement de menu)
-        if VUI_HubMode and not VUI_Switching then
+        if hubDeferred then
+            VUI_HubEndToken = VUI_HubEndToken + 1
+            local token = VUI_HubEndToken
+            Citizen.SetTimeout(HUB_END_DELAY, function()
+                if token ~= VUI_HubEndToken or not VUI_HubMode or VUI_CurrentMenu then return end
+                SendNUIMessage({ action = "vui:menu:close" })
+                VUI_HubMode = false
+                VUI_HubReturnProxy = nil
+                TriggerEvent("vui:hub:ended")
+            end)
+        elseif VUI_HubMode and not VUI_Switching then
             VUI_HubMode = false
             VUI_HubReturnProxy = nil
             TriggerEvent("vui:hub:ended")

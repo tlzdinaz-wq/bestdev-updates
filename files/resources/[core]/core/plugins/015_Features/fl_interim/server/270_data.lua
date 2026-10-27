@@ -239,16 +239,59 @@ local function decode(value, fallback)
     return fallback
 end
 
+local function copyValue(value)
+    if type(value) ~= "table" then return value end
+    local out = {}
+    for key, child in pairs(value) do
+        out[key] = copyValue(child)
+    end
+    return out
+end
+
+local function isArray(value)
+    return type(value) == "table" and rawget(value, 1) ~= nil
+end
+
+--- Les anciennes lignes de configuration ne contiennent pas forcément les nouveaux champs
+--- (emplacements des scooters, portes de livraison, couleurs...). Une ligne enregistrée ne
+--- doit donc pas masquer entièrement les valeurs par défaut : on complète seulement ce qui
+--- manque, tout en respectant les listes explicitement modifiées ou vidées depuis la gestion.
+local function withDefaults(defaults, saved)
+    if type(defaults) ~= "table" then
+        return saved ~= nil and copyValue(saved) or defaults
+    end
+
+    local out = copyValue(defaults)
+    if type(saved) ~= "table" then return out end
+
+    for key, value in pairs(saved) do
+        local base = defaults[key]
+        if type(value) == "table"
+            and type(base) == "table"
+            and next(value) ~= nil
+            and not isArray(value)
+            and not isArray(base)
+        then
+            out[key] = withDefaults(base, value)
+        else
+            out[key] = copyValue(value)
+        end
+    end
+    return out
+end
+
 function InterimServer.GetPositions(job)
     local data = InterimServer.Positions[job]
-    if data then return data end
-    return DEFAULT_POSITIONS[job]
+    local defaults = DEFAULT_POSITIONS[job]
+    if defaults then return withDefaults(defaults, data) end
+    return data and copyValue(data) or nil
 end
 
 function InterimServer.GetConfig(job)
     local data = InterimServer.Configs[job]
-    if data then return data end
-    return DEFAULT_CONFIGS[job]
+    local defaults = DEFAULT_CONFIGS[job]
+    if defaults then return withDefaults(defaults, data) end
+    return data and copyValue(data) or nil
 end
 
 --- Enregistre une ligne par metier, en remplacant la precedente.

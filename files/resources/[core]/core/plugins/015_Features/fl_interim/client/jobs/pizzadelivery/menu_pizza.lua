@@ -97,6 +97,36 @@ end
 
 local trunkMarkerThread = nil
 
+local function prepareDeliveryVehicle(netId)
+    CreateThread(function()
+        local vehicle = 0
+        local tries = 0
+        while tries < 100 do
+            vehicle = NetworkGetEntityFromNetworkId(tonumber(netId) or 0)
+            if vehicle and vehicle ~= 0 and DoesEntityExist(vehicle) then break end
+            Wait(50)
+            tries = tries + 1
+        end
+
+        if not vehicle or vehicle == 0 or not DoesEntityExist(vehicle) then return end
+        local coords = GetEntityCoords(vehicle)
+        RequestCollisionAtCoord(coords.x, coords.y, coords.z)
+        local collisionTries = 0
+        while not HasCollisionLoadedAroundEntity(vehicle) and collisionTries < 40 do
+            Wait(50)
+            collisionTries = collisionTries + 1
+        end
+        SetVehicleOnGroundProperly(vehicle)
+        SetVehicleDoorsLocked(vehicle, 1)
+        SetVehicleNeedsToBeHotwired(vehicle, false)
+        SetVehicleEngineOn(vehicle, false, true, true)
+    end)
+end
+
+RegisterNetEvent("interim:pizza:client:vehicleReady", function(netId)
+    prepareDeliveryVehicle(netId)
+end)
+
 local function removeTrunkMarker()
     if trunkMarkerThread then
         trunkMarkerThread = nil
@@ -109,6 +139,7 @@ local function requestVehicle()
     local netId = TriggerServerCallback("interim:pizza:requestvehicle", {})
 
     if netId then
+        prepareDeliveryVehicle(netId)
         notify("VERT", "Véhicule sorti.")
 
 

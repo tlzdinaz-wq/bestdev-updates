@@ -129,127 +129,130 @@ end
 local ensureDeliveryMarker
 
 local function createDoorCircle(currentDeliveryPoint, cfg)
-    local npc = nil
-    local knocking = false  -- true pendant les 2s d'attente avant spawn du NPC
+    local knocking = false
     local doorColor = (configData and configData.interactionCircle and configData.interactionCircle.doorColor)
             or { r = 255, g = 140, b = 0, a = 120 }
+
+    local function fadeAndDeleteNpc(npc)
+        if not npc or not DoesEntityExist(npc) then return end
+        CreateThread(function()
+            Wait(3000)
+            local alpha = 255
+            while alpha > 0 and DoesEntityExist(npc) do
+                alpha = math.max(0, alpha - 20)
+                SetEntityAlpha(npc, alpha, false)
+                Wait(35)
+            end
+            if DoesEntityExist(npc) then DeleteEntity(npc) end
+        end)
+    end
+
+    local function showCustomer()
+        local distance = 0.3
+        local headingRad = math.rad(currentDeliveryHeading)
+        local offsetX = math.sin(headingRad) * distance
+        local offsetY = math.cos(headingRad) * distance
+        local pedPos = currentDeliveryPoint - vector3(offsetX, offsetY, 0.0)
+        local models = cfg and cfg.possibleNPCS or nil
+        if type(models) ~= "table" or #models == 0 then
+            models = { "a_m_y_business_01", "a_f_y_hipster_01" }
+        end
+
+        local npc = SpawnNpcsInterimJobs(
+            models[math.random(1, #models)],
+            pedPos,
+            currentDeliveryHeading,
+            nil,
+            nil
+        )
+        if npc and DoesEntityExist(npc) then
+            SetEntityAlpha(npc, 0, false)
+            CreateThread(function()
+                local alpha = 0
+                while alpha < 255 and DoesEntityExist(npc) do
+                    alpha = math.min(255, alpha + 20)
+                    SetEntityAlpha(npc, alpha, false)
+                    Wait(35)
+                end
+                if DoesEntityExist(npc) then ResetEntityAlpha(npc) end
+            end)
+        end
+        return npc
+    end
+
+    local function applyDeliveryResult(res)
+        isCarryingPizza = false
+        ExecuteCommand("cancelemote")
+        notify("VERT", "Pizza livrée au client.")
+
+        if res.done then
+            notify("VERT", ("Tournée terminée (%d/%d)."):format(res.delivered, res.total))
+            cleanupRun()
+
+            local currentCfg = TriggerServerCallback("interim:pizza:getConfig")
+            if currentCfg and currentCfg.PositionsPizza and currentCfg.PositionsPizza.startplace then
+                local startPos = currentCfg.PositionsPizza.startplace
+                SetNewWaypoint(startPos.x, startPos.y)
+            end
+        else
+            notify("VERT", ("Livraison %d/%d"):format(res.delivered, res.total))
+            if res.next then
+                removeBlip()
+                blip = AddBlipForCoord(res.next.x, res.next.y, res.next.z)
+                SetBlipScale(blip, 0.5)
+                SetBlipRoute(blip, true)
+                SetBlipRouteColour(blip, 5)
+                ensureDoorCircle(res.next)
+            end
+        end
+    end
 
     doorCircle = CreateInteractionCircle(
             currentDeliveryPoint,
             1.5,
             doorColor,
-            "Appuyez sur ~INPUT_CONTEXT~ pour toquer à la porte",
+            "Appuyez sur ~INPUT_CONTEXT~ pour livrer la pizza",
             function()
-                if npc and DoesEntityExist(npc) then
-                    notify("JAUNE", "Le client est déjà à la porte, donnez-lui la pizza.")
+                if knocking then
+                    notify("JAUNE", "Le client arrive, patientez un instant.")
                     return
                 end
-                if knocking then
-                    notify("ROUGE", "Vous venez de toquer, attendez un instant.")
+                if not isCarryingPizza then
+                    notify("ROUGE", "Prenez une pizza dans le coffre avant de sonner.")
                     return
                 end
                 knocking = true
                 notify("JAUNE", "Vous toquez à la porte...")
 
-                exports.xsound:PlayUrlPos("door_knock", "https://cdn.pixabay.com/download/audio/2025/06/02/audio_25951885d0.mp3?filename=fast-knocking-on-door-352704.mp3", 0.3, currentDeliveryPoint, false)
-                exports.xsound:Distance("door_knock", 10.0)
+                local soundName = ("door_knock_%s"):format(GetPlayerServerId(PlayerId()))
+                pcall(function()
+                    exports.xsound:PlayUrlPos(soundName, "https://cdn.pixabay.com/download/audio/2025/06/02/audio_25951885d0.mp3?filename=fast-knocking-on-door-352704.mp3", 0.3, currentDeliveryPoint, false)
+                    exports.xsound:Distance(soundName, 10.0)
+                end)
 
-                SetTimeout(2000, function()
-                    knocking = false
-                    if exports.xsound:soundExists("door_knock") then
-                        exports.xsound:Destroy("door_knock")
-                    end
-
-                    local distance = 0.3
-                    local headingRad = math.rad(currentDeliveryHeading)
-                    local offsetX = math.sin(headingRad) * distance
-                    local offsetY = math.cos(headingRad) * distance
-                    local pedPos = currentDeliveryPoint - vector3(offsetX, offsetY, 0.0)
-
-                    local pedModel = cfg.possibleNPCS[math.random(#cfg.possibleNPCS)]
-                    local pedHeading = currentDeliveryHeading
-
-                    npc = SpawnNpcsInterimJobs(pedModel, pedPos, pedHeading, "Appuyez sur ~INPUT_CONTEXT~ pour donner la pizza", function()
-                        if not isCarryingPizza then
-                            notify("ROUGE", "Tu dois avoir une pizza dans les mains.")
-                            return
-                        end
-
-                        local res = TriggerServerCallback("interim:pizza:validateDeliveryAtDoor", runId)
-                        if not res then
-                            notify("ROUGE", "Le client n'est pas prêt.")
-                            return
-                        end
-
-                        isCarryingPizza = false
-                        ExecuteCommand("cancelemote")
-                        notify("VERT", "Vous avez donné la pizza au client.")
-
-                        if res.done then
-                            notify("VERT", ("Tournée terminée (%d/%d)."):format(res.delivered, res.total))
-                            cleanupRun()
-
-                            local cfg = TriggerServerCallback("interim:pizza:getConfig")
-                            if cfg and cfg.PositionsPizza and cfg.PositionsPizza.startplace then
-                                local startPos = cfg.PositionsPizza.startplace
-                                SetNewWaypoint(startPos.x, startPos.y)
-                            end
-                        else
-                            notify("VERT", ("Livraison %d/%d"):format(res.delivered, res.total))
-                            if res.next then
-                                removeBlip()
-                                blip = AddBlipForCoord(res.next.x, res.next.y, res.next.z)
-                                SetBlipScale(blip, 0.5)
-                                SetBlipRoute(blip, true)
-                                SetBlipRouteColour(blip, 5)
-                                ensureDoorCircle(res.next)
-                            end
-                        end
-
-                        CreateThread(function()
-                            Wait(5000)
-                            if npc and DoesEntityExist(npc) then
-                                local alpha = 255
-                                while alpha > 0 do
-                                    alpha = alpha - 15
-                                    if alpha < 0 then
-                                        alpha = 0
-                                    end
-                                    if DoesEntityExist(npc) then
-                                        SetEntityAlpha(npc, alpha, false)
-                                    end
-                                    Wait(30)
-                                end
-                                if DoesEntityExist(npc) then
-                                    DeleteEntity(npc)
-                                    npc = nil
-                                end
-                            end
-                        end)
+                SetTimeout(1500, function()
+                    pcall(function()
+                        if exports.xsound:soundExists(soundName) then exports.xsound:Destroy(soundName) end
                     end)
 
-                    if npc and DoesEntityExist(npc) then
-                        SetEntityAlpha(npc, 0, false)
-                        CreateThread(function()
-                            local alpha = 0
-                            while alpha < 255 do
-                                alpha = alpha + 15
-                                if alpha > 255 then
-                                    alpha = 255
-                                end
-                                if DoesEntityExist(npc) then
-                                    SetEntityAlpha(npc, alpha, false)
-                                end
-                                Wait(30)
-                            end
-                            if DoesEntityExist(npc) then
-                                ResetEntityAlpha(npc)
-                            end
-                        end)
+                    if not runActive or not isCarryingPizza then
+                        knocking = false
+                        return
+                    end
+
+                    local npc = showCustomer()
+                    local res = TriggerServerCallback("interim:pizza:validateDeliveryAtDoor", runId)
+                    if not res then
+                        knocking = false
+                        fadeAndDeleteNpc(npc)
+                        notify("ROUGE", "Livraison refusée : rapprochez-vous de la porte et réessayez.")
+                        return
                     end
 
                     removeCircle(doorCircle)
                     doorCircle = nil
+                    fadeAndDeleteNpc(npc)
+                    applyDeliveryResult(res)
                 end)
             end
     )

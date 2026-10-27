@@ -63,22 +63,28 @@ function VFW.Blips.SyncAll()
     TriggerClientEvent("blips:retrieve:list", -1, blipsList)
 end
 
+local function ensureTable()
+    MySQL.query.await([[
+        CREATE TABLE IF NOT EXISTS `blips` (
+            `id` INT NOT NULL AUTO_INCREMENT,
+            `label` VARCHAR(64) NOT NULL,
+            `sprite` INT NOT NULL DEFAULT 1,
+            `color` INT NOT NULL DEFAULT 0,
+            `scale` FLOAT NOT NULL DEFAULT 0.8,
+            `x` DOUBLE NOT NULL,
+            `y` DOUBLE NOT NULL,
+            `z` DOUBLE NOT NULL,
+            `created_by` VARCHAR(80) NOT NULL DEFAULT '',
+            PRIMARY KEY (`id`)
+        )
+    ]])
+end
+
+local IMPORTED_FLAG <const> = "blips_file_imported"
+
 local function saveJson()
     local body = json.encode({ nextId = nextId, blips = blipsList })
     return SaveResourceFile(GetCurrentResourceName(), JSON_FILE, body, -1) == true
-end
-
-local function loadJson()
-    local raw = LoadResourceFile(GetCurrentResourceName(), JSON_FILE)
-    if type(raw) ~= "string" or raw == "" then return end
-    local ok, decoded = pcall(json.decode, raw)
-    if not ok or type(decoded) ~= "table" or type(decoded.blips) ~= "table" then return end
-    blipsList = decoded.blips
-    nextId = tonumber(decoded.nextId) or 1
-    for id in pairs(blipsList) do
-        local n = tonumber(id)
-        if n and n >= nextId then nextId = n + 1 end
-    end
 end
 
 function VFW.Blips.Create(data, createdBy)
@@ -181,42 +187,84 @@ function VFW.Blips.Remove(blipId)
     return true
 end
 
-local function ensureTable()
-    MySQL.query.await([[
-        CREATE TABLE IF NOT EXISTS `blips` (
-            `id` INT NOT NULL AUTO_INCREMENT,
-            `label` VARCHAR(64) NOT NULL,
-            `sprite` INT NOT NULL DEFAULT 1,
-            `color` INT NOT NULL DEFAULT 0,
-            `scale` FLOAT NOT NULL DEFAULT 0.8,
-            `x` DOUBLE NOT NULL,
-            `y` DOUBLE NOT NULL,
-            `z` DOUBLE NOT NULL,
-            `created_by` VARCHAR(80) NOT NULL DEFAULT '',
-            PRIMARY KEY (`id`)
-        )
-    ]])
+local function insertBlipRow(id, blipData, createdBy)
+    return MySQL.insert.await(
+        "INSERT INTO `blips` (`id`, `label`, `sprite`, `color`, `scale`, `x`, `y`, `z`, `created_by`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        { id, blipData.label, blipData.sprite, blipData.color, blipData.scale, blipData.position.x, blipData.position.y, blipData.position.z, createdBy or "" }
+    )
+end
+
+--- La base fait foi.
+---
+--- Avant, les blips etaient lus dans config/custom_blips.json PUIS completes par la base, et
+--- un blip cree n'arrivait jamais en base (voir ensureTable plus haut) : tout reposait sur le
+--- fichier, qui disparait quand le dossier `core` est remplace en entier.
+---
+--- Maintenant la base est lue en premier ; le fichier est repris UNE SEULE FOIS, pour les
+--- serveurs dont les blips n'existent que dedans : ceux qui manquent en base y sont ajoutes,
+--- puis la base seule decide. Un fichier arrive plus tard avec une mise a jour est ignore.
+local function importFile()
+    local flagged = VFW.Variables and VFW.Variables.GetVariable and VFW.Variables.GetVariable(IMPORTED_FLAG)
+    if type(flagged) == "table" and flagged.done == true then return 0 end
+    if not (VFW.Variables and VFW.Variables.Loaded == true) then return 0 end
+
+    local fromFile = {}
+    local raw = LoadResourceFile(GetCurrentResourceName(), JSON_FILE)
+    if type(raw) == "string" and raw ~= "" then
+        local ok, decoded = pcall(json.decode, raw)
+        if ok and type(decoded) == "table" and type(decoded.blips) == "table" then fromFile = decoded.blips end
+    end
+
+    local added = 0
+    for key, stored in pairs(fromFile) do
+        local blipData = sanitize(stored)
+        local id = tonumber(key)
+        if blipData and id and not blipsList[tostring(id)] then
+            local ok = pcall(insertBlipRow, id, blipData, "import")
+            if ok then
+                blipsList[tostring(id)] = blipData
+                if id >= nextId then nextId = id + 1 end
+                added = added + 1
+            end
+        end
+    end
+
+    VFW.Variables.SetVariable(IMPORTED_FLAG, { done = true })
+    if VFW.Variables.Flush then pcall(VFW.Variables.Flush, IMPORTED_FLAG) end
+    return added
 end
 
 local function load()
-    loadJson()
     local ok, rows = pcall(function()
         ensureTable()
         return MySQL.query.await("SELECT * FROM `blips`") or {}
     end)
     rows = (ok and rows) or {}
 
+    blipsList = {}
     for i = 1, #rows do
         local key = tostring(rows[i].id)
-        if not blipsList[key] then
-            blipsList[key] = toBlipData(rows[i])
-        end
+        blipsList[key] = toBlipData(rows[i])
         local n = tonumber(key)
         if n and n >= nextId then nextId = n + 1 end
     end
 
     loaded = true
     console.init("Blips", ("%d blips serveur charges"):format(#rows))
+    if not ok then return end
+
+    -- Reprise du fichier : il faut que les variables soient lues pour savoir si c'est deja fait.
+    local waited = 0
+    while not (VFW.Variables and VFW.Variables.Loaded == true) and waited < 120 do
+        Wait(250)
+        waited = waited + 1
+    end
+    local imported = importFile()
+    if imported > 0 then
+        console.init("Blips", ("%d blips repris de config/custom_blips.json et enregistres en base"):format(imported))
+        VFW.Blips.SyncAll()
+    end
+    saveJson()
 end
 
 AddEventHandler("vfw:characterLoaded", function(source)

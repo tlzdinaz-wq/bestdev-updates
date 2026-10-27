@@ -609,10 +609,13 @@ end
 --- EmoteCancel
 function EmoteCancel()
     local ped = VFW.PlayerData and VFW.PlayerData.ped or PlayerPedId()
+    local inVehicle = ped and ped ~= 0 and IsPedInAnyVehicle(ped, false)
 
-    -- 1. Detach first (simple, no Wait)
+    -- 1. Detach first (simple, no Wait). Jamais en véhicule : le détacher le ferait sortir du siège.
     if ped and ped ~= 0 then
-        DetachIfAttached(ped)
+        if not inVehicle then
+            DetachIfAttached(ped)
+        end
 
         -- 2. Clean up props
         CleanUpProps(ped)
@@ -620,6 +623,7 @@ function EmoteCancel()
 
     -- 3. Reset tracking
     local wasScenario = lastAnimation and lastAnimation[1] == "Scenario"
+    local animDict, animName = currentAnimDict, currentAnimationPlayed
     currentAnimDict = nil
     currentAnimationPlayed = nil
     if ped and ped ~= 0 then
@@ -631,12 +635,33 @@ function EmoteCancel()
     -- 4. Stop tasks. Scenarios ignore the smooth blend-out of ClearPedTasks,
     -- so they need ClearPedTasksImmediately to actually interrupt.
     if ped and ped ~= 0 then
-        if wasScenario then
+        if inVehicle then
+            -- En véhicule : on arrête l'animation sans toucher à la tâche « conduire / être assis »
+            if animDict and animName and IsEntityPlayingAnim(ped, animDict, animName, 3) then
+                StopAnimTask(ped, animDict, animName, -1.0)
+            else
+                ClearPedSecondaryTask(ped)
+            end
+        elseif wasScenario then
             ClearPedTasksImmediately(ped)
         else
             ClearPedTasks(ped)
         end
     end
+end
+
+--- Annule l'emote du joueur (touche X, bouton « Annuler l'animation », /cancelemote).
+--- L'arrêt se fait tout de suite ici ; le serveur nettoie ensuite les props / la phase et arrête aussi le
+--- partenaire d'une emote partagée. (Avant, tout attendait un retour du serveur qui n'arrivait jamais.)
+function VFW.CancelEmote()
+    local ped = VFW.PlayerData and VFW.PlayerData.ped or PlayerPedId()
+    if not HasActiveEmote(ped) and lastAnimation == nil then return false end
+
+    targetPlayerId = nil
+    TriggerServerEvent("vfw:newanim:deleteAllProps")
+    EmoteCancel()
+    TriggerServerEvent("vfw:newanim:cancelSharedAnim")
+    return true
 end
 
 --- PlayAnimation
@@ -1883,10 +1908,7 @@ end)
 
 RegisterNUICallback("nui:newanimation:cancel", function(_, cb)
     cb("ok")
-    if (lastAnimation and lastAnimation[VFW.PlayerData.ped] ~= nil) or lastEmote[VFW.PlayerData.ped] ~= nil then
-        -- Cancel via server to propagate to shared emote partner
-        TriggerServerEvent("vfw:newanim:cancelSharedAnim")
-    end
+    VFW.CancelEmote()
 end)
 
 RegisterNUICallback("nui:newanimation:resetwalk", function(_, cb)
@@ -1992,8 +2014,7 @@ RegisterCommand("cancelemote", function()
         return
     end
 
-    -- Cancel via server to propagate to shared emote partner
-    TriggerServerEvent("vfw:newanim:cancelSharedAnim")
+    VFW.CancelEmote()
 end, false)
 
 
@@ -2021,8 +2042,7 @@ VFW.RegisterInput("cancelAnimInVehicle", "Annuler animation (vehicule)", "keyboa
         return
     end
 
-    -- Cancel via server to propagate to shared emote partner
-    TriggerServerEvent("vfw:newanim:cancelSharedAnim")
+    VFW.CancelEmote()
 end)
 
 --- VFW.CopyAnimation

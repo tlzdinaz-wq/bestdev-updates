@@ -1,15 +1,13 @@
-RegisterNetEvent('zonesafe:client:add', function(newZone)
-    ZoneSafe:ReformatZones({newZone})
-end)
+-- L'ajout, la modification et le retrait d'une zone sont reçus dans function.lua (zonesafe:client:add / update /
+-- remove). Ici : ce que le serveur demande au joueur quand il entre dans une zone.
 
-RegisterNetEvent('zonesafe:client:remove', function(name)
-    if not name then
+-- Entrée dans une zone où sortir une arme est interdit : on range celle qu'il a en main.
+RegisterNetEvent('zonesafe:client:holster', function()
+    local ped = PlayerPedId()
+    if GetSelectedPedWeapon(ped) == `WEAPON_UNARMED` then
         return
     end
 
-    ZoneSafe:RemoveZone(name)
-end)
-
-RegisterNetEvent('zonesafe:client:update', function(oldName, newData)
-    ZoneSafe:UpdateZone(oldName, newData)
+    SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true)
+    LastWeaponId = nil
 end)

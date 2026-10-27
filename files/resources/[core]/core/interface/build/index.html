@@ -461,7 +461,7 @@
     <link rel="stylesheet" href="./skin/notifications.css?v=9">
     <link rel="stylesheet" href="./skin/status-hud.css?v=5">
     <link rel="stylesheet" href="./skin/char-creator.css?v=4">
-    <link rel="stylesheet" href="./skin/clothing-shop.css?v=2">
+    <link rel="stylesheet" href="./skin/clothing-shop.css?v=4">
     <link rel="stylesheet" href="./skin/salon.css?v=1">
     <link rel="stylesheet" href="./skin/inventory.css?v=6">
     <link rel="stylesheet" href="./skin/nui-fallbacks.css?v=22">
@@ -1557,6 +1557,10 @@
         var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;pointer-events:none;z-index:10000;';
         var HIDDEN = BASE + 'display:none;';
         var SHOWN = BASE + 'display:block;';
+        // Dock staff / animateurs seul : un simple indicateur, il doit rester SOUS les menus du jeu (emotes 9999,
+        // inventaire, hub gestion...). Les autres surcouches (hack, mégaphone, avertissement...) gardent 10000.
+        var DOCK_ONLY = BASE.replace('z-index:10000;', 'z-index:1000;') + 'display:block;';
+        var DOCK_KEYS = { staffHud: true, animatorHud: true };
         var QUEUE_MAX = 64;
         var open = {};
         var pending = [];
@@ -1589,6 +1593,18 @@
           return false;
         }
 
+        function onlyDockOpen() {
+          for (var key in open) {
+            if (open[key] && !DOCK_KEYS[key]) return false;
+          }
+          return true;
+        }
+
+        function frameStyle() {
+          if (!anyOpen()) return HIDDEN;
+          return onlyDockOpen() ? DOCK_ONLY : SHOWN;
+        }
+
         window.addEventListener('message', function (e) {
           var d = e && e.data;
           if (!d || typeof d.action !== 'string' || HUD_ACTIONS.indexOf(d.action) === -1) return;
@@ -1607,7 +1623,7 @@
             var key = d.action.split(':')[0];
             if (d.action.indexOf(':toggle') !== -1) open[key] = d.data === true;
             else if (d.data && typeof d.data.visible === 'boolean') open[key] = d.data.visible;
-            frame.style.cssText = anyOpen() ? SHOWN : HIDDEN;
+            frame.style.cssText = frameStyle();
             return;
           }
           if (d.action === 'core:branding:apply') return;
@@ -1615,7 +1631,7 @@
           if (parts[2] === 'show') open[parts[1]] = true;
           else if (parts[2] === 'hide') open[parts[1]] = false;
           else return;
-          frame.style.cssText = anyOpen() ? SHOWN : HIDDEN;
+          frame.style.cssText = frameStyle();
         });
       })();
     </script>

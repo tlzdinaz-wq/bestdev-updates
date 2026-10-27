@@ -201,25 +201,28 @@ end
 
 local VARIABLE <const> = "branding_overrides"
 
---- La charte est doublee en base de donnees.
+--- La charte vit en base de donnees ; le fichier n'en est qu'une copie.
 ---
 --- Elle ne vivait que dans ce fichier, a l interieur de la ressource. Un client qui
---- remplace le dossier `core` en entier pour se mettre a jour — ce que nos propres
---- consignes d installation demandaient — effaçait du meme coup le nom du serveur,
---- son logo, sa banniere, son ecran de chargement et ses couleurs. Tout revenait aux
---- valeurs par defaut, sans moyen de revenir en arriere.
+--- remplace le dossier `core` en entier pour se mettre a jour effaçait du meme coup le
+--- nom du serveur, son logo, sa banniere, son ecran de chargement et ses couleurs.
 ---
---- Le fichier reste la source lue a chaud ; la base n'en est que la copie de secours,
---- relue quand le fichier a disparu.
+--- La base fait foi : un fichier arrive avec une mise a jour (celui du developpeur) ne
+--- doit jamais prendre la place de ce que le serveur a configure. Le fichier ne sert
+--- qu'a la toute premiere fois : une base encore vide reprend ce qu'il contient.
 ---@param data table
 local function mirrorToDatabase(data)
     if not VFW.Variables or not VFW.Variables.SetVariable then return end
     pcall(VFW.Variables.SetVariable, VARIABLE, data)
+    -- tout de suite : la sauvegarde periodique ne passe qu'une fois par minute
+    if VFW.Variables.Flush then pcall(VFW.Variables.Flush, VARIABLE) end
 end
 
 ---@return table|nil charte, boolean consultee
 local function readFromDatabase()
     if not VFW.Variables or not VFW.Variables.GetVariable then return nil, false end
+    -- tant que les variables ne sont pas lues, GetVariable rend une table vide : ce n'est pas « rien d'enregistre »
+    if VFW.Variables.Loaded ~= true then return nil, false end
 
     local ok, stored = pcall(VFW.Variables.GetVariable, VARIABLE)
     if not ok then return nil, false end
@@ -227,47 +230,50 @@ local function readFromDatabase()
     return stored, true
 end
 
+local function readOverridesFile()
+    local raw = LoadResourceFile(GetCurrentResourceName(), JSON_FILE)
+    if type(raw) ~= "string" or raw == "" then return nil end
+    local ok, decoded = pcall(json.decode, raw)
+    if ok and type(decoded) == "table" then return decoded end
+    return nil
+end
+
 local function writeOverridesFile(data)
+    -- la base d'abord : c'est elle qui compte, meme si le dossier de la ressource n'est pas inscriptible
+    jsonCache = data
+    mirrorToDatabase(data)
+
     local body = encodeOverridesJson(data)
     local resource = GetCurrentResourceName()
     local ok, saved = pcall(SaveResourceFile, resource, JSON_FILE, body, -1)
     if not ok or not saved then
-        console.warn("[Branding] Impossible d'écrire " .. JSON_FILE)
-        return false
+        console.warn("[Branding] Impossible d'écrire " .. JSON_FILE .. " (la charte reste enregistrée en base).")
     end
-    local readOk, persisted = pcall(LoadResourceFile, resource, JSON_FILE)
-    if not readOk or persisted ~= body then
-        console.warn("[Branding] Écriture JSON non confirmée : " .. JSON_FILE)
-        return false
-    end
-    jsonCache = data
-    mirrorToDatabase(data)
     return true
 end
 
 local function loadOverridesFile()
     if jsonCache ~= nil then return jsonCache end
-    local raw = LoadResourceFile(GetCurrentResourceName(), JSON_FILE)
-    if type(raw) == "string" and raw ~= "" then
-        local ok, decoded = pcall(json.decode, raw)
-        if ok and type(decoded) == "table" then
-            jsonCache = decoded
-            return jsonCache
-        end
-    end
-    -- Fichier absent ou illisible : la copie en base prend le relais, et on la
-    -- rend au fichier pour que le prochain demarrage n ait plus a la chercher.
+
     local stored, consulted = readFromDatabase()
     if stored then
         jsonCache = stored
-        console.warn("[Branding] " .. JSON_FILE .. " manquant : charte restauree depuis la base.")
-        pcall(writeOverridesFile, stored)
         return jsonCache
     end
 
-    -- Base pas encore joignable : ne rien retenir, sinon ce vide ferait office de
-    -- charte pour toute la duree du serveur et la copie ne serait jamais relue.
-    if not consulted then return {} end
+    local fromFile = readOverridesFile()
+
+    -- Base pas encore lue : on s'en sert sans le retenir, sinon cette valeur ferait office de
+    -- charte pour toute la duree du serveur et la base ne serait jamais consultee.
+    if not consulted then return fromFile or {} end
+
+    if fromFile then
+        -- premiere fois : le fichier existant devient la copie de la base
+        jsonCache = fromFile
+        mirrorToDatabase(fromFile)
+        console.warn("[Branding] charte reprise depuis " .. JSON_FILE .. " et enregistrée en base.")
+        return jsonCache
+    end
 
     jsonCache = {}
     return jsonCache

@@ -36,7 +36,7 @@ function SpawnNpcsInterimJobs(model, position, heading, interactLabel, onInterac
     ClearPedTasksImmediately(npc)
     TaskStandStill(npc, -1)
     SetPedCanBeTargetted(npc, false)
-    SetEntityCollision(npc, false, false)
+    SetEntityCollision(npc, true, true)
     FreezeEntityPosition(npc, true)
     SetEntityHeading(npc, heading)
 
@@ -53,10 +53,10 @@ function SpawnNpcsInterimJobs(model, position, heading, interactLabel, onInterac
     return npc
 end
 
--- Le PNJ apparaît à la hauteur enregistrée, qui est celle d'un joueur debout (hauteur de ceinture) : il flottait.
--- On cherche le sol sous ce point (un rayon vers le bas, sur la carte seulement : ni objets ni véhicules) et on pose
--- le PNJ dessus, ses pieds au sol d'après les dimensions de son modèle. Sans sol chargé, le rayon ne touche rien :
--- on réessaie tant que le joueur est à portée.
+-- Les points peuvent venir d'anciennes configurations (Z du sol) ou avoir été posés à la
+-- position d'un joueur (Z de son centre). On recherche systématiquement le sol et on laisse
+-- SetEntityCoords appliquer l'offset propre au modèle du ped, au lieu de le recalculer avec
+-- des dimensions de modèle qui diffèrent selon les skins.
 local MAX_TRIES <const> = 300
 local GROUND_RANGE <const> = 120.0
 
@@ -66,20 +66,26 @@ local function groundNpc(npc)
     local c = npc.coords
 
     RequestCollisionAtCoord(c.x, c.y, c.z)
-    local ray = StartExpensiveSynchronousShapeTestLosProbe(c.x, c.y, c.z + 1.5, c.x, c.y, c.z - 6.0, 1, entity, 4)
+    local ray = StartExpensiveSynchronousShapeTestLosProbe(
+        c.x, c.y, c.z + 2.5,
+        c.x, c.y, c.z - 8.0,
+        1, entity, 4
+    )
     local _, hit, hitCoords = GetShapeTestResult(ray)
-    if hit ~= true and hit ~= 1 then return false end
-
-    local minimum = GetModelDimensions(GetEntityModel(entity))
-    local feet = (minimum and minimum.z) or -1.0
-    local rootZ = hitCoords.z - feet
+    local groundZ = (hit == true or hit == 1) and hitCoords.z or nil
+    if not groundZ then
+        local found, fallbackZ = GetGroundZFor_3dCoord(c.x, c.y, c.z + 50.0, false)
+        if not found then return false end
+        groundZ = fallbackZ
+    end
 
     FreezeEntityPosition(entity, false)
-    SetEntityCoordsNoOffset(entity, c.x, c.y, rootZ, false, false, false)
+    SetEntityCollision(entity, true, true)
+    SetEntityCoords(entity, c.x, c.y, groundZ, false, false, false, false)
     SetEntityHeading(entity, npc.heading)
     FreezeEntityPosition(entity, true)
 
-    npc.coords = vector3(c.x, c.y, rootZ)
+    npc.coords = GetEntityCoords(entity)
     npc.grounded = true
     return true
 end
@@ -103,13 +109,15 @@ CreateThread(function()
                     sleep = math.min(sleep, 100)
                     dist = #(pCoords - npc.coords)
                 end
-                if dist < 2.0 then
+                if dist < 2.0 and npc.action then
                     sleep = 0
                     isNear = true
 
-                    VFW.ShowHelpNotification(npc.label or "Interagir")
+                    if npc.label then
+                        VFW.ShowHelpNotification(npc.label)
+                    end
 
-                    if VFW.Interact.JustPressed(0, 38) and npc.action then
+                    if VFW.Interact.JustPressed(0, 38) then
                         npc.action()
                     end
                     break

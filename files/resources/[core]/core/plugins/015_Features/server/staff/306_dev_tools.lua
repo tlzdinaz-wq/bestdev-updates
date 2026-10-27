@@ -27,6 +27,11 @@ end
 
 local function SaveVar(name, data)
     VFW.Variables.SetVariable(name, data)
+    -- Écriture immédiate : le vidage automatique ne passe que toutes les 60 s, et un redémarrage avant lui
+    -- faisait perdre le réglage (webhooks, etc.). Pas avant le chargement : on écraserait la base avec une table vide.
+    if VFW.Variables.Loaded and VFW.Variables.Flush then
+        pcall(VFW.Variables.Flush, name)
+    end
 end
 
 local function Require(source, ...)

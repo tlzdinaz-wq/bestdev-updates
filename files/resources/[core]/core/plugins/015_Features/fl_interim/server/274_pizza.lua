@@ -6,6 +6,7 @@ local stocks = {}
 local carrying = {}
 local runs = {}
 local cancelCooldowns = {}
+local vehicleKeys = {}
 
 local function cfg()
     return InterimServer.GetConfig(JOB) or {}
@@ -72,6 +73,16 @@ local function stopService(source)
     carrying[source] = nil
 end
 
+local function revokeVehicleKey(source)
+    local plate = vehicleKeys[source]
+    if not plate then return end
+    vehicleKeys[source] = nil
+    local player = Player(source)
+    if player and player.state then
+        player.state:set("tempVehicleKey:" .. plate, nil, true)
+    end
+end
+
 InterimServer.RegisterService(JOB, { start = startService, stop = stopService })
 
 RegisterServerCallback("interim:pizza:getPositionsAll", function(source)
@@ -91,11 +102,12 @@ end)
 RegisterServerCallback("interim:pizza:getConfig", function(source)
     local c = cfg()
     local p = pos()
+    local start = p.startplace or {}
     return {
         main = c.main or { pedService = "a_m_m_indian_01" },
         possibleNPCS = c.possibleNPCS or { "a_m_y_business_01", "a_f_y_hipster_01" },
-        PositionsPizza = c.PositionsPizza or {
-            startplace = { x = (p.startplace and p.startplace.x) or 0.0, y = (p.startplace and p.startplace.y) or 0.0 },
+        PositionsPizza = {
+            startplace = { x = start.x or 0.0, y = start.y or 0.0 },
         },
         interactionCircle = c.interactionCircle or {
             doorColor = { r = 255, g = 140, b = 0, a = 120 },
@@ -138,10 +150,36 @@ RegisterServerCallback("interim:pizza:requestvehicle", function(source)
     for index = 1, #spots do
         if InterimServer.LockSpot(JOB, index, source) then
             local spot = spots[index]
-            local netId = Feat27.SpawnVehicle(model, spot, tonumber(spot.w) or 0.0, cfg().vehicleType, source)
+            local netId, vehicle = Feat27.SpawnVehicle(
+                model,
+                spot,
+                tonumber(spot.w) or 0.0,
+                cfg().vehicleType or "bike",
+                source
+            )
             if netId then
+                local plate = ("PIZZA%03d"):format((tonumber(source) or 0) % 1000)
+                if vehicle and DoesEntityExist(vehicle) then
+                    pcall(SetVehicleNumberPlateText, vehicle, plate)
+                    pcall(SetVehicleDoorsLocked, vehicle, 1)
+                    local ok, state = pcall(function() return Entity(vehicle).state end)
+                    if ok and state then
+                        state:set("interimJob", JOB, true)
+                        state:set("interimOwner", source, true)
+                        state:set("doorsLocked", false, true)
+                    end
+                end
+
+                revokeVehicleKey(source)
+                vehicleKeys[source] = plate
+                local player = Player(source)
+                if player and player.state then
+                    player.state:set("tempVehicleKey:" .. plate, JOB, true)
+                end
+
                 InterimServer.Vehicle(source)[JOB] = netId
                 stocks[source] = 0
+                TriggerClientEvent("interim:pizza:client:vehicleReady", source, netId)
                 return netId
             end
             InterimServer.ReleaseSpots(JOB, source)
@@ -169,6 +207,7 @@ RegisterNetEvent("interim:pizza:unregisterVehicle", function(netId)
 
     Feat27.DeleteNet(id)
     bag[JOB] = nil
+    revokeVehicleKey(source)
     stocks[source] = nil
     carrying[source] = nil
     InterimServer.ReleaseSpots(JOB, source)
@@ -333,4 +372,5 @@ AddEventHandler("vfw:playerDropped", function(source)
     stocks[source] = nil
     carrying[source] = nil
     cancelCooldowns[source] = nil
+    vehicleKeys[source] = nil
 end)

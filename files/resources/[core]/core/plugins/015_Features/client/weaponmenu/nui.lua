@@ -11,7 +11,7 @@ function OpenWeaponMenu(weaponItem, weaponData, forceVip)
     if weaponMenuOpen then return end
 
     local equippedComponents = weaponItem.meta and weaponItem.meta.components or {}
-    local currentTint = weaponItem.meta and weaponItem.meta.tint or 0
+    local currentTint = weaponItem.meta and (weaponItem.meta.tintIdx or weaponItem.meta.tint) or 0
     local isMK2 = string.find(weaponData.name:upper(), "_MK2") ~= nil
     local noTint = weaponData.noTint or weaponData.airsoft or false
 

@@ -78,8 +78,9 @@ RegisterCommand('+cancelanim', function()
 
     -- Arreter toute autre animation (emotes, scenarios, etc.)
     if hasEmote then
-        -- Cancel via server to propagate to shared emote partner
-        TriggerServerEvent("vfw:newanim:cancelSharedAnim")
+        VFW.CancelEmote()
     end
 end, false)
+-- Relâchement de la touche : rien à faire (sans cette commande, FiveM signale « -cancelanim » inconnue)
+RegisterCommand('-cancelanim', function() end, false)
 RegisterKeyMapping('+cancelanim', "Annuler animation", 'keyboard', 'X')

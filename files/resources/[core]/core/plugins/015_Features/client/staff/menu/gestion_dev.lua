@@ -1389,6 +1389,27 @@ CALL.devstate = function(action, a)
 end
 
 -- ═══════════════════════════════════════════════════════════════
+-- Tickets à gratter : montants et pourcentages (serveur : inventory/25_09_scratchcard_admin.lua)
+-- ═══════════════════════════════════════════════════════════════
+
+OPEN.scratch = function()
+    if not Has("builder_scratch_card", "server_management", "dev") then return Fail("Permission requise.") end
+    local res = TriggerServerCallback("gestion:scratch:get")
+    if type(res) ~= "table" or res.ok ~= true then return Fail(type(res) == "table" and res.error or "Configuration indisponible.") end
+    return Ok({ tiers = res.tiers, defaults = res.defaults })
+end
+
+CALL.scratch = function(action, a)
+    a = a or {}
+    if action == "save" then
+        local res = TriggerServerCallback("gestion:scratch:save", a.tiers)
+        if type(res) ~= "table" or res.ok ~= true then return Fail(type(res) == "table" and res.error or "Enregistrement refusé.") end
+        return Ok({ tiers = res.tiers, message = res.message })
+    end
+    return Fail("Action inconnue.")
+end
+
+-- ═══════════════════════════════════════════════════════════════
 -- Callbacks NUI génériques
 -- ═══════════════════════════════════════════════════════════════
 
