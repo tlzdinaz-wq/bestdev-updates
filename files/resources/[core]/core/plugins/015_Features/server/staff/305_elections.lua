@@ -323,13 +323,15 @@ Staff29.Cb("elections:create", function(source, payload)
     local xPlayer = staff(source)
     if not xPlayer then return { success = false, reason = "Permission refusee." } end
 
-    local data = Staff29.IsTable(payload)
-    if not data then return { success = false, reason = "Donnees invalides." } end
+    if not Staff29.IsTable(payload) then
+        return { success = false, reason = "Donnees invalides." }
+    end
+    local data = payload
 
     local name = Staff29.Clean(data.name, 120)
     local description = Staff29.Clean(data.description, 1000) or ""
-    local proposals = Staff29.IsTable(data.proposals) or {}
-    local points = Staff29.IsTable(data.points) or {}
+    local proposals = Staff29.IsTable(data.proposals) and data.proposals or {}
+    local points = Staff29.IsTable(data.points) and data.points or {}
     local hours = Staff29.ToInt(data.durationHours, 1, 8760) or 24
 
     if not name then return { success = false, reason = "Le nom est obligatoire." } end

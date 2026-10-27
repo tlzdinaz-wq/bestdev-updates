@@ -328,30 +328,82 @@ end)
 
 ---@param staut any
 local frozenByStaff = false
+local freezeGeneration = 0
+local frozenVehicleByStaff = nil
+
+local function releaseStaffFreeze()
+    local ped = PlayerPedId()
+    if ped and ped ~= 0 and DoesEntityExist(ped) then
+        FreezeEntityPosition(ped, false)
+    end
+
+    if frozenVehicleByStaff and DoesEntityExist(frozenVehicleByStaff) then
+        FreezeEntityPosition(frozenVehicleByStaff, false)
+    end
+    frozenVehicleByStaff = nil
+end
+
+local function applyStaffFreeze()
+    local ped = PlayerPedId()
+    if not ped or ped == 0 or not DoesEntityExist(ped) then return end
+
+    FreezeEntityPosition(ped, true)
+
+    local vehicle = GetVehiclePedIsIn(ped, false)
+    if vehicle and vehicle ~= 0 and DoesEntityExist(vehicle) then
+        if frozenVehicleByStaff and frozenVehicleByStaff ~= vehicle and DoesEntityExist(frozenVehicleByStaff) then
+            FreezeEntityPosition(frozenVehicleByStaff, false)
+        end
+        frozenVehicleByStaff = vehicle
+        FreezeEntityPosition(vehicle, true)
+    end
+end
 
 RegisterNetEvent("core:FreezePlayer", function(staut)
     local frozen = staut == true
     frozenByStaff = frozen
+    freezeGeneration = freezeGeneration + 1
+    local generation = freezeGeneration
 
     -- VFW.PlayerData.ped est un handle mis en cache : il devient invalide après un
     -- changement de modèle et le gel ne s'appliquait alors à rien.
-    FreezeEntityPosition(PlayerPedId(), frozen)
+    if frozen then
+        applyStaffFreeze()
+    else
+        releaseStaffFreeze()
+    end
 
     if not frozen then return end
 
     VFW.ShowNotification({ type = 'ROUGE', content = "Vous avez été immobilisé par le staff." })
 
     CreateThread(function()
-        while frozenByStaff do
-            local ped = PlayerPedId()
-            if not IsEntityPositionFrozen(ped) then
-                FreezeEntityPosition(ped, true)
-            end
-            Wait(500)
+        while frozenByStaff and freezeGeneration == generation do
+            applyStaffFreeze()
+            DisableControlAction(0, 30, true)
+            DisableControlAction(0, 31, true)
+            DisableControlAction(0, 32, true)
+            DisableControlAction(0, 33, true)
+            DisableControlAction(0, 34, true)
+            DisableControlAction(0, 35, true)
+            DisableControlAction(0, 71, true)
+            DisableControlAction(0, 72, true)
+            DisableControlAction(0, 75, true)
+            Wait(0)
         end
-        FreezeEntityPosition(PlayerPedId(), false)
-        VFW.ShowNotification({ type = 'VERT', content = "Vous pouvez de nouveau bouger." })
+
+        if not frozenByStaff then
+            releaseStaffFreeze()
+            VFW.ShowNotification({ type = 'VERT', content = "Vous pouvez de nouveau bouger." })
+        end
     end)
+end)
+
+AddEventHandler("onResourceStop", function(resourceName)
+    if resourceName ~= GetCurrentResourceName() then return end
+    frozenByStaff = false
+    freezeGeneration = freezeGeneration + 1
+    releaseStaffFreeze()
 end)
 
 ---@param ped any

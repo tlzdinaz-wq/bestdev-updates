@@ -187,7 +187,7 @@ StaffMenu.createGarageFactionData.OnOpen(function()
             return Garage:SetExitPoint(garageSelected.vehType)
         end)
 
-        garageSelected.spawnPosition = exitCoords
+        if exitCoords then garageSelected.spawnPosition = exitCoords end
         StaffMenu.createGarageFactionData.refresh()
     end)
 
@@ -211,10 +211,11 @@ StaffMenu.createGarageFactionData.OnOpen(function()
     end)
 
     StaffMenu.createGarageFactionData.Button("Créer le garage", "", nil, "chevron", false, function()
-        if not garageSelected.position.x or not garageSelected.spawnPosition[1] or not garageSelected.deletePosition.x then
+        local missing = StaffMenu.GarageMissing(garageSelected, false)
+        if missing then
             VFW.ShowNotification({
                 type = 'STAFF', variant = 'ERROR', subtitle = 'Garage Faction',
-                message = "Veuillez définir toutes les positions avant d'ajouter le garage."
+                message = "Il manque : " .. missing .. "."
           })
 
             return
@@ -357,7 +358,7 @@ StaffMenu.modifyGarageFactionData.OnOpen(function()
             return Garage:SetExitPoint(garageSelected.vehType)
         end)
 
-        garageSelected.spawnPosition = exitCoords
+        if exitCoords then garageSelected.spawnPosition = exitCoords end
         StaffMenu.modifyGarageFactionData.refresh()
     end)
 
@@ -374,10 +375,11 @@ StaffMenu.modifyGarageFactionData.OnOpen(function()
     end, StaffMenu.modifyGarageFactionDataPreview)
 
     StaffMenu.modifyGarageFactionData.Button("Modifier le garage", "", nil, "chevron", false, function()
-        if not garageSelected.position.x or not garageSelected.spawnPosition[1] or not garageSelected.deletePosition.x then
+        local missing = StaffMenu.GarageMissing(garageSelected, false)
+        if missing then
             VFW.ShowNotification({
                 type = 'STAFF', variant = 'ERROR', subtitle = 'Garage Faction',
-                message = "Veuillez définir toutes les positions avant de modifier le garage."
+                message = "Il manque : " .. missing .. "."
           })
 
             return

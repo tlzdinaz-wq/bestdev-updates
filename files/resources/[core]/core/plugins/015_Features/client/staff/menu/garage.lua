@@ -18,6 +18,18 @@ local VUI = exports["VUI"]
 local vehicleType <const> = {"voiture/moto", "bateaux", "avion"}
 
 local adminBanner = exports["core"]:GetVUIBanner("admin")
+--- Ce qui manque encore à un garage en cours de création ou de modification (nil s'il est complet).
+--- Au moins UNE position de spawn des véhicules est obligatoire : sans elle, aucun véhicule ne peut sortir.
+function StaffMenu.GarageMissing(g, needName)
+    local missing = {}
+    if needName and (type(g.name) ~= "string" or g.name == "") then missing[#missing + 1] = "le nom" end
+    if type(g.position) ~= "table" or not g.position.x then missing[#missing + 1] = "la position du garage" end
+    if type(g.spawnPosition) ~= "table" or not g.spawnPosition[1] then missing[#missing + 1] = "au moins 1 position de spawn des véhicules" end
+    if type(g.deletePosition) ~= "table" or not g.deletePosition.x then missing[#missing + 1] = "la position de suppression" end
+    if #missing == 0 then return nil end
+    return table.concat(missing, ", ")
+end
+
 StaffMenu.createGarageData = VUI:CreateSubMenu(StaffMenu.createGarage, "CRÉATION DE GARAGE", adminBanner, true)
 StaffMenu.createGarageDataPreview = VUI:CreateSubMenu(StaffMenu.createGarageData, "APERÇU DES VÉHICULES", adminBanner, true)
 StaffMenu.addVehicleToGarage = VUI:CreateSubMenu(StaffMenu.createGarageData, "AJOUT DE VÉHICULES", adminBanner, true)
@@ -147,7 +159,7 @@ StaffMenu.createGarageData.OnOpen(function()
             return Garage:SetExitPoint(garageSelected.vehType)
         end)
 
-        garageSelected.spawnPosition = exitCoords
+        if exitCoords then garageSelected.spawnPosition = exitCoords end
         StaffMenu.createGarageData.refresh()
     end)
 
@@ -160,10 +172,11 @@ StaffMenu.createGarageData.OnOpen(function()
     end)
 
     StaffMenu.createGarageData.Button("Créer le garage", "", nil, "chevron", false, function()
-        if not garageSelected.position.x or not garageSelected.spawnPosition[1] or not garageSelected.deletePosition.x or not garageSelected.name then
+        local missing = StaffMenu.GarageMissing(garageSelected, true)
+        if missing then
             VFW.ShowNotification({
                 type = 'STAFF', variant = 'ERROR', subtitle = 'Gestion Garage',
-                message = "Veuillez définir toutes les positions avant d'ajouter le garage."
+                message = "Il manque : " .. missing .. "."
           })
 
             return
@@ -200,7 +213,7 @@ StaffMenu.modifyGarageData.OnOpen(function()
             return Garage:SetExitPoint(garageSelected.vehType)
         end)
 
-        garageSelected.spawnPosition = exitCoords
+        if exitCoords then garageSelected.spawnPosition = exitCoords end
         StaffMenu.modifyGarageData.refresh()
     end)
 
@@ -216,10 +229,11 @@ StaffMenu.modifyGarageData.OnOpen(function()
     --end, StaffMenu.modifyGarageDataPreview)
 
     StaffMenu.modifyGarageData.Button("Modifier le garage", "", nil, "chevron", false, function()
-        if not garageSelected.position.x or not garageSelected.spawnPosition[1] or not garageSelected.deletePosition.x then
+        local missing = StaffMenu.GarageMissing(garageSelected, false)
+        if missing then
             VFW.ShowNotification({
                 type = 'STAFF', variant = 'ERROR', subtitle = 'Gestion Garage',
-                message = "Veuillez définir toutes les positions avant de modifier le garage."
+                message = "Il manque : " .. missing .. "."
           })
 
             return

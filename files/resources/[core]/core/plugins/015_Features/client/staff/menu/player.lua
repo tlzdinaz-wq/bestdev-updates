@@ -198,8 +198,15 @@ function StaffMenu.BuildPlayerMenu()
 
     if isAnimatorCtx or perms["freeze_player"] then
         P_Checkbox(" FREEZE / UNFREEZE", "Immobiliser ou libérer le joueur, il ne peut plus bouger tant que c'est actif", false, player.Freeze, function(_checked)
+            local success, reason = TriggerServerCallback("vfw:staff:setPlayerFrozen", selectedPlayer, _checked)
+            if not success then
+                player.Freeze = not _checked
+                VFW.ShowNotification({ type = 'STAFF', title = notifTitle, variant = 'ERROR', subtitle = notifSub, message = reason or "Impossible de modifier le freeze du joueur." })
+                StaffMenu.player.refresh()
+                return
+            end
+
             player.Freeze = _checked
-            TriggerServerEvent("core:FreezePlayer", selectedPlayer, _checked)
             VFW.ShowNotification({ type = 'STAFF', title = notifTitle, variant = _checked and 'SUCCESS' or 'INFO', subtitle = notifSub, message = _checked and "Joueur freezé." or "Joueur unfreezé." })
         end)
     end

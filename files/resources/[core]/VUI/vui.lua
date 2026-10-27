@@ -106,6 +106,22 @@ VUI_ColorPickerCallbacks = nil
 VUI_RoleColorPickerCallbacks = nil
 VUI_MenuStack = {}  ---@type {menu: VUIMenu, savedIndex: number}[] Stack de navigation (pop = retour)
 VUI_IsOpening = false  -- Debounce flag to prevent double-open on key spam
+VUI_BlockReopenAfterExit = false -- Empêche un OnClose asynchrone de rouvrir le menu après une vraie fermeture
+VUI_ExitBlockToken = 0
+
+-- Les callbacks OnClose sont exécutés dans un thread séparé et certains anciens
+-- menus y rouvrent leur parent. C'est utile pendant une transition, mais pas
+-- après une vraie sortie utilisateur : sans garde, le menu réapparaît aussitôt.
+local function BlockReopenAfterExit()
+    VUI_ExitBlockToken = VUI_ExitBlockToken + 1
+    local token = VUI_ExitBlockToken
+    VUI_BlockReopenAfterExit = true
+    Citizen.SetTimeout(400, function()
+        if token == VUI_ExitBlockToken then
+            VUI_BlockReopenAfterExit = false
+        end
+    end)
+end
 
 -- Bannière de marque live (panel EVE). Si non vide, prime sur la ConVar et sur
 -- les bannières par type. Mise à jour à chaud via l'event 'core:vui:setBranding'.
@@ -153,6 +169,7 @@ end
 --- Ferme le menu courant ET nettoie tout le stack proprement.
 --- Utilisable via exports['VUI']:CloseAll()
 function VUI_CloseAll()
+    BlockReopenAfterExit()
     -- Marquer tous les menus du stack comme fermés
     if VUI_MenuStack then
         for i = #VUI_MenuStack, 1, -1 do
@@ -164,13 +181,16 @@ function VUI_CloseAll()
     VUI_MenuStack = {}
     -- Fermer le menu actif
     if VUI_CurrentMenu then
+        VUI_IsExitingMenu = true
         VUI_CurrentMenu.close()
+        VUI_IsExitingMenu = false
     end
 end
 
 exports('CloseAll', VUI_CloseAll)
 
 local function ReturnToHub()
+    BlockReopenAfterExit()
     local proxy = VUI_HubReturnProxy
     VUI_HubReturnProxy = nil
     VUI_MenuStack = {}
@@ -1165,6 +1185,12 @@ function CreateMenu(title, banner, autoRefresh)
             VUI_IsExitingMenu = false
             return
         end
+        -- Une ouverture provenant d'un OnClose retardé ne doit pas annuler une
+        -- fermeture volontaire. Les transitions/refresh internes passent avec
+        -- VUI_Switching et restent donc autorisés.
+        if VUI_BlockReopenAfterExit and not VUI_Switching then
+            return
+        end
         if VUI_CurrentMenu and VUI_CurrentMenu ~= menu and VUI_CurrentMenu.opened then
             if not VUI_HubMode then
                 VUI_MenuStack = {}
@@ -1268,6 +1294,9 @@ function CreateMenu(title, banner, autoRefresh)
     end
 
     menu.close = function()
+        if VUI_IsExitingMenu then
+            BlockReopenAfterExit()
+        end
         -- Mode hub : un menu qui se ferme puis en rouvre un autre (close() suivi de parent.open(), très courant dans
         -- les builders) ne doit PAS terminer la chaîne. Sinon le hub retourne à la liste des outils, VUI repasse en
         -- rendu natif et le menu suivant s'ouvre derrière la tablette (double menu). La fin est donc différée :
@@ -1417,7 +1446,9 @@ function CreateMenu(title, banner, autoRefresh)
 
     menu.toggle = function()
         if menu.opened then
+            VUI_IsExitingMenu = true
             menu.close()
+            VUI_IsExitingMenu = false
         else
             menu.open()
         end

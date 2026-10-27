@@ -152,9 +152,9 @@ local function buildPayload(data, catalog)
         },
     }
 
-    local sanitized = VFW.Garages.Sanitize(payload, "faction")
+    local sanitized, why = VFW.Garages.Sanitize(payload, "faction")
     if not sanitized then
-        return nil, "Définissez le nom et les 3 positions (entrée, spawn, suppression)."
+        return nil, why or "Définissez le nom et les 3 positions (entrée, spawn, suppression)."
     end
     return sanitized
 end

@@ -69,6 +69,40 @@ end
 
 local jobInCreation = getJobDefaultCreationData()
 
+local function normalizeJobName(value)
+    local name = tostring(value or "")
+
+    local replacements = {
+        ["à"] = "a", ["â"] = "a", ["ä"] = "a", ["á"] = "a", ["ã"] = "a",
+        ["À"] = "a", ["Â"] = "a", ["Ä"] = "a", ["Á"] = "a", ["Ã"] = "a",
+        ["ç"] = "c",
+        ["Ç"] = "c",
+        ["é"] = "e", ["è"] = "e", ["ê"] = "e", ["ë"] = "e",
+        ["É"] = "e", ["È"] = "e", ["Ê"] = "e", ["Ë"] = "e",
+        ["î"] = "i", ["ï"] = "i", ["í"] = "i",
+        ["Î"] = "i", ["Ï"] = "i", ["Í"] = "i",
+        ["ô"] = "o", ["ö"] = "o", ["ó"] = "o", ["õ"] = "o",
+        ["Ô"] = "o", ["Ö"] = "o", ["Ó"] = "o", ["Õ"] = "o",
+        ["ù"] = "u", ["û"] = "u", ["ü"] = "u", ["ú"] = "u",
+        ["Ù"] = "u", ["Û"] = "u", ["Ü"] = "u", ["Ú"] = "u",
+        ["ÿ"] = "y", ["ñ"] = "n", ["œ"] = "oe", ["æ"] = "ae",
+        ["Ÿ"] = "y", ["Ñ"] = "n", ["Œ"] = "oe", ["Æ"] = "ae",
+    }
+
+    name = name:lower()
+    for accented, plain in pairs(replacements) do
+        name = name:gsub(accented, plain)
+    end
+
+    return name
+        :gsub("[%s%-]+", "_")
+        :gsub("[^%w_]", "")
+        :gsub("_+", "_")
+        :gsub("^_+", "")
+        :gsub("_+$", "")
+        :sub(1, 60)
+end
+
 local jobGradeInCreation = {}
 
 local jobInModification = {}
@@ -240,7 +274,7 @@ modifyJobData.OnOpen(function()
 
         for _, v in pairs(modelData.addonFields) do
             if v.type == "position" then
-                modifyJobData.Button(v.label, "", jobInModification.custom?[v.name] and "Défini" or "Non défini",
+                modifyJobData.Button(v.label, "", (jobInModification.custom or {})[v.name] and "Défini" or "Non défini",
                     "chevron", false, function()
                         local pos <const> = GetEntityCoords(PlayerPedId())
                         jobInModification.custom[v.name] = pos
@@ -249,7 +283,7 @@ modifyJobData.OnOpen(function()
             else
                 local converter <const> = v.type == "number" and tonumber or tostring
 
-                modifyJobData.Button(v.label, "", converter(jobInModification.custom?[v.name] or "Non défini"), "chevron",
+                modifyJobData.Button(v.label, "", converter((jobInModification.custom or {})[v.name] or "Non défini"), "chevron",
                     false, function()
                         local value <const> = converter(VFW.Nui.KeyboardInput(true,
                             ("Entrez la valeur pour %s"):format(v.label), ""))
@@ -958,7 +992,7 @@ createJob.OnOpen(function()
             return
         end
 
-        jobInCreation.name = name
+        jobInCreation.name = normalizeJobName(name)
         createJob.refresh()
     end)
 
@@ -1017,7 +1051,7 @@ createJob.OnOpen(function()
 
         for _, v in pairs(modelData.addonFields) do
             if v.type == "position" then
-                createJob.Button(v.label, "", jobInCreation.custom?[v.name] and "Défini" or "Non défini", "chevron",
+                createJob.Button(v.label, "", (jobInCreation.custom or {})[v.name] and "Défini" or "Non défini", "chevron",
                     false, function()
                         local pos <const> = GetEntityCoords(PlayerPedId())
                         jobInCreation.custom[v.name] = pos
@@ -1026,7 +1060,7 @@ createJob.OnOpen(function()
             else
                 local converter <const> = v.type == "number" and tonumber or tostring
 
-                createJob.Button(v.label, "", converter(jobInCreation.custom?[v.name] or "Non défini"), "chevron", false,
+                createJob.Button(v.label, "", converter((jobInCreation.custom or {})[v.name] or "Non défini"), "chevron", false,
                     function()
                         local value <const> = converter(VFW.Nui.KeyboardInput(true,
                             ("Entrez la valeur pour %s"):format(v.label), ""))
@@ -1083,11 +1117,36 @@ createJob.OnOpen(function()
             return
         end
 
-        jobInCreation.type = jobTypes[jobInCreation.type]
-        TriggerServerEvent("core:create:society", jobInCreation.name, jobInCreation)
+        local payload = {}
+        for key, value in pairs(jobInCreation) do
+            payload[key] = value
+        end
+        payload.type = jobTypes[jobInCreation.type]
+
+        local result = TriggerServerCallback("core:create:society:submit", jobInCreation.name, payload)
+        if type(result) ~= "table" then
+            VFW.ShowNotification({
+                type = 'STAFF',
+                variant = 'ERROR',
+                subtitle = 'Builder',
+                message = "Le serveur n'a pas confirmé la création. Le formulaire a été conservé."
+            })
+            return
+        end
+
+        VFW.ShowNotification({
+            type = 'STAFF',
+            variant = result.success and 'SUCCESS' or 'ERROR',
+            subtitle = 'Builder',
+            message = result.message or (result.success and "Métier créé." or "Création impossible.")
+        })
+
+        if not result.success then
+            createJob.refresh()
+            return
+        end
 
         jobInCreation = getJobDefaultCreationData()
-
         main.open()
     end)
 end)

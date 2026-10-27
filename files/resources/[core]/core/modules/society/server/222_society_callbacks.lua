@@ -17,6 +17,14 @@ end
 
 VFW.Society.IsStaff = isStaff
 
+registerCallback("core:create:society:submit", function(source, name, data)
+    if type(VFW.Society.CreateFromBuilder) ~= "function" then
+        return { success = false, message = "Le service de création des métiers est indisponible." }
+    end
+
+    return VFW.Society.CreateFromBuilder(source, name, data)
+end)
+
 local function isBossGrade(job)
     if not job then return false end
     if job.grade_is_boss == true or job.grade_is_boss == 1 or job.grade_is_boss == "1" then return true end

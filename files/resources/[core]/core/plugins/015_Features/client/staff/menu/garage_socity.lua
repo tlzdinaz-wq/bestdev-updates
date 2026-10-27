@@ -159,7 +159,7 @@ StaffMenu.createGarageSocietyData.OnOpen(function()
             return Garage:SetExitPoint(garageSelected.vehType)
         end)
 
-        garageSelected.spawnPosition = exitCoords
+        if exitCoords then garageSelected.spawnPosition = exitCoords end
         StaffMenu.createGarageSocietyData.refresh()
     end)
 
@@ -181,10 +181,11 @@ StaffMenu.createGarageSocietyData.OnOpen(function()
     end)
 
     StaffMenu.createGarageSocietyData.Button("Créer le garage", "", nil, "chevron", false, function()
-        if not garageSelected.position.x or not garageSelected.spawnPosition[1] or not garageSelected.deletePosition.x then
+        local missing = StaffMenu.GarageMissing(garageSelected, false)
+        if missing then
             VFW.ShowNotification({
                 type = 'STAFF', variant = 'ERROR', subtitle = 'Garage Société',
-                message = "Veuillez définir toutes les positions avant d'ajouter le garage."
+                message = "Il manque : " .. missing .. "."
           })
 
             return
@@ -375,7 +376,7 @@ StaffMenu.modifyGarageSocietyData.OnOpen(function()
             return Garage:SetExitPoint(garageSelected.vehType)
         end)
 
-        garageSelected.spawnPosition = exitCoords
+        if exitCoords then garageSelected.spawnPosition = exitCoords end
         StaffMenu.modifyGarageSocietyData.refresh()
     end)
 
@@ -396,10 +397,11 @@ StaffMenu.modifyGarageSocietyData.OnOpen(function()
     end)
 
     StaffMenu.modifyGarageSocietyData.Button("Modifier le garage", "", nil, "chevron", false, function()
-        if not garageSelected.position.x or not garageSelected.spawnPosition[1] or not garageSelected.deletePosition.x then
+        local missing = StaffMenu.GarageMissing(garageSelected, false)
+        if missing then
             VFW.ShowNotification({
                 type = 'STAFF', variant = 'ERROR', subtitle = 'Garage Société',
-                message = "Veuillez définir toutes les positions avant de modifier le garage."
+                message = "Il manque : " .. missing .. "."
           })
 
             return

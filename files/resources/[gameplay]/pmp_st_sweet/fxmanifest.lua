@@ -1,5 +1,0 @@
-fx_version 'cerulean'
-game 'gta5'
-author 'discord.gg/pimpmyped - Stella'
-file 'peds.meta'
-data_file 'PED_METADATA_FILE' 'peds.meta'

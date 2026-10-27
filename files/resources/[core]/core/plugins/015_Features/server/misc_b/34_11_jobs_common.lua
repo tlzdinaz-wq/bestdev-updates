@@ -1330,6 +1330,23 @@ local function garageStaff(source)
     return nil
 end
 
+--- Un garage métier doit avoir sa position et AU MOINS UN point de spawn valide, sinon aucun véhicule ne peut sortir.
+local function policeGarageProblem(garage)
+    local pos = garage.position
+    if type(pos) ~= "table" or tonumber(pos.x) == nil or tonumber(pos.y) == nil or tonumber(pos.z) == nil then
+        return "Position du garage non définie."
+    end
+    local ok = false
+    if type(garage.spawnPositions) == "table" then
+        for i = 1, #garage.spawnPositions do
+            local sp = garage.spawnPositions[i]
+            if type(sp) == "table" and tonumber(sp.x) and tonumber(sp.y) and tonumber(sp.z) then ok = true break end
+        end
+    end
+    if not ok then return "Il faut définir au moins un point de spawn pour les véhicules (sans lui, aucun véhicule ne peut sortir)." end
+    return nil
+end
+
 RegisterNetEvent("policeGarage:create", function(garage)
     local source = source
     if type(garage) ~= "table" then return end
@@ -1340,6 +1357,12 @@ RegisterNetEvent("policeGarage:create", function(garage)
     local name = MiscB.Str(garage.name, 64)
     local job = MiscB.Str(garage.job, 64) or MiscB.JobName(xPlayer)
     if not name or not job then return end
+
+    local problem = policeGarageProblem(garage)
+    if problem then
+        MiscB.Notify(source, problem, "ROUGE")
+        return
+    end
 
     local id = MiscB.Insert([[
         INSERT INTO police_garages (name, job, position, spawn_positions, despawn_position, vehicles, ped_model)
@@ -1370,6 +1393,12 @@ RegisterNetEvent("policeGarage:update", function(garageId, garage)
     local xPlayer = garageStaff(source)
     if not xPlayer then return end
     if not policeGarages[id] then return end
+
+    local problem = policeGarageProblem(garage)
+    if problem then
+        MiscB.Notify(source, problem, "ROUGE")
+        return
+    end
 
     MiscB.Update([[
         UPDATE police_garages SET name = ?, position = ?, spawn_positions = ?,

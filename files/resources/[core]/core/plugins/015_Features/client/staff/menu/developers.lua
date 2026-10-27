@@ -407,13 +407,17 @@ StaffMenu.starterPack.OnOpen(function()
         local input = VFW.Nui.KeyboardInput(true, "Montant en banque", tostring(config.bank or 0))
         if not input or input == "" then return end
         local amount = tonumber(input)
-        if not amount or amount < 0 then
+        if not amount then
             VFW.ShowNotification({ type = "ROUGE", content = "Ce montant n'est pas valide" })
             return
         end
+        -- le champ propose le montant actuel : un nombre négatif (ex. -500) retire cette somme, jamais sous 0
+        if amount < 0 then amount = math.max(0, (tonumber(config.bank) or 0) + amount) end
         local result = TriggerServerCallback("starterpack:setBank", amount)
         if result then
             VFW.ShowNotification({ type = "STAFF", variant = "SUCCESS", subtitle = "Starter Pack", message = "Banque mise à jour : " .. VFW.Math.FormatMoney(amount) })
+        else
+            VFW.ShowNotification({ type = "ROUGE", content = "Le serveur a refusé la modification" })
         end
         StaffMenu.starterPack.refresh()
     end)
@@ -422,13 +426,16 @@ StaffMenu.starterPack.OnOpen(function()
         local input = VFW.Nui.KeyboardInput(true, "Montant en liquide", tostring(config.cash or 0))
         if not input or input == "" then return end
         local amount = tonumber(input)
-        if not amount or amount < 0 then
+        if not amount then
             VFW.ShowNotification({ type = "ROUGE", content = "Ce montant n'est pas valide" })
             return
         end
+        if amount < 0 then amount = math.max(0, (tonumber(config.cash) or 0) + amount) end
         local result = TriggerServerCallback("starterpack:setCash", amount)
         if result then
             VFW.ShowNotification({ type = "STAFF", variant = "SUCCESS", subtitle = "Starter Pack", message = "Cash mis à jour : " .. VFW.Math.FormatMoney(amount) })
+        else
+            VFW.ShowNotification({ type = "ROUGE", content = "Le serveur a refusé la modification" })
         end
         StaffMenu.starterPack.refresh()
     end)
@@ -444,6 +451,8 @@ StaffMenu.starterPack.OnOpen(function()
                 local result = TriggerServerCallback("starterpack:removeItem", item.name)
                 if result then
                     VFW.ShowNotification({ type = "STAFF", variant = "SUCCESS", subtitle = "Starter Pack", message = label .. " retiré du starter pack" })
+                else
+                    VFW.ShowNotification({ type = "ROUGE", content = "Le serveur a refusé la suppression" })
                 end
                 StaffMenu.starterPack.refresh()
             end)

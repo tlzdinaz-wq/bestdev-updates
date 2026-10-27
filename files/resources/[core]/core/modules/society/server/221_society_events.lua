@@ -59,11 +59,8 @@ local function jobNameIsValid(name)
     return type(name) == "string" and name ~= "" and name:match("^[%w_%-]+$") ~= nil and #name <= 60
 end
 
-local function rejectName(xPlayer)
-    xPlayer.showNotification({
-        type = "STAFF", variant = "ERROR", subtitle = "Builder",
-        message = "Ce nom de métier n'est pas valide (lettres, chiffres, _ et - uniquement).",
-    })
+local function builderResult(success, message)
+    return { success = success == true, message = message }
 end
 
 RegisterNetEvent("core:society:requestData", function()
@@ -97,23 +94,22 @@ AddEventHandler("vfw:setDuty", function(source)
     TriggerClientEvent("vfw:setJob", source, xPlayer.job)
 end)
 
-RegisterNetEvent("core:create:society", function(name, data)
-    local source = source
+local function createSocietyFromBuilder(source, name, data)
     local xPlayer = getStaff(source)
-    if not xPlayer then return end
+    if not xPlayer then
+        return builderResult(false, "Vous n'avez pas la permission de créer un métier.")
+    end
 
     if not jobNameIsValid(name) then
-        rejectName(xPlayer)
-        return
+        return builderResult(false,
+            "Le nom technique est invalide. Utilisez uniquement des lettres, chiffres, _ ou -.")
     end
-    if type(data) ~= "table" then return end
+    if type(data) ~= "table" then
+        return builderResult(false, "Les informations du métier sont invalides.")
+    end
 
     if VFW.Society.Get(name) or VFW.Jobs[name] then
-        xPlayer.showNotification({
-            type = "STAFF", variant = "ERROR", subtitle = "Builder",
-            message = "Ce métier existe déjà.",
-        })
-        return
+        return builderResult(false, "Ce métier existe déjà.")
     end
 
     local label = cleanString(data.label, 120, name)
@@ -125,12 +121,16 @@ RegisterNetEvent("core:create:society", function(name, data)
     local management = sanitizeVector(data.management)
     local custom = sanitizeCustom(data.custom)
 
-    VFW.Society.Update([[
+    local jobSaved = VFW.Society.Update([[
         INSERT INTO jobs (name, label, type, whitelisted) VALUES (?, ?, ?, 1)
         ON DUPLICATE KEY UPDATE label = VALUES(label), type = VALUES(type)
     ]], { name, label, societyType })
 
-    VFW.Society.Update([[
+    if jobSaved == nil then
+        return builderResult(false, "La sauvegarde du métier a échoué. Consultez la console serveur.")
+    end
+
+    local societySaved = VFW.Society.Update([[
         INSERT INTO societies (name, label, type, image, banner, address, blip, management, storage, custom)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE label = VALUES(label), type = VALUES(type), image = VALUES(image),
@@ -140,6 +140,11 @@ RegisterNetEvent("core:create:society", function(name, data)
         name, label, societyType, image, banner, address,
         VFW.DB.Encode(blip), VFW.DB.Encode(management), VFW.DB.Encode({}), VFW.DB.Encode(custom),
     })
+
+    if societySaved == nil then
+        VFW.Society.Update("DELETE FROM jobs WHERE name = ?", { name })
+        return builderResult(false, "La sauvegarde de la société a échoué. Consultez la console serveur.")
+    end
 
     local grades = type(data.grades) == "table" and data.grades or {}
     local used = {}
@@ -172,7 +177,10 @@ RegisterNetEvent("core:create:society", function(name, data)
 
     VFW.Society.SaveGrades(name, normalized)
     VFW.Society.RefreshJobs()
-    VFW.Society.Reload(name)
+    local reloaded = VFW.Society.Reload(name)
+    if not reloaded then
+        return builderResult(false, "Le métier a été sauvegardé, mais son rechargement a échoué.")
+    end
     VFW.Society.BroadcastToJob(name)
 
     if custom.catalog then
@@ -182,12 +190,24 @@ RegisterNetEvent("core:create:society", function(name, data)
         VFW.Concess.Ensure(name)
     end
 
-    xPlayer.showNotification({
-        type = "STAFF", variant = "SUCCESS", subtitle = "Builder",
-        message = ("Métier %s créé."):format(label),
-    })
-
     console.info(("[Society] %s a créé le métier %s"):format(xPlayer.name or source, name))
+    return builderResult(true, ("Métier %s créé avec succès."):format(label))
+end
+
+VFW.Society.CreateFromBuilder = createSocietyFromBuilder
+
+RegisterNetEvent("core:create:society", function(name, data)
+    local source = source
+    local result = createSocietyFromBuilder(source, name, data)
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not xPlayer or not result then return end
+
+    xPlayer.showNotification({
+        type = "STAFF",
+        variant = result.success and "SUCCESS" or "ERROR",
+        subtitle = "Builder",
+        message = result.message,
+    })
 end)
 
 RegisterNetEvent("core:modify:society", function(name, data)

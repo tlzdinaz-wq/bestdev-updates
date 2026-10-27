@@ -8,6 +8,7 @@ local GoFast = {
 
 local BUILDER_PERM = "builder_gofast"
 local CARGO_ITEM = "gofast_cargo"
+local DIRTY_MONEY_ITEM = "dirty_money"
 local playerCooldown = {}
 local DEFAULT_SETTINGS = {
     missionCooldown = 900,
@@ -371,6 +372,7 @@ RegisterNetEvent("core:gofast:completeMission", function(missionId)
     if not mission then return end
     if missionId ~= nil and missionId ~= mission.id then return end
     if not mission.cargoLoaded then return end
+    if mission.completing then return end
 
     local delivery = mission.delivery
     if IL.DistanceTo(source, delivery.pos.x, delivery.pos.y, delivery.pos.z) > 60.0 then
@@ -378,8 +380,23 @@ RegisterNetEvent("core:gofast:completeMission", function(missionId)
         return
     end
 
-    IL.GiveMoney(xPlayer, "black_money", mission.price, "gofast")
-    IL.Notify(source, "ILLEGAL", ("Livraison terminee : %d$ sale."):format(mission.price))
+    local reward = math.floor(tonumber(mission.price) or 0)
+    if reward <= 0 or not IL.ItemExists(DIRTY_MONEY_ITEM) then
+        IL.Notify(source, "ILLEGAL", "La récompense du Go Fast est mal configurée. Contactez le staff.")
+        return
+    end
+
+    -- L'argent sale est désormais un objet d'inventaire (`dirty_money`) et non plus
+    -- l'ancien compte `black_money`. Ne terminer la mission qu'après confirmation de
+    -- l'ajout évite d'annoncer une récompense que le joueur n'a pas reçue.
+    mission.completing = true
+    if not IL.GiveItem(xPlayer, DIRTY_MONEY_ITEM, reward, true) then
+        mission.completing = false
+        IL.Notify(source, "ILLEGAL", "Impossible d'ajouter l'argent sale dans votre inventaire.")
+        return
+    end
+
+    IL.Notify(source, "ILLEGAL", ("Livraison terminee : %d$ sale ajouté à l'inventaire."):format(reward))
 
     TriggerClientEvent("core:gofast:missionCompleted", source, 60)
     EndMission(source, "completed", nil)

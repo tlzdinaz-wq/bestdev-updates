@@ -205,14 +205,14 @@ StaffMenu.vehicleSellCreate.OnOpen(function()
     local spotsValid = newLocationData.parking_spots and #newLocationData.parking_spots > 0
 
     StaffMenu.vehicleSellCreate.Button("Creer le point de vente", npcValid and spotsValid and "Pret" or "Position PNJ et emplacements requis", nil, npcValid and spotsValid and "check" or nil, not (npcValid and spotsValid), function()
-        local newId = TriggerServerCallback("vehicleSell:createConfig", newLocationData)
+        local newId, errorMessage = TriggerServerCallback("vehicleSell:createConfig", newLocationData)
         if newId then
             VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Vente Vehicules', message = ("Point de vente #%d créé."):format(newId) })
             StaffMenu.vehicleSellCreate.close()
             Wait(100)
             StaffMenu.vehicleSellList.refresh()
         else
-            VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Vente Vehicules', message = "Erreur lors de la creation." })
+            VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Vente Vehicules', message = errorMessage or "Erreur lors de la creation." })
         end
     end)
 end)
@@ -286,8 +286,13 @@ StaffMenu.vehicleSellEdit.OnOpen(function()
     StaffMenu.vehicleSellEdit.Separator("ACTIONS")
 
     StaffMenu.vehicleSellEdit.Button("Sauvegarder", "Enregistrer la configuration", nil, "check", false, function()
-        TriggerServerEvent("vehicleSell:saveConfig", selectedLocationId, configData)
-        VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Vente Vehicules', message = "Configuration sauvegardée." })
+        local success, errorMessage = TriggerServerCallback("vehicleSell:saveConfigCallback", selectedLocationId, configData)
+        VFW.ShowNotification({
+            type = 'STAFF',
+            variant = success and 'SUCCESS' or 'ERROR',
+            subtitle = 'Vente Vehicules',
+            message = success and "Configuration sauvegardée." or (errorMessage or "Erreur lors de la sauvegarde.")
+        })
     end)
 
     StaffMenu.vehicleSellEdit.Button("Supprimer ce point de vente", "Suppression définitive", nil, "trash", false, function()
@@ -295,7 +300,7 @@ StaffMenu.vehicleSellEdit.OnOpen(function()
         local bResponse = VFW.Nui.ConfirmPopup("Suppression", ("Supprimer le point de vente #%d ?"):format(selectedLocationId))
         VFW.Nui.Focus(false)
         if bResponse then
-            local success = TriggerServerCallback("vehicleSell:deleteConfig", selectedLocationId)
+            local success, errorMessage = TriggerServerCallback("vehicleSell:deleteConfig", selectedLocationId)
             if success then
                 VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Vente Vehicules', message = "Point de vente supprimé." })
                 selectedLocationId = nil
@@ -304,7 +309,7 @@ StaffMenu.vehicleSellEdit.OnOpen(function()
                 Wait(100)
                 StaffMenu.vehicleSellList.refresh()
             else
-                VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Vente Vehicules', message = "Impossible de supprimer (ventes actives ?)." })
+                VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Vente Vehicules', message = errorMessage or "Impossible de supprimer ce point de vente." })
             end
         end
     end)

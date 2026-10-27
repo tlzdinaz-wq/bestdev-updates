@@ -210,8 +210,11 @@ RegisterServerCallback("core:updateGarage", function(source, id, payload)
 
     if not Garages.CanEdit(xPlayer, existing.type) then return false end
 
-    local data = Garages.Sanitize(payload, existing.type)
-    if not data then return false end
+    local data, why = Garages.Sanitize(payload, existing.type)
+    if not data then
+        Vehicles.Notify(source, "ROUGE", "Garage", why or "Ces données de garage ne sont pas valides.")
+        return false
+    end
     if not Garages.CanEdit(xPlayer, data.type) then return false end
 
     data.id = garageId

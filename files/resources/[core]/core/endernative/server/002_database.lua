@@ -794,7 +794,8 @@ function VFW.DB.CreateCharacter(accountId, slot, identifier, data)
             if account.name == "bank" and tonumber(starter.bank) then account.money = math.floor(tonumber(starter.bank)) end
             if account.name == "money" and tonumber(starter.cash) then account.money = math.floor(tonumber(starter.cash)) end
         end
-        if type(starter.items) == "table" and #starter.items > 0 then
+        -- une liste d'items réglée par le staff prime, même vide (« tout supprimer » ne remet pas les items par défaut)
+        if type(starter.items) == "table" and (#starter.items > 0 or starter.itemsConfigured == true) then
             inventory = {}
             for _, it in ipairs(starter.items) do
                 if type(it.name) == "string" and (tonumber(it.count) or 0) > 0 then

@@ -210,11 +210,16 @@ function Garages.Delete(id)
     return true
 end
 
+--- Vérifie et nettoie un garage reçu d'un menu. Renvoie le garage, ou nil et la raison du refus (affichée au staff).
+--- Un garage doit avoir sa position, AU MOINS UNE position de spawn des véhicules et sa position de rangement :
+--- sans point de spawn, les véhicules ne peuvent pas sortir.
 function Garages.Sanitize(payload, fallbackType)
-    if type(payload) ~= "table" then return nil end
+    if type(payload) ~= "table" then return nil, "Ces données de garage ne sont pas valides." end
 
     local position = type(payload.position) == "table" and payload.position or nil
-    if not position or tonumber(position.x) == nil or tonumber(position.y) == nil or tonumber(position.z) == nil then return nil end
+    if not position or tonumber(position.x) == nil or tonumber(position.y) == nil or tonumber(position.z) == nil then
+        return nil, "Position du garage non définie."
+    end
 
     local spawnPosition = {}
     if type(payload.spawnPosition) == "table" then
@@ -230,10 +235,14 @@ function Garages.Sanitize(payload, fallbackType)
             end
         end
     end
-    if #spawnPosition == 0 then return nil end
+    if #spawnPosition == 0 then
+        return nil, "Il faut définir au moins une position de spawn pour les véhicules (sans elle, aucun véhicule ne peut sortir)."
+    end
 
     local deletePosition = type(payload.deletePosition) == "table" and payload.deletePosition or nil
-    if not deletePosition or tonumber(deletePosition.x) == nil or tonumber(deletePosition.y) == nil or tonumber(deletePosition.z) == nil then return nil end
+    if not deletePosition or tonumber(deletePosition.x) == nil or tonumber(deletePosition.y) == nil or tonumber(deletePosition.z) == nil then
+        return nil, "Position de rangement des véhicules non définie."
+    end
 
     local garageType = tostring(payload.type or fallbackType or "public")
     if garageType ~= "public" and garageType ~= "society" and garageType ~= "gang" and garageType ~= "faction" then
@@ -249,7 +258,9 @@ function Garages.Sanitize(payload, fallbackType)
         }
     end
 
-    if garageType ~= "public" and not access then return nil end
+    if garageType ~= "public" and not access then
+        return nil, "Un garage de société ou de faction doit être rattaché à son groupe (job ou faction)."
+    end
 
     local vehType = tonumber(payload.vehType) or 1
     if vehType < 1 or vehType > 3 then vehType = 1 end
@@ -291,4 +302,15 @@ CreateThread(function()
 
     Garages.Load()
     Garages.LoadLabelOverrides()
+
+    -- Garages créés avant l'obligation d'un point de spawn : les véhicules n'y sortent pas. On le signale au démarrage.
+    local broken = {}
+    for id, garage in pairs(Garages.list or {}) do
+        local spawns = type(garage.spawnPosition) == "table" and garage.spawnPosition or {}
+        if #spawns == 0 then broken[#broken + 1] = ("#%s %s"):format(tostring(id), tostring(garage.name)) end
+    end
+    if #broken > 0 then
+        table.sort(broken)
+        print(("^1[garage]^7 %d garage(s) sans position de spawn (aucun véhicule n'y sort) : %s. Gestion > Builders > Garages : ajouter un spawn."):format(#broken, table.concat(broken, ", ")))
+    end
 end)

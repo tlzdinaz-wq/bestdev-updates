@@ -16,10 +16,11 @@ PTVConfig = {
     -- Delai minimal (ms) entre deux lancements par un meme joueur.
     PlayCooldownMs = 2000,
 
-    -- Page de lecture. Par defaut celle de la ressource (nui://ptelevision/html/player.html). Si YouTube
-    -- refuse la lecture integree (erreur 153 « lecteur refuse »), heberger une copie de html/player.html
-    -- sur un site https et mettre son adresse ici : YouTube exige un site d'origine, pas un nui://.
-    PlayerUrl = nil,
+    -- Page de lecture. YouTube refuse la lecture integree depuis une page du jeu (nui://, erreur 153
+    -- « lecteur refuse ») : il exige un site d'origine en https. Par defaut, la copie de html/player.html
+    -- hebergee sur le site Aurora. nil = page de la ressource (nui://ptelevision/html/player.html), qui ne
+    -- lit alors que les liens directs (.mp4…), pas YouTube.
+    PlayerUrl = 'https://base.auroglowmedia.net/tv/player.html',
 
     -- Liens directs vers un fichier video (.mp4, .webm, .ogv, .m4v, .mov) en plus de YouTube.
     -- Chaque joueur proche de l'ecran contacte l'hote du lien : mettre false pour n'accepter que YouTube.

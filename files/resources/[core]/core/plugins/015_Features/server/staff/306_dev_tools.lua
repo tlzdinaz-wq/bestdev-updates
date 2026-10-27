@@ -603,6 +603,7 @@ Staff29.Cb("starterpack:addItem", function(source, name, count)
     local c = math.floor(tonumber(count) or 0)
     if not name or not VFW.Items[name] or c <= 0 then return false end
     StarterSave(function(d)
+        d.itemsConfigured = true
         for _, it in ipairs(d.items) do
             if it.name == name then it.count = c return end
         end
@@ -614,6 +615,8 @@ end)
 Staff29.Cb("starterpack:removeItem", function(source, name)
     if not Require(source, "dev") then return false end
     StarterSave(function(d)
+        -- la liste des items est désormais réglée par le staff : même vide, elle remplace les items par défaut
+        d.itemsConfigured = true
         for i = #d.items, 1, -1 do
             if d.items[i].name == name then table.remove(d.items, i) end
         end

@@ -546,6 +546,24 @@ ConcessVehicles.OnOpen(function()
     ConcessVehicles.Button(":plus: AJOUTER UN VÉHICULE", bHasCategories and "" or "Créez une catégorie d'abord", nil, bHasCategories and "chevron" or "lock", not bHasCategories, function()
         tNewVehicle = { sModel = "", sName = "", sCategory = tCategories[1] or "", iPrice = 0 }
     end, ConcessVehicleAdd)
+
+    -- Copie dans le catalogue toutes les voitures et motos de la base avec leurs prix ; ne modifie jamais ce qui existe déjà.
+    ConcessVehicles.Button(":download: IMPORTER LE CATALOGUE COMPLET", "Ajoute toutes les voitures et motos avec leurs prix (ne change pas ceux déjà réglés)", nil, "chevron", false, function()
+        fcAskText("Tapez 'IMPORTER' pour ajouter tous les véhicules du catalogue de la base", "", function(confirmResult)
+            if confirmResult:upper() ~= "IMPORTER" then return end
+            local ok, result = pcall(TriggerServerCallback, "core:concess:importCatalog")
+            if not ok or type(result) ~= "table" or not result.success then
+                VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Concessionnaires', message = (type(result) == "table" and result.error) or "Import impossible." })
+                return
+            end
+            VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Concessionnaires',
+                message = ("%d véhicule(s) et %d catégorie(s) ajoutés (%d au catalogue)."):format(result.vehicles or 0, result.categories or 0, result.total or 0) })
+            categoriesCache = nil
+            categoriesWithTypeCache = nil
+            fcLoadCategories()
+            fcRefresh(ConcessVehicles)
+        end)
+    end)
 end)
 
 -- Catégories

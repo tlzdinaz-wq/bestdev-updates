@@ -73,6 +73,43 @@ RegisterNetEvent("core:vnotif:createAlert:player", function(msg, targetId, isAni
         ("%s %s"):format(target.firstName, target.lastName), target.source, senderType)
 end)
 
+-- Annonce depuis le menu animateur (Options animateur > Annonces) : le menu envoyait cet événement mais aucun
+-- code serveur n'y répondait, rien n'était jamais affiché. Réservé aux animateurs (permission menu_anim) ;
+-- annonce globale (tout le serveur) ou limitée à un rayon autour de l'animateur.
+local lastAnimatorAnnounce = {}
+
+RegisterNetEvent("vfw:animator:announce", function(message, isGlobal, radius)
+    local source = source
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not xPlayer or not xPlayer.hasPermission("menu_anim") then return end
+    if type(message) ~= "string" then return end
+    message = message:gsub("[%c]", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    if message == "" then return end
+    message = message:sub(1, 500)
+
+    local now = GetGameTimer()
+    if lastAnimatorAnnounce[source] and now - lastAnimatorAnnounce[source] < 2000 then return end
+    lastAnimatorAnnounce[source] = now
+
+    if isGlobal == true then
+        TriggerClientEvent("core:vnotif:createAlert", -1, message, "")
+        TriggerEvent("vfw:logs:staff", source, "animator_announce", { global = true, message = message })
+        return
+    end
+
+    radius = tonumber(radius) or 0
+    if radius < 1 or radius > 750 then radius = 50 end
+    local nearby = VFW.GetPlayersInRadius(xPlayer.getCoords(), radius)
+    for i = 1, #nearby do
+        TriggerClientEvent("core:vnotif:createAlert", nearby[i].source, message, "")
+    end
+    TriggerEvent("vfw:logs:staff", source, "animator_announce", { global = false, radius = radius, count = #nearby, message = message })
+end)
+
+AddEventHandler("playerDropped", function()
+    lastAnimatorAnnounce[source] = nil
+end)
+
 RegisterNetEvent("vfw:showPlayerID", function()
     local source = source
     local xPlayer = VFW.GetPlayerFromId(source)

@@ -32,7 +32,9 @@ local function pickSpawnCoords(garage, requested)
             }
         end
 
-        return candidate
+        -- Garage sans aucune position de spawn : on ne fait JAMAIS confiance aux coordonnées envoyées par le joueur
+        -- (le véhicule apparaissait n'importe où, sous la carte, puis finissait en fourrière).
+        return nil
     end
 
     local spawns = garage and garage.spawnPosition or nil
@@ -113,7 +115,9 @@ RegisterNetEvent("garage:exitVehicle", function(garageId, plate, spawnCoords, re
     local coords = pickSpawnCoords(garage, spawnCoords)
     if not coords then
         release()
-        Vehicles.Notify(source, "ROUGE", "Garage", "Aucune place de spawn disponible.")
+        local hasSpawn = type(garage.spawnPosition) == "table" and #garage.spawnPosition > 0
+        Vehicles.Notify(source, "ROUGE", "Garage", hasSpawn and "Aucune place de spawn disponible."
+            or "Ce garage n'a aucune position de spawn : prévenez le staff. Votre véhicule reste rangé.")
         return
     end
 
@@ -361,9 +365,9 @@ local function createGarageFromPayload(source, payload)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer then return false, "Joueur introuvable." end
 
-    local data = Garages.Sanitize(payload)
+    local data, why = Garages.Sanitize(payload)
     if not data then
-        return false, "Ces données de garage ne sont pas valides."
+        return false, why or "Ces données de garage ne sont pas valides."
     end
 
     if not Garages.CanEdit(xPlayer, data.type) then

@@ -219,7 +219,42 @@ local function orderReward(items)
     return reward
 end
 
-local function newDeliveryStep(cfg, current)
+--- Un client réglé dans le builder (Gestion > Builders > Livraisons …) : le PNJ, sa position et sa commande avec ses prix.
+local function configuredStep(brand, jobName, current)
+    local list = MiscB.Restaurants and MiscB.Restaurants.Clients and MiscB.Restaurants.Clients(brand, jobName)
+    if not list then return nil end
+
+    local pick = list[math.random(#list)]
+    local tries = 0
+    while current and current.clientId == pick.id and #list > 1 and tries < 8 do
+        pick = list[math.random(#list)]
+        tries = tries + 1
+    end
+
+    local items, reward = {}, 0
+    for _, it in ipairs(pick.orderItems or {}) do
+        local def = VFW.Items and VFW.Items[it.name] or nil
+        items[#items + 1] = { name = it.name, label = (type(def) == "table" and def.label) or it.name, count = it.count }
+        reward = reward + it.count * (tonumber(it.price) or 0)
+    end
+    if #items == 0 then return nil end
+    if reward <= 0 then reward = orderReward(items) end
+
+    return {
+        clientId = pick.id,
+        point = pick,
+        clientData = { x = pick.x, y = pick.y, z = pick.z, heading = pick.heading, npcName = pick.npcName, npcModel = pick.npcModel },
+        npcName = pick.npcName,
+        orderItems = items,
+        reward = reward,
+        model = pick.npcModel,
+    }
+end
+
+local function newDeliveryStep(cfg, current, brand, jobName)
+    local configured = configuredStep(brand, jobName, current)
+    if configured then return configured end
+
     local point = deliveryPick(current and current.point or nil)
     local items = deliveryOrder(cfg)
     if not items then return nil end
@@ -468,7 +503,7 @@ local function registerBrand(brand)
         if not onDutyFor(xPlayer, jobName) then return false, "Vous devez etre en service." end
         if deliveries[source] then return false, "Une livraison est deja en cours." end
 
-        local step = newDeliveryStep(cfg, nil)
+        local step = newDeliveryStep(cfg, nil, brand, jobName)
         if not step then return false, "Aucune commande disponible." end
 
         deliveries[source] = { brand = brand, jobName = jobName, step = step, delivered = 0 }
@@ -483,7 +518,7 @@ local function registerBrand(brand)
             return false, "Aucune livraison en cours."
         end
 
-        local step = newDeliveryStep(cfg, delivery.step)
+        local step = newDeliveryStep(cfg, delivery.step, brand, delivery.jobName)
         if not step then return false, "Il n'y a plus de clients disponibles." end
 
         delivery.step = step
