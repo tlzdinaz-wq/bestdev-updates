@@ -76,9 +76,17 @@ fi
 DOWNLOAD=(); SKIPPED=(); DELETED=(); KEPT=(); UNCHANGED=0; TOTAL=0
 mapfile -t RELS < <(printf '%s\n' "${!FILES[@]}" | sort)
 FIRST=0; [ "${#INSTALLED[@]}" -eq 0 ] && FIRST=1 && info "première vérification : empreinte de chaque fichier (${#RELS[@]}), patiente une à deux minutes…"
-i=0
+# barre de progression sur une seule ligne (\r) ; dans un journal sans terminal, une ligne tous les 10 %
+progress() {
+  local label="$1" done="$2" total="$3" pct full
+  pct=$(( total > 0 ? done * 100 / total : 100 )); full=$(( pct / 5 ))
+  local line; line="$(printf '[%s%s] %3d %%  (%d / %d)' "$(printf '%*s' "$full" '' | tr ' ' '#')" "$(printf '%*s' $((20 - full)) '' | tr ' ' '-')" "$pct" "$done" "$total")"
+  if [ -t 1 ]; then printf '\r\033[36m[Aurora]\033[0m %s %s' "$label" "$line"; [ "$done" -ge "$total" ] && printf '\n'
+  elif [ $(( pct / 10 )) -gt "${PROGRESS_TENTH:--1}" ]; then PROGRESS_TENTH=$(( pct / 10 )); info "$label $line"; fi
+}
+i=0; PROGRESS_TENTH=-1
 for rel in "${RELS[@]}"; do
-  i=$((i+1)); [ $FIRST -eq 1 ] && [ $((i % 500)) -eq 0 ] && info "vérification $i / ${#RELS[@]}…"
+  i=$((i+1)); { [ $((i % 20)) -eq 0 ] || [ $i -eq ${#RELS[@]} ]; } && progress "vérification" "$i" "${#RELS[@]}"
   remote="${FILES[$rel]}"; abs="$ROOT/$rel"; local_hash=""
   if [ -f "$abs" ]; then
     if [ "${INSTALLED[$rel]:-}" = "$remote" ]; then local_hash="$remote"; else local_hash="$(hash_of "$abs")"; fi
@@ -116,7 +124,7 @@ fi
 BACKUP="$UPDATER_DIR/backup/$(printf '%s' "$REMOTE_VERSION" | tr -c 'A-Za-z0-9._-' '_')"
 for k in "${!INSTALLED[@]}"; do NEWSTATE["$k"]="${INSTALLED[$k]}"; done
 # téléchargements dans le dossier temporaire puis déplacés (jamais de fichier temporaire dans resources/)
-ERRORS=0; declare -A TOUCHED=(); n=0; tn=0
+ERRORS=0; declare -A TOUCHED=(); n=0; tn=0; PROGRESS_TENTH=-1
 res_of() { local r="${1#resources/}" seg; IFS='/' read -ra segs <<< "$r"; for seg in "${segs[@]}"; do [[ "$seg" == \[* ]] && continue; printf '%s' "$seg"; return; done; }
 for d in "${DOWNLOAD[@]}"; do
   rel="${d%|*}"; ex="${d#*|}"; abs="$ROOT/$rel"; n=$((n+1)); tn=$((tn+1)); tmp="$TMPD/$tn.tmp"
@@ -127,7 +135,7 @@ for d in "${DOWNLOAD[@]}"; do
   else
     ERRORS=$((ERRORS+1)); fail "échec : $rel (téléchargement ou hash différent)"; rm -f "$tmp"
   fi
-  [ $((n % 25)) -eq 0 ] && info "$n / ${#DOWNLOAD[@]} fichiers…"
+  progress "téléchargement" "$n" "${#DOWNLOAD[@]}"
 done
 for s in "${SKIPPED[@]}"; do
   rel="${s%|*}"; abs="$ROOT/$rel"; mkdir -p "$(dirname "$abs")"; tn=$((tn+1)); tmp="$TMPD/$tn.tmp"

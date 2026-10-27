@@ -249,6 +249,7 @@ end
 
 IL.OnReady(function()
     LoadSettings()
+    if DefaultShopPoints then DefaultShopPoints.Ensure("supermarkets") end
     LoadStores()
     LoadItems()
     TriggerClientEvent("core:supermarket:syncSupermarkets", -1, StoresMap())

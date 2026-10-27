@@ -72,6 +72,16 @@ local K = {
 local M32 = 0xffffffff
 local function rrot(x, n) return ((x >> n) | (x << (32 - n))) & M32 end
 
+-- Rend la main au serveur dès que 8 ms de calcul sont passées (beaucoup de petits fichiers à hacher
+-- d'affilée faisaient des « server thread hitch » de près d'une seconde).
+local sliceStart = os.clock()
+local function yieldIfNeeded()
+    if Wait and os.clock() - sliceStart > 0.008 then
+        Wait(0)
+        sliceStart = os.clock()
+    end
+end
+
 local function sha256(data)
     local len = #data
     data = data .. "\128" .. string.rep("\0", (55 - len) % 64) .. string.pack(">I8", len * 8)
@@ -81,9 +91,9 @@ local function sha256(data)
     local unpack = string.unpack
     local n = 0
     for chunk = 1, #data, 64 do
-        -- ~3 Mo/s en Lua pur : on rend la main au serveur tous les 16 Ko pour ne pas bloquer le tick
+        -- ~3 Mo/s en Lua pur : on regarde l'horloge tous les 1 Ko pour ne pas bloquer le tick
         n = n + 1
-        if Wait and (n & 255) == 0 then Wait(0) end
+        if (n & 15) == 0 then yieldIfNeeded() end
         for i = 0, 15 do w[i] = unpack(">I4", data, chunk + i * 4) end
         for i = 16, 63 do
             local w15, w2 = w[i - 15], w[i - 2]
@@ -292,6 +302,25 @@ local function fetchManifest(configured)
     return manifest
 end
 
+-- ── progression (la console FXServer n'a pas de barre animée : une ligne tous les 10 %) ──
+local progress = nil -- { label, done, total } pendant une vérification
+
+local function bar(done, total)
+    local pct = total > 0 and math.floor(done * 100 / total) or 100
+    local full = pct // 5
+    return ("[%s%s] %3d %%  (%d / %d)"):format(string.rep("#", full), string.rep("-", 20 - full), pct, done, total)
+end
+
+local function step(done, total)
+    if not progress then return end
+    progress.done = done
+    local tenth = total > 0 and (done * 10 // total) or 10
+    if tenth > progress.shown then
+        progress.shown = tenth
+        log(progress.label .. " " .. bar(done, total))
+    end
+end
+
 -- ── comparaison base installée / version publiée ──────────────────
 local function plan(manifest, state, root)
     local out = { download = {}, skipped = {}, deleted = {}, keep = {}, pendingNew = {}, unchanged = 0 }
@@ -303,10 +332,12 @@ local function plan(manifest, state, root)
     table.sort(rels)
 
     if not state then log("première vérification : calcul de l'empreinte de chaque fichier (" .. #rels .. "), cela peut prendre une à deux minutes…") end
+    progress = { label = "vérification", done = 0, total = #rels, shown = 0 }
+    log(("vérification de %d fichiers…"):format(#rels))
     for idx, rel in ipairs(rels) do
         -- 3 300 fichiers à vérifier : on rend la main au serveur régulièrement (pas de hitch)
-        if Wait and idx % 150 == 0 then Wait(0) end
-        if not state and idx % 500 == 0 then log(("vérification %d / %d…"):format(idx, #rels)) end
+        yieldIfNeeded()
+        step(idx, #rels)
         local safe = safeRel(rel)
         local base = safe and safe:match("([^/]+)$")
         if safe and not NEVER[base] then
@@ -349,6 +380,7 @@ local function plan(manifest, state, root)
 
     -- présents dans l'état installé, absents du manifest → supprimés par la mise à jour
     for rel, h in pairs(known) do
+        yieldIfNeeded()
         if not files[rel] then
             local safe = safeRel(rel)
             if safe and not isProtected(safe, manifest.protected) then
@@ -377,7 +409,10 @@ end
 -- ── commande ──────────────────────────────────────────────────────
 local busy = false
 local function command(args)
-    if busy then warn("une vérification est déjà en cours.") return end
+    if busy then
+        warn("une vérification est déjà en cours" .. (progress and (" : " .. bar(progress.done, progress.total)) or ".") .. " Patiente, le résultat s'affiche à la fin.")
+        return
+    end
     busy = true
     local ok, e = pcall(function()
         local mode = (args[1] or ""):lower()
@@ -424,6 +459,7 @@ local function command(args)
         end
     end)
     busy = false
+    progress = nil
     if not ok then err(tostring(e)) end
 end
 

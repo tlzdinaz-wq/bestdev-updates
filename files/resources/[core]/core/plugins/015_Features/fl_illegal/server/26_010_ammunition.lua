@@ -68,6 +68,7 @@ local function InvalidateItems()
 end
 
 IL.OnReady(function()
+    if DefaultShopPoints then DefaultShopPoints.Ensure("ammunition_shops") end
     LoadShops()
     LoadItems()
     Broadcast()

@@ -113,6 +113,7 @@ CreateThread(function()
         Wait(250)
         tries = tries + 1
     end
+    if DefaultShopPoints then DefaultShopPoints.Ensure("shops") end
     Cl.LoadShops()
 end)
 

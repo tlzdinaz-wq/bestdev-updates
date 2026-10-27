@@ -10,8 +10,12 @@ local EnableControlAction <const> = EnableControlAction
 VFW.Nui._hasFocus = false
 VFW.Nui._hasCursor = false -- Track cursor separately
 VFW.Nui._onExternalFocus = nil -- Callback appelé quand une UI externe prend le focus
+VFW.Nui._focusReleasedAt = 0 -- GetGameTimer() du dernier passage focus → sans focus (lu par VFW.Interact)
 local _originalSetNuiFocus = SetNuiFocus
 SetNuiFocus = function(hasFocus, hasCursor)
+    if VFW.Nui._hasFocus and not (hasFocus or hasCursor) then
+        VFW.Nui._focusReleasedAt = GetGameTimer()
+    end
     VFW.Nui._hasFocus = hasFocus or hasCursor
     VFW.Nui._hasCursor = hasCursor
     if hasFocus and VFW.Nui._onExternalFocus then
@@ -48,7 +52,6 @@ VFW.Nui.Close = function()
 end
 
 VFW.Nui.Focus = function(focus, keep)
-    VFW.Nui._hasFocus = focus
     SetNuiFocus(focus, focus)
     SetNuiFocusKeepInput(keep or false)
 end

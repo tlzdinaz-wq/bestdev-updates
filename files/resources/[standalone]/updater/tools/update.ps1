@@ -104,15 +104,35 @@ if (Test-Path -LiteralPath $stateFile) {
 
 function Sha256($path) { return (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLower() }
 
+# Barre de progression : barre de PowerShell en haut de la fenêtre + une ligne tous les 10 %
+$script:shownTenth = -1
+function Bar($done, $total) {
+    $pct = if ($total -gt 0) { [math]::Floor($done * 100 / $total) } else { 100 }
+    $full = [math]::Floor($pct / 5)
+    return ('[' + ('#' * $full) + ('-' * (20 - $full)) + ('] {0,3} %  ({1} / {2})' -f $pct, $done, $total))
+}
+# Téléchargement d'un fichier sans la barre propre à Invoke-WebRequest (elle cacherait la nôtre et ralentit PowerShell 5.1)
+function Fetch($uri, $out) {
+    $ProgressPreference = 'SilentlyContinue'
+    Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $out
+}
+function Step($activity, $done, $total, $detail) {
+    $pct = if ($total -gt 0) { [math]::Min(100, [math]::Floor($done * 100 / $total)) } else { 100 }
+    Write-Progress -Activity $activity -Status ("{0} %  —  {1} / {2}" -f $pct, $done, $total) -CurrentOperation $detail -PercentComplete $pct
+    $tenth = [math]::Floor($pct / 10)
+    if ($tenth -gt $script:shownTenth) { $script:shownTenth = $tenth; Info ("{0} {1}" -f $activity, (Bar $done $total)) }
+}
+
 # ── plan ───────────────────────────────────────────────────────
 $download = @(); $skipped = @(); $deleted = @(); $kept = @(); $same = @{}; $unchanged = 0
 $rels = $files.Keys | Sort-Object
 $firstRun = ($installed.Count -eq 0)
 if ($firstRun) { Info "première vérification : empreinte de chaque fichier ($($rels.Count)), patiente une à deux minutes…" }
 $i = 0
+$script:shownTenth = -1
 foreach ($rel in $rels) {
     $i++
-    if ($firstRun -and ($i % 500 -eq 0)) { Info "vérification $i / $($rels.Count)…" }
+    if ($i % 20 -eq 0 -or $i -eq $rels.Count) { Step 'vérification' $i $rels.Count $rel }
     $remote = $files[$rel]
     $abs = Join-Path $root ($rel -replace '/', '\')
     $exists = Test-Path -LiteralPath $abs -PathType Leaf
@@ -138,6 +158,7 @@ foreach ($rel in @($installed.Keys)) {
     if (-not (Test-Path -LiteralPath $abs -PathType Leaf)) { continue }
     if ($Force -or ((Sha256 $abs) -eq $installed[$rel])) { $deleted += $rel } else { $kept += $rel }
 }
+Write-Progress -Activity 'vérification' -Completed
 
 $totalBytes = ($download | ForEach-Object { $_.s } | Measure-Object -Sum).Sum
 if (-not $totalBytes) { $totalBytes = 0 }
@@ -163,13 +184,17 @@ $backupRoot = Join-Path $updaterDir ("backup\" + ($remoteVersion -replace '[^\w.
 $newState = @{}; foreach ($k in $installed.Keys) { $newState[$k] = $installed[$k] }
 $errors = 0; $touched = @{}
 $n = 0
+$bytesDone = 0
+$script:shownTenth = -1
 foreach ($d in $download) {
     $n++
+    Step 'téléchargement' $n $download.Count ("{0}  —  {1:N1} / {2:N1} Mo" -f $d.rel, ($bytesDone / 1MB), ($totalBytes / 1MB))
+    $bytesDone += [double]$d.s
     $abs = Join-Path $root ($d.rel -replace '/', '\')
     $tmpN++; $tmp = Join-Path $tmpDir "$tmpN.tmp"
     try {
         [IO.Directory]::CreateDirectory((Split-Path -Parent $abs)) | Out-Null
-        Invoke-WebRequest -UseBasicParsing -Uri (Get-Remote $d.rel) -OutFile $tmp
+        Fetch (Get-Remote $d.rel) $tmp
         if ((Sha256 $tmp) -ne $d.h) { throw "hash différent après téléchargement" }
         if ($d.existed) {
             $bak = Join-Path $backupRoot ($d.rel -replace '/', '\')
@@ -180,17 +205,17 @@ foreach ($d in $download) {
         [IO.File]::Delete($tmp)
         $newState[$d.rel] = $d.h
         $m = [regex]::Match($d.rel, '^resources/(?:\[[^\]]+\]/)*([^/\[]+)/'); if ($m.Success) { $touched[$m.Groups[1].Value] = $true }
-        if ($n % 25 -eq 0) { Info "$n / $($download.Count) fichiers…" }
     } catch {
         $errors++
         Fail ("échec : {0} — {1}" -f $d.rel, $_.Exception.Message)
         if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
     }
 }
+Write-Progress -Activity 'téléchargement' -Completed
 foreach ($s in $skipped) {
     $abs = Join-Path $root ($s.rel -replace '/', '\')
     $tmpN++; $tmp = Join-Path $tmpDir "$tmpN.tmp"
-    try { Invoke-WebRequest -UseBasicParsing -Uri (Get-Remote $s.rel) -OutFile $tmp; [IO.File]::Copy($tmp, "$abs.new", $true); [IO.File]::Delete($tmp); Warn ("{0} : {1} → nouvelle version dans {0}.new" -f $s.rel, $s.reason) }
+    try { Fetch (Get-Remote $s.rel) $tmp; [IO.File]::Copy($tmp, "$abs.new", $true); [IO.File]::Delete($tmp); Warn ("{0} : {1} → nouvelle version dans {0}.new" -f $s.rel, $s.reason) }
     catch { $errors++; Fail ("échec (.new) : {0} — {1}" -f $s.rel, $_.Exception.Message) }
 }
 foreach ($rel in $deleted) {
