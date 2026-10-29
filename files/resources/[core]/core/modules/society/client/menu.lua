@@ -1448,7 +1448,7 @@ local function renderJobMenu()
         end
 
         -- Invoices Button (EMS jobs open MDT instead)
-        if jobName == "sams_pib" or jobName == "sams_pab" then
+        if SN_SAMS.IsSamsJob(jobName) then
             main.Button("Faire une Facture", "Ouvre le MDT Médical", nil, "chevron", false, function()
                 main.close()
                 SN_SAMS.OpenMDT()
@@ -1513,7 +1513,7 @@ local function renderJobMenu()
         end
 
         -- SAMS MDT
-        if VFW.PlayerData.job.name == "sams_pib" or VFW.PlayerData.job.name == "sams_pab" then
+        if SN_SAMS.IsSamsJob(VFW.PlayerData.job.name) then
             main.Button(MENTA_SERVER == "FR" and "Actions Secours" or "Actions EMS", "Soigner, inspecter, réanimer, backup", nil, "chevron", false, function()
             end, samsActionsSubMenu)
 

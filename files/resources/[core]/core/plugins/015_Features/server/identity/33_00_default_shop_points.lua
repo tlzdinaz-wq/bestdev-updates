@@ -2,8 +2,8 @@
     Points de magasins livrés avec la base : Ammu-Nation, superettes (24/7, LTD, Rob's Liquor),
     magasins de vêtements, coiffeurs et tatoueurs, aux emplacements d'origine de GTA.
 
-    Posés UNE SEULE FOIS par serveur, et seulement si la table de ce type de magasin est vide :
-      - un serveur qui a déjà ses magasins n'est jamais modifié ;
+    Posés UNE SEULE FOIS par serveur, et seulement là où il n'y a pas déjà un magasin du même type (25 m) :
+      - un magasin déjà réglé à cet endroit n'est jamais modifié ni doublé ;
       - si le staff supprime ensuite tous les points, ils ne reviennent pas au redémarrage
         (table `default_seeds`).
     Les positions sont celles du joueur debout à l'endroit (comme un point posé avec les builders) ;
@@ -103,50 +103,99 @@ local function ensureSeedTable()
     return tableReady
 end
 
+-- Un point par défaut n'est pas posé s'il existe déjà un magasin du même type à moins de NEAR mètres
+-- (points de test, magasin déjà réglé par le staff, ou point posé par une version précédente).
+local NEAR = 25.0
+
+local function query(q, params)
+    local ok, res = pcall(MySQL.query.await, q, params or {})
+    if not ok then console.warn(("[default_shop_points] %s"):format(tostring(res))) return nil end
+    return res or {}
+end
+
+local function near(list, p)
+    for i = 1, #list do
+        local e = list[i]
+        local dx, dy = (tonumber(e.x) or 0) - p.x, (tonumber(e.y) or 0) - p.y
+        if dx * dx + dy * dy < NEAR * NEAR then return true end
+    end
+    return false
+end
+
+-- Chaque seeder lit les magasins existants puis ajoute les points par défaut absents. Renvoie le nombre ajouté, ou nil si la table est illisible.
 local SEEDERS = {
     ammunition_shops = function()
+        local rows = query("SELECT pos_x AS x, pos_y AS y FROM ammunition_shops UNION ALL SELECT npc_x, npc_y FROM ammunition_shops")
+        if not rows then return nil end
+        local n = 0
         for _, s in ipairs(AMMUNATION) do
             local p = s[2]
-            exec([[INSERT INTO ammunition_shops (name, pos_x, pos_y, pos_z, pos_h, npc_x, npc_y, npc_z, npc_h, npc_model, active, blip_enabled)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 's_m_y_ammucity_01', 1, 1)]], { s[1], p.x, p.y, p.z, p.h, p.x, p.y, p.z, p.h })
+            if not near(rows, p) then
+                exec([[INSERT INTO ammunition_shops (name, pos_x, pos_y, pos_z, pos_h, npc_x, npc_y, npc_z, npc_h, npc_model, active, blip_enabled)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 's_m_y_ammucity_01', 1, 1)]], { s[1], p.x, p.y, p.z, p.h, p.x, p.y, p.z, p.h })
+                n = n + 1
+            end
         end
-        return #AMMUNATION
+        return n
     end,
     supermarkets = function()
+        local rows = query("SELECT pos_x AS x, pos_y AS y FROM supermarkets UNION ALL SELECT apu_x, apu_y FROM supermarkets")
+        if not rows then return nil end
+        local n = 0
         for _, s in ipairs(SUPERMARKETS) do
             local p = s[2]
-            exec([[INSERT INTO supermarkets (name, store_type, pos_x, pos_y, pos_z, apu_x, apu_y, apu_z, apu_h,
-                    safe_x, safe_y, safe_z, safe_h, zone_radius, active, blip_enabled, can_rob)
-                VALUES (?, 'automatic', ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 2.0, 1, 1, 0)]], { s[1], p.x, p.y, p.z, p.x, p.y, p.z, p.h })
+            if not near(rows, p) then
+                exec([[INSERT INTO supermarkets (name, store_type, pos_x, pos_y, pos_z, apu_x, apu_y, apu_z, apu_h,
+                        safe_x, safe_y, safe_z, safe_h, zone_radius, active, blip_enabled, can_rob)
+                    VALUES (?, 'automatic', ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 2.0, 1, 1, 0)]], { s[1], p.x, p.y, p.z, p.x, p.y, p.z, p.h })
+                n = n + 1
+            end
         end
-        return #SUPERMARKETS
+        return n
     end,
     shops = function()
+        local rows = query("SELECT type, position FROM shops")
+        if not rows then return nil end
+        local byType = {}
+        for _, r in ipairs(rows) do
+            local ok, pos = pcall(json.decode, r.position or "")
+            if ok and type(pos) == "table" then
+                byType[r.type] = byType[r.type] or {}
+                byType[r.type][#byType[r.type] + 1] = pos
+            end
+        end
         local n = 0
         for shopType, def in pairs(SHOPS) do
+            local existing = byType[shopType] or {}
             for _, p in ipairs(def.points) do
-                exec("INSERT INTO shops (type, position, blip, blip_color, price_multiplier, chairs) VALUES (?, ?, ?, ?, 1, '[]')",
-                    { shopType, json.encode({ x = p.x, y = p.y, z = p.z, heading = p.h }), def.blip, def.color })
-                n = n + 1
+                if not near(existing, p) then
+                    exec("INSERT INTO shops (type, position, blip, blip_color, price_multiplier, chairs) VALUES (?, ?, ?, ?, 1, '[]')",
+                        { shopType, json.encode({ x = p.x, y = p.y, z = p.z, heading = p.h }), def.blip, def.color })
+                    n = n + 1
+                end
             end
         end
         return n
     end,
 }
 
---- Pose les points par défaut d'une table s'ils n'ont jamais été posés et que la table est vide.
+-- v2 : la v1 (1.12.80) ne posait rien dans une table qui contenait déjà un point, même de test ;
+-- la v2 repasse une fois partout et complète ce qui manque.
+local SEED_VERSION = "v2"
+
+--- Ajoute une seule fois les points par défaut qui manquent dans une table de magasins.
 --- Appelé par chaque système juste avant de charger ses magasins.
 ---@param tableName "ammunition_shops"|"supermarkets"|"shops"
 function DefaultShopPoints.Ensure(tableName)
     local seeder = SEEDERS[tableName]
     if not seeder or not ensureSeedTable() then return end
-    if scalar("SELECT 1 FROM default_seeds WHERE name = ?", { tableName }) then return end
+    local key = tableName .. ":" .. SEED_VERSION
+    if scalar("SELECT 1 FROM default_seeds WHERE name = ?", { key }) then return end
 
-    local count = scalar(("SELECT COUNT(*) FROM `%s`"):format(tableName))
-    if count == nil then return end -- table absente : on réessaiera au prochain démarrage
-    if tonumber(count) == 0 then
-        local added = seeder()
+    local added = seeder()
+    if added == nil then return end -- table absente : on réessaiera au prochain démarrage
+    if added > 0 then
         console.success(("[default_shop_points] %d point(s) par défaut ajouté(s) dans %s."):format(added, tableName))
     end
-    exec("INSERT IGNORE INTO default_seeds (name) VALUES (?)", { tableName })
+    exec("INSERT IGNORE INTO default_seeds (name) VALUES (?)", { key })
 end

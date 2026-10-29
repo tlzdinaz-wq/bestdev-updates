@@ -80,6 +80,8 @@ local function normalize(row)
         job = row.job or "",
         concessType = JC.Int(row.concess_type, 1, 3) or 1,
         automatic = row.automatic == 1 or row.automatic == true,
+        -- PNJ vendeur : oui par défaut (concessionnaires créés avant ce réglage)
+        npc = row.ped_enabled == nil or JC.Bool(row.ped_enabled),
         pedModel = JC.Str(row.ped_model, 64) or Concess.DefaultPed,
         catalog = decodePoints(row.catalog, true),
         preview = decodePoints(row.preview, true),
@@ -97,6 +99,7 @@ local function serializeEntry(entry)
         job = entry.job,
         concessType = entry.concessType,
         automatic = entry.automatic == true,
+        npc = entry.npc ~= false,
         pedModel = entry.pedModel,
         catalog = entry.catalog or {},
         preview = entry.preview or {},
@@ -145,6 +148,7 @@ local function loadPointsFile()
                 job = row.job,
                 concess_type = row.concessType or row.concess_type,
                 automatic = row.automatic and 1 or 0,
+                ped_enabled = row.npc == false and 0 or 1,
                 ped_model = row.pedModel or row.ped_model,
                 catalog = row.catalog,
                 preview = row.preview,
@@ -165,14 +169,15 @@ local function restoreEntryToDb(entry)
         return
     end
     JC.Insert([[
-        INSERT INTO concess (id, name, job, concess_type, automatic, ped_model, catalog, preview, spawn, showcase)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO concess (id, name, job, concess_type, automatic, ped_enabled, ped_model, catalog, preview, spawn, showcase)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ]], {
         entry.id,
         entry.name,
         entry.job or "",
         entry.concessType or 1,
         entry.automatic and 1 or 0,
+        entry.npc == false and 0 or 1,
         entry.pedModel or Concess.DefaultPed,
         JC.Encode(entry.catalog) or "[]",
         JC.Encode(entry.preview) or "[]",
@@ -191,7 +196,26 @@ end
 ---
 --- Maintenant le fichier n'est qu'une sauvegarde : on l'ecrit, et on ne le relit que pour
 --- remplir une base completement vide. Il ne supprime ni ne modifie jamais rien.
+-- La colonne « ped_enabled » (PNJ vendeur oui / non) manque aux bases créées avant ce réglage :
+-- on la crée une fois (« ADD COLUMN IF NOT EXISTS » n'existe pas sur MySQL, on regarde le schéma).
+local pedColumnChecked = false
+
+local function ensurePedColumn()
+    if pedColumnChecked then return end
+    pedColumnChecked = true
+
+    local exists = JC.Scalar([[
+        SELECT COUNT(*) FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'concess' AND COLUMN_NAME = 'ped_enabled'
+    ]], {}, 0)
+
+    if (tonumber(exists) or 0) == 0 then
+        JC.Exec("ALTER TABLE concess ADD COLUMN `ped_enabled` TINYINT(1) NOT NULL DEFAULT 1", {})
+    end
+end
+
 function Concess.Load()
+    ensurePedColumn()
     local rows = JC.Query("SELECT * FROM concess ORDER BY id ASC")
     local out = {}
     for i = 1, #rows do
@@ -311,17 +335,20 @@ function Concess.Ensure(jobName)
     local showcase = decodeShowcase(custom.showcase or {})
     local label = (society and society.label) or (job and job.label) or jobName
     local concessType = JC.Int(custom.concessType, 1, 3) or 1
-    local automatic = custom.automatic == true
+    local npc = custom.npc ~= false
+    local automatic = npc and custom.automatic == true
     local pedModel = JC.Str(custom.pedModel, 64) or Concess.DefaultPed
 
+    ensurePedColumn()
     local insertId = JC.Insert([[
-        INSERT INTO concess (name, job, concess_type, automatic, ped_model, catalog, preview, spawn, showcase)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO concess (name, job, concess_type, automatic, ped_enabled, ped_model, catalog, preview, spawn, showcase)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ]], {
         label,
         jobName,
         concessType,
         automatic and 1 or 0,
+        npc and 1 or 0,
         pedModel,
         JC.Encode(catalog) or "[]",
         JC.Encode(preview) or "[]",
@@ -501,6 +528,7 @@ function Concess.Payload(entry)
         job = entry.job,
         concessType = entry.concessType,
         automatic = entry.automatic,
+        npc = entry.npc ~= false,
         pedModel = entry.pedModel,
         catalog = entry.catalog,
         preview = entry.preview,
@@ -511,8 +539,9 @@ end
 
 function Concess.Persist(entry)
     if not entry or not entry.id then return end
+    ensurePedColumn()
     JC.Exec([[
-        UPDATE concess SET name = ?, job = ?, concess_type = ?, automatic = ?, ped_model = ?,
+        UPDATE concess SET name = ?, job = ?, concess_type = ?, automatic = ?, ped_enabled = ?, ped_model = ?,
             catalog = ?, preview = ?, spawn = ?, showcase = ?
         WHERE id = ?
     ]], {
@@ -520,6 +549,7 @@ function Concess.Persist(entry)
         entry.job,
         entry.concessType,
         entry.automatic and 1 or 0,
+        entry.npc == false and 0 or 1,
         entry.pedModel,
         JC.Encode(entry.catalog),
         JC.Encode(entry.preview),

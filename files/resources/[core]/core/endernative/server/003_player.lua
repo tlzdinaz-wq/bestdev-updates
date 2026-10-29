@@ -79,6 +79,67 @@ function VFW.CreateExtendedPlayer(source, row, account)
         TriggerClientEvent(event, self.source, ...)
     end
 
+    -- ── Liquide ──────────────────────────────────────────────────
+    -- Le liquide est l'objet « money » de l'inventaire : celui que montrent l'inventaire, la banque et le
+    -- HUD. Le compte « money » n'en est qu'une vue : getAccount, setAccountMoney, addAccountMoney,
+    -- removeAccountMoney et getMoney lisent et écrivent cet objet, si bien que tous les achats paient avec
+    -- l'argent que le joueur voit. Avant, les magasins lisaient le compte (0 $) pendant que l'argent retiré
+    -- à la banque était un objet : « vous n'avez pas assez d'argent » avec 4500 $ dans le sac.
+    -- Ce que le compte garde en base reste à 0 (rien n'est compté deux fois) ; un ancien solde est versé
+    -- dans l'inventaire au chargement du personnage (foldStoredCash).
+    local CASH = "money"
+
+    local function cashInInventory()
+        local total = 0
+        for i = 1, #self.inventory do
+            local entry = self.inventory[i]
+            if entry.name == CASH then total = total + (tonumber(entry.count) or 0) end
+        end
+        return total
+    end
+
+    local function cashTotal()
+        local stored = findAccount(self.accounts, CASH)
+        return cashInInventory() + math.max(0, tonumber(stored and stored.money) or 0)
+    end
+
+    local function cashAccount()
+        local stored = findAccount(self.accounts, CASH)
+        return {
+            name = CASH,
+            money = cashTotal(),
+            label = stored and stored.label or "Espèces",
+            round = stored == nil or stored.round ~= false,
+        }
+    end
+
+    local function accountsForClient()
+        local list = {}
+        for i = 1, #self.accounts do
+            list[i] = self.accounts[i].name == CASH and cashAccount() or self.accounts[i]
+        end
+        return list
+    end
+
+    --- Verse dans l'inventaire un solde resté dans le compte, sans événement (appelé au chargement).
+    local function foldStoredCash()
+        local stored = findAccount(self.accounts, CASH)
+        local amount = math.floor(tonumber(stored and stored.money) or 0)
+        if not stored or amount <= 0 then return end
+        if not (VFW.Items and VFW.Items[CASH]) then return end -- objet inconnu : le solde reste dans le compte
+
+        for i = 1, #self.inventory do
+            if self.inventory[i].name == CASH then
+                self.inventory[i].count = (tonumber(self.inventory[i].count) or 0) + amount
+                stored.money = 0
+                return
+            end
+        end
+
+        self.inventory[#self.inventory + 1] = { name = CASH, count = amount }
+        stored.money = 0
+    end
+
     function self.triggerEvent(event, ...)
         push(event, ...)
     end
@@ -107,7 +168,7 @@ function VFW.CreateExtendedPlayer(source, row, account)
             mugshot = self.mugshot,
             skin = self.skin,
             tattoos = self.tattoos,
-            accounts = self.accounts,
+            accounts = accountsForClient(),
             inventory = self.inventory,
             loadout = self.loadout,
             licenses = self.licenses,
@@ -203,12 +264,42 @@ function VFW.CreateExtendedPlayer(source, row, account)
     end
 
     function self.getAccount(name)
+        if name == CASH then return cashAccount() end
         return (findAccount(self.accounts, name))
     end
 
     function self.setAccountMoney(name, money, reason)
         money = math.floor(money + 0.5)
         if money < 0 then money = 0 end
+
+        if name == CASH then
+            local stored = ensureAccount(self.accounts, CASH)
+            local current = cashTotal()
+
+            if money > current then
+                local added = money - current
+                if not self.addInventoryItem(CASH, added, nil, false) then
+                    stored.money = (tonumber(stored.money) or 0) + added -- objet inconnu : le compte garde la différence
+                end
+            elseif money < current then
+                -- d'abord l'éventuel solde de l'ancien compte, puis l'inventaire, pile après pile
+                local missing = current - money
+                local fromStored = math.min(math.max(0, tonumber(stored.money) or 0), missing)
+                stored.money = (tonumber(stored.money) or 0) - fromStored
+                missing = missing - fromStored
+
+                while missing > 0 do
+                    local item = self.getInventoryItem(CASH)
+                    local take = item and math.min(tonumber(item.count) or 0, missing) or 0
+                    if take <= 0 or not self.removeInventoryItem(CASH, take, nil, false) then break end
+                    missing = missing - take
+                end
+            end
+
+            push("vfw:setAccountMoney", cashAccount())
+            TriggerEvent("vfw:setAccountMoney", self.source, name, cashTotal(), reason)
+            return
+        end
 
         local account = ensureAccount(self.accounts, name)
 
@@ -219,20 +310,21 @@ function VFW.CreateExtendedPlayer(source, row, account)
 
     function self.addAccountMoney(name, money, reason)
         if money <= 0 then return end
+        if name == CASH then return self.setAccountMoney(name, cashTotal() + money, reason) end
         local account = ensureAccount(self.accounts, name)
         self.setAccountMoney(name, account.money + money, reason)
     end
 
     function self.removeAccountMoney(name, money, reason)
         if money <= 0 then return end
+        if name == CASH then return self.setAccountMoney(name, cashTotal() - money, reason) end
         local account = findAccount(self.accounts, name)
         if not account then return end
         self.setAccountMoney(name, account.money - money, reason)
     end
 
     function self.getMoney()
-        local account = findAccount(self.accounts, "money")
-        return account and account.money or 0
+        return cashTotal()
     end
 
     function self.getInventoryItem(name)
@@ -499,6 +591,8 @@ function VFW.CreateExtendedPlayer(source, row, account)
         self.updateCoords()
         VFW.DB.SaveCharacter(self)
     end
+
+    foldStoredCash()
 
     return self
 end

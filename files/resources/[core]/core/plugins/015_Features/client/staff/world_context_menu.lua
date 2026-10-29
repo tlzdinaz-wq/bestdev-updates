@@ -338,8 +338,8 @@ end, function(_, worldPosition)
         end
 
         local plate = "ADM" .. math.random(10000, 99999)
+        -- le serveur confirme lui-même (« Véhicule enregistré au nom de … ») ou explique le refus
         TriggerServerEvent("vfw:staff:giveCar", tonumber(playerId), vehicle, plate, GetMakeNameFromVehicleModel(GetHashKey(vehicle)))
-        VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Menu Monde', message = 'Véhicule définitif donné au joueur #' .. playerId .. '.' })
     end)
 end, {}, spawnSubmenu)
 

@@ -1096,7 +1096,7 @@ local jobContext = VFW.ContextAddSubmenu("ped", " Action Métier", function(ped)
         return false
     end
     -- Exclure les jobs SAMS/LSFD (gérés par sn_sams)
-    if VFW.PlayerData.job and (VFW.PlayerData.job.name == "sams_pib" or VFW.PlayerData.job.name == "sams_pab") then
+    if VFW.PlayerData.job and SN_SAMS.IsSamsJob(VFW.PlayerData.job.name) then
         return false
     end
     -- Exclure les jobs police et milice (gérés par le context menu police)

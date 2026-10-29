@@ -1371,10 +1371,12 @@ end
 local function renderVisualOptionsMenu()
     visualOptionsMenu.Separator("Thème HUD")
 
-    local themeNames = { "Neon", "Minimal", "Cercles", "Cercles Vertical" }
-    local themeValues = { "neon", "minimal", "circles", "circles-v" }
+    -- Trois modèles (skin/status-hud.css) : Cristal (capsules), Orbes (sphères), Pulse (filets).
+    local themeNames = { "Cristal", "Orbes", "Pulse" }
+    local themeValues = { "neon", "circles", "minimal" }
     local currentThemeIndex = 1
     local savedTheme = GetResourceKvpString("hud_theme") or "neon"
+    if savedTheme == "circles-v" then savedTheme = "circles" end -- l'ancien thème vertical n'existe plus
    for i, v in ipairs(themeValues) do
         if v == savedTheme then currentThemeIndex = i break end
     end

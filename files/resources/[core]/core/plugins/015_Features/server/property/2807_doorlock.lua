@@ -191,16 +191,35 @@ RegisterNetEvent("doorlock:server:update", function(doorlockId, label, maxIntera
     TriggerClientEvent("doorlock:client:update", -1, PS.BuildDoorlockPayload(dl))
 end)
 
-RegisterNetEvent("doorlock:server:delete", function(doorlockId)
-    local source = source
-    if not requireDoorlockAdmin(source) then return end
-
+--- Supprime un doorlock (base + clients). Rend vrai s'il existait.
+function PS.DeleteDoorlock(doorlockId)
     local id = PS.ToInt(doorlockId)
-    if not id or not PS.Doorlocks[id] then return end
+    if not id or not PS.Doorlocks[id] then return false end
 
     PS.Doorlocks[id] = nil
     MySQL.update.await("DELETE FROM doorlocks WHERE id = ?", { id })
     TriggerClientEvent("doorlock:client:delete", -1, id)
+    return true
+end
+
+--- Après la suppression de chambres de motel : supprime leurs doorlocks qu'aucune autre chambre n'utilise.
+--- À appeler une fois PS.Rooms rechargé (PS.LoadMotels).
+---@param doorlockIds integer[]
+---@return integer removed
+function PS.DeleteOrphanMotelDoorlocks(doorlockIds)
+    local removed = 0
+    for _, dlId in ipairs(doorlockIds or {}) do
+        if not PS.IsMotelDoorlock(dlId) and PS.DeleteDoorlock(dlId) then
+            removed = removed + 1
+        end
+    end
+    return removed
+end
+
+RegisterNetEvent("doorlock:server:delete", function(doorlockId)
+    local source = source
+    if not requireDoorlockAdmin(source) then return end
+    PS.DeleteDoorlock(doorlockId)
 end)
 
 RegisterNetEvent("doorlock:server:toggleDoor", function(newState, doorlockId, access, pincode)
@@ -308,4 +327,18 @@ end)
 
 MySQL.ready(function()
     PS.LoadDoorlocks()
+
+    -- Portes laissées par des motels / chambres supprimés avant que la suppression ne retire leurs doorlocks :
+    -- un doorlock « Motel - … » qu'aucune chambre n'utilise est un reste, on le retire.
+    if PS.LoadMotels then pcall(PS.LoadMotels) end
+    if not PS.Rooms then return end
+    local removed = 0
+    for id, dl in pairs(PS.Doorlocks or {}) do
+        if type(dl.label) == "string" and dl.label:sub(1, 8) == "Motel - " and not PS.IsMotelDoorlock(id) then
+            if PS.DeleteDoorlock(id) then removed = removed + 1 end
+        end
+    end
+    if removed > 0 then
+        console.warn(("[Doorlock] %d porte(s) de motel supprimé(s) retirée(s)."):format(removed))
+    end
 end)

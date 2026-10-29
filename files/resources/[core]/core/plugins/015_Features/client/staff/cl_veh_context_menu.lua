@@ -404,11 +404,29 @@ end, function(vehicle)
 
         local props = VFW.Game.GetVehicleProperties(vehicle)
 
+        -- Nom de spawn du modèle : nécessaire si le véhicule n'est pas encore en base (véhicule de spawn), le serveur
+        -- l'enregistre alors au nom du joueur. GetDisplayNameFromVehicleModel peut différer pour les add-ons.
+        local modelHash = GetEntityModel(vehicle)
+        local model = string.lower(GetDisplayNameFromVehicleModel(modelHash))
+        if GetHashKey(model) ~= modelHash then model = nil end
+
         local result = TriggerServerCallback("vfw:action:run", {
             action = "vehicle:give",
             ent = { netId = netId, entType = 2 },
-            extra = { targetId = tonumber(targetId), props = props }
+            extra = { targetId = tonumber(targetId), props = props, model = model,
+                      label = GetLabelText(GetDisplayNameFromVehicleModel(modelHash)) }
         })
+
+        if result and not result.ok and result.err == "Le nom de modèle de ce véhicule est introuvable" then
+            local typed = VFW.Nui.KeyboardInput(true, "Nom de spawn du véhicule (ex: gbsultanrsx)", "", 40)
+            if typed and typed ~= "" and typed ~= "KBD_CANCEL" then
+                result = TriggerServerCallback("vfw:action:run", {
+                    action = "vehicle:give",
+                    ent = { netId = netId, entType = 2 },
+                    extra = { targetId = tonumber(targetId), props = props, model = string.lower(typed) }
+                })
+            end
+        end
 
         if result and result.ok then
             VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Gestion Véhicules', message = (result.msg or "Véhicule transféré") .. "." })

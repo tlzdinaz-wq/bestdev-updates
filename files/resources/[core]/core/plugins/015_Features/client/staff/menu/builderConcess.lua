@@ -31,6 +31,7 @@ local tNewConcess = {
     name = "",
     job = "",
     concessType = 1,
+    npc = true,
     automatic = false,
     pedModel = "a_m_y_business_01",
     catalog = {},
@@ -177,6 +178,7 @@ local function fcResetNewConcess()
         name = "",
         job = "",
         concessType = 1,
+        npc = true,
         automatic = false,
         pedModel = "a_m_y_business_01",
         catalog = {},
@@ -250,11 +252,20 @@ ConcessCreate.OnOpen(function()
         tNewConcess.concessType = index
     end)
 
-    ConcessCreate.Checkbox(":robot: MODE AUTO PERMANENT", "PED toujours présent (pas besoin d'employés)", false, tNewConcess.automatic, function(checked)
-        tNewConcess.automatic = checked == true
-        if tNewConcess.automatic then tNewConcess.job = "" end
+    ConcessCreate.Checkbox(":user: PNJ VENDEUR", "Coché : un PNJ tient le catalogue. Décoché : aucun PNJ, jamais (même sans employé en service)", false, tNewConcess.npc, function(checked)
+        tNewConcess.npc = checked == true
+        if not tNewConcess.npc then tNewConcess.automatic = false end
         fcRefresh(ConcessCreate)
     end)
+
+    -- Le mode auto (PNJ toujours là, sans employés) n'existe qu'avec un PNJ
+    if tNewConcess.npc then
+        ConcessCreate.Checkbox(":robot: MODE AUTO PERMANENT", "PED toujours présent (pas besoin d'employés)", false, tNewConcess.automatic, function(checked)
+            tNewConcess.automatic = checked == true
+            if tNewConcess.automatic then tNewConcess.job = "" end
+            fcRefresh(ConcessCreate)
+        end)
+    end
 
     fcAddJobList(ConcessCreate,
         function() return tNewConcess.job end,
@@ -262,12 +273,14 @@ ConcessCreate.OnOpen(function()
         function(job) tNewConcess.job = job end
     )
 
-    ConcessCreate.Button(":user: MODÈLE PED", tNewConcess.pedModel, nil, "chevron", false, function()
-        fcAskText("Modèle du PED", tNewConcess.pedModel, function(sInput)
-            tNewConcess.pedModel = sInput
-            fcRefresh(ConcessCreate)
+    if tNewConcess.npc then
+        ConcessCreate.Button(":user: MODÈLE PED", tNewConcess.pedModel, nil, "chevron", false, function()
+            fcAskText("Modèle du PED", tNewConcess.pedModel, function(sInput)
+                tNewConcess.pedModel = sInput
+                fcRefresh(ConcessCreate)
+            end)
         end)
-    end)
+    end
 
     ConcessCreate.Separator(":pin: POINTS CATALOGUE")
 
@@ -397,11 +410,20 @@ ConcessEdit.OnOpen(function()
         tSelectedConcess.concessType = index
     end)
 
-    ConcessEdit.Checkbox(":robot: MODE AUTO PERMANENT", "PED toujours présent (pas besoin d'employés)", false, tSelectedConcess.automatic or false, function(checked)
-        tSelectedConcess.automatic = checked == true
-        if tSelectedConcess.automatic then tSelectedConcess.job = "" end
+    ConcessEdit.Checkbox(":user: PNJ VENDEUR", "Coché : un PNJ tient le catalogue. Décoché : aucun PNJ, jamais (même sans employé en service)", false, tSelectedConcess.npc ~= false, function(checked)
+        tSelectedConcess.npc = checked == true
+        if not tSelectedConcess.npc then tSelectedConcess.automatic = false end
         fcRefresh(ConcessEdit)
     end)
+
+    -- Le mode auto (PNJ toujours là, sans employés) n'existe qu'avec un PNJ
+    if tSelectedConcess.npc ~= false then
+        ConcessEdit.Checkbox(":robot: MODE AUTO PERMANENT", "PED toujours présent (pas besoin d'employés)", false, tSelectedConcess.automatic or false, function(checked)
+            tSelectedConcess.automatic = checked == true
+            if tSelectedConcess.automatic then tSelectedConcess.job = "" end
+            fcRefresh(ConcessEdit)
+        end)
+    end
 
     fcAddJobList(ConcessEdit,
         function() return tSelectedConcess.job end,
@@ -409,12 +431,14 @@ ConcessEdit.OnOpen(function()
         function(job) tSelectedConcess.job = job end
     )
 
-    ConcessEdit.Button(":user: MODÈLE PED", tSelectedConcess.pedModel or "a_m_y_business_01", nil, "chevron", false, function()
-        fcAskText("Modèle du PED", tSelectedConcess.pedModel or "", function(sInput)
-            tSelectedConcess.pedModel = sInput
-            fcRefresh(ConcessEdit)
+    if tSelectedConcess.npc ~= false then
+        ConcessEdit.Button(":user: MODÈLE PED", tSelectedConcess.pedModel or "a_m_y_business_01", nil, "chevron", false, function()
+            fcAskText("Modèle du PED", tSelectedConcess.pedModel or "", function(sInput)
+                tSelectedConcess.pedModel = sInput
+                fcRefresh(ConcessEdit)
+            end)
         end)
-    end)
+    end
 
     ConcessEdit.Separator(":pin: POINTS CATALOGUE")
 

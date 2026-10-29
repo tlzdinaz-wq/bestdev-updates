@@ -918,8 +918,12 @@ RegisterNetEvent("motel:server:admin:deleteMotel", function(motelId)
     local motel = PS.Motels[PS.ToInt(motelId) or 0]
     if not motel then return end
 
+    local doorlockIds = {}
     for i = 1, #motel.rooms do
         MySQL.update.await("DELETE FROM motel_rentals WHERE room_id = ?", { motel.rooms[i].id })
+        for _, dlId in ipairs(motel.rooms[i].doorlockIds or {}) do
+            doorlockIds[#doorlockIds + 1] = dlId
+        end
     end
 
     MySQL.update.await("DELETE FROM motel_rooms WHERE motel_id = ?", { motel.id })
@@ -927,6 +931,8 @@ RegisterNetEvent("motel:server:admin:deleteMotel", function(motelId)
 
     PS.MotelLog(motel.id, nil, nil, "admin_delete", xPlayer.name, motel.name)
     PS.LoadMotels()
+    -- les portes des chambres restaient verrouillées sur la carte après la suppression du motel
+    if PS.DeleteOrphanMotelDoorlocks then PS.DeleteOrphanMotelDoorlocks(doorlockIds) end
     TriggerClientEvent("motel:client:motelDeleted", -1, motel.id)
 end)
 
@@ -1025,6 +1031,7 @@ RegisterNetEvent("motel:server:admin:removeRoom", function(roomId)
 
     local doorlockIds = room.doorlockIds
     PS.LoadMotels()
+    if PS.DeleteOrphanMotelDoorlocks then PS.DeleteOrphanMotelDoorlocks(doorlockIds) end
     TriggerClientEvent("motel:client:roomRemoved", -1, room.motelId, room.id, doorlockIds)
 end)
 

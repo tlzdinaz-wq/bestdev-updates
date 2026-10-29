@@ -31,11 +31,20 @@ local function buildSelectionEntry(row)
     local job = VFW.DB.BuildJob(row.job, row.job_grade)
     local faction = row.job2 ~= "" and VFW.DB.BuildJob(row.job2, row.job2_grade) or nil
 
+    -- Le liquide est l'objet « money » de l'inventaire ; un ancien solde du compte « money » s'y ajoute.
     local cash = 0
     for i = 1, #row.accounts do
         if row.accounts[i].name == "money" then
-            cash = row.accounts[i].money
+            cash = tonumber(row.accounts[i].money) or 0
             break
+        end
+    end
+    if type(row.inventory) == "table" then
+        for i = 1, #row.inventory do
+            local entry = row.inventory[i]
+            if type(entry) == "table" and entry.name == "money" then
+                cash = cash + (tonumber(entry.count) or 0)
+            end
         end
     end
 

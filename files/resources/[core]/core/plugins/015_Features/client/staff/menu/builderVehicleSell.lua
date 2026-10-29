@@ -154,7 +154,12 @@ StaffMenu.builderVehicleSell.OnOpen(function()
     StaffMenu.builderVehicleSell.Separator("VENTE VEHICULES")
 
     StaffMenu.builderVehicleSell.Button("Creer un point de vente", "Ajouter un nouveau point de vente", nil, "chevron", false, function()
-        newLocationData = getDefaultConfig()
+        -- On garde la saisie en cours : dans la tablette Gestion, un retour peut renvoyer à la liste des outils,
+        -- et repasser ici effaçait le PNJ et les emplacements déjà posés (le bouton Créer restait alors grisé).
+        -- Elle n'est remise à zéro qu'une fois le point de vente créé.
+        if not newLocationData.npc_coords then
+            newLocationData = getDefaultConfig()
+        end
     end, StaffMenu.vehicleSellCreate)
 
     StaffMenu.builderVehicleSell.Button("Gerer les points de vente", "Modifier ou supprimer", nil, "chevron", false, function()
@@ -162,6 +167,7 @@ StaffMenu.builderVehicleSell.OnOpen(function()
 end)
 
 StaffMenu.vehicleSellCreate.OnOpen(function()
+    if not newLocationData.npc_coords then newLocationData = getDefaultConfig() end
     StaffMenu.vehicleSellCreate.Separator("NOUVEAU POINT DE VENTE")
 
     StaffMenu.vehicleSellCreate.Button("Nom: " .. (newLocationData.name or ""), "Définir le nom", nil, "chevron", false, function()
@@ -204,9 +210,17 @@ StaffMenu.vehicleSellCreate.OnOpen(function()
     local npcValid = newLocationData.npc_coords and newLocationData.npc_coords.x ~= 0
     local spotsValid = newLocationData.parking_spots and #newLocationData.parking_spots > 0
 
-    StaffMenu.vehicleSellCreate.Button("Creer le point de vente", npcValid and spotsValid and "Pret" or "Position PNJ et emplacements requis", nil, npcValid and spotsValid and "check" or nil, not (npcValid and spotsValid), function()
+    -- Jamais grisé : un clic sans PNJ ou sans emplacement dit ce qui manque, au lieu de ne rien faire.
+    StaffMenu.vehicleSellCreate.Button("Creer le point de vente", npcValid and spotsValid and "Pret" or "Position PNJ et emplacements requis", nil, npcValid and spotsValid and "check" or nil, false, function()
+        if not npcValid or not spotsValid then
+            VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Vente Vehicules', message = not npcValid
+                and "Définissez d'abord l'emplacement du PNJ."
+                or "Ajoutez au moins un emplacement de parking (Emplacements parking)." })
+            return
+        end
         local newId, errorMessage = TriggerServerCallback("vehicleSell:createConfig", newLocationData)
         if newId then
+            newLocationData = getDefaultConfig()
             VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Vente Vehicules', message = ("Point de vente #%d créé."):format(newId) })
             StaffMenu.vehicleSellCreate.close()
             Wait(100)

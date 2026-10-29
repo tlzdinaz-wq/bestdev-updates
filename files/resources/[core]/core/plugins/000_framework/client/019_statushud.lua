@@ -169,6 +169,12 @@ RegisterNUICallback("nui:logo:getPosition", function(_, cb)
 end)
 
 local hudTheme = GetResourceKvpString("hud_theme") or "neon"
+-- Les trois modèles du HUD sont neon (Cristal), circles (Orbes) et minimal (Pulse) : l'ancien
+-- thème vertical passe sur Orbes.
+if hudTheme == "circles-v" then
+    hudTheme = "circles"
+    SetResourceKvp("hud_theme", hudTheme)
+end
 
 RegisterNUICallback("nui:StatusHUD:getTheme", function(_, cb)
     cb(hudTheme)

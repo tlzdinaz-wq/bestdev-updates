@@ -3,6 +3,18 @@
 
 local isServerSide = IsDuplicityVersion();
 
+-- Ce fichier est chargé par le motif récursif des scripts partagés. Certains
+-- artefacts/chargeurs de protection peuvent l'exécuter deux fois dans le même
+-- runtime ; sans garde, le callback ci-dessous est enregistré une seconde fois
+-- et bloque entièrement le démarrage de core.
+VFW = VFW or {}
+local initFlag = isServerSide and "__variablesServerInitialized" or "__variablesClientInitialized"
+if VFW[initFlag] then
+    console.warn("[Variables] initialisation en double ignorée")
+    return
+end
+VFW[initFlag] = true
+
 if isServerSide then 
     VFW.Variables = {
 ---@class Datas
@@ -37,14 +49,19 @@ if isServerSide then
         ON DUPLICATE KEY UPDATE `data` = VALUES(`data`)
     ]]
 
+    ---@return boolean ok, string|nil err
     local function writeRow(name, data)
-        if type(MySQL) ~= "table" then return false end
-        local encoded = json.encode(data)
+        if type(MySQL) ~= "table" then return false, "MySQL indisponible" end
+        local encOk, encoded = pcall(json.encode, data)
+        if not encOk then
+            console.error(("[Variables] %s : données impossibles à enregistrer (%s)"):format(name, tostring(encoded)))
+            return false, tostring(encoded)
+        end
         if MySQL.update and MySQL.update.await then
             local ok, err = pcall(MySQL.update.await, UPSERT_VARIABLE, { name, encoded })
             if not ok then
-                console.warn(("[Variables] Flush %s : %s"):format(name, tostring(err)))
-                return false
+                console.error(("[Variables] écriture de %s en base impossible : %s"):format(name, tostring(err)))
+                return false, tostring(err)
             end
             return true
         end
@@ -55,16 +72,18 @@ if isServerSide then
         return false
     end
 
+    ---@return boolean ok, string|nil err
     function VFW.Variables.Flush(name)
-        if type(name) ~= "string" or name == "" then return false end
+        if type(name) ~= "string" or name == "" then return false, "nom invalide" end
         local data = VFW.Variables.Datas[name]
-        if data == nil then return false end
-        if writeRow(name, data) then
+        if data == nil then return false, "aucune donnée" end
+        local ok, err = writeRow(name, data)
+        if ok then
             VFW.Variables.NeedSaves[name] = nil
             return true
         end
         VFW.Variables.NeedSaves[name] = true
-        return false
+        return false, err
     end
 
     -- lastid is used to check if the client has already the same version has the server, if so, no need to send again and flood the network

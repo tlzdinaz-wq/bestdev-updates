@@ -1034,15 +1034,19 @@ StaffMenu.motelAddRoom.OnOpen(function()
         "Visez la porte de la chambre et appuyez sur E",
         nil, "chevron", false,
         function()
-            StaffMenu.motelAddRoom.close()
-
             VFW.ShowNotification({ type = 'STAFF', variant = 'INFO', subtitle = 'Motel', message = 'Visez la porte et appuyez sur E' })
 
-            local entity, coords = SelectDoorVisually()
+            -- Dans la tablette Gestion, close() renvoyait à la liste des outils pendant la visée : la porte choisie
+            -- n'arrivait jamais dans le menu. PlaceInWorld garde le menu ouvert (hub) ou le ferme / rouvre (menu F5).
+            local picked = StaffMenu.PlaceInWorld(StaffMenu.motelAddRoom, function()
+                local e, c = SelectDoorVisually()
+                return { entity = e, coords = c }
+            end) or {}
+            local entity, coords = picked.entity, picked.coords
 
             if not entity or not coords then
                 VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Motel', message = 'Sélection annulée' })
-                StaffMenu.motelAddRoom.open()
+                StaffMenu.motelAddRoom.refresh()
                 return
             end
 
@@ -1054,7 +1058,7 @@ StaffMenu.motelAddRoom.OnOpen(function()
                 for _, d in ipairs(newRoomData.doors) do
                     if d.existingId == existingDoorlockId then
                         VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Motel', message = 'Cette porte est déjà ajoutée' })
-                        StaffMenu.motelAddRoom.open()
+                        StaffMenu.motelAddRoom.refresh()
                         return
                     end
                 end
@@ -1072,7 +1076,7 @@ StaffMenu.motelAddRoom.OnOpen(function()
                 VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Motel', message = 'Porte enregistrée (sera créée à la sauvegarde)' })
             end
 
-            StaffMenu.motelAddRoom.open()
+            StaffMenu.motelAddRoom.refresh()
         end
     )
 
@@ -1354,15 +1358,19 @@ StaffMenu.motelRoomEdit.OnOpen(function()
         "Visez la porte et appuyez sur E",
         nil, "chevron", false,
         function()
-            StaffMenu.motelRoomEdit.close()
-
             VFW.ShowNotification({ type = 'STAFF', variant = 'INFO', subtitle = 'Motel', message = 'Visez la porte et appuyez sur E' })
 
-            local entity, coords = SelectDoorVisually()
+            -- Dans la tablette Gestion, close() renvoyait à la liste des outils pendant la visée : la porte choisie
+            -- n'arrivait jamais dans le menu. PlaceInWorld garde le menu ouvert (hub) ou le ferme / rouvre (menu F5).
+            local picked = StaffMenu.PlaceInWorld(StaffMenu.motelRoomEdit, function()
+                local e, c = SelectDoorVisually()
+                return { entity = e, coords = c }
+            end) or {}
+            local entity, coords = picked.entity, picked.coords
 
             if not entity or not coords then
                 VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Motel', message = 'Sélection annulée' })
-                StaffMenu.motelRoomEdit.open()
+                StaffMenu.motelRoomEdit.refresh()
                 return
             end
 
@@ -1406,7 +1414,7 @@ StaffMenu.motelRoomEdit.OnOpen(function()
                 end
             end
 
-            StaffMenu.motelRoomEdit.open()
+            StaffMenu.motelRoomEdit.refresh()
         end
     )
 

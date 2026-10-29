@@ -466,9 +466,21 @@ function Feat27.Vehicles.Store(identifier, model, properties, plate, extra)
 
     extra = extra or {}
 
+    -- personnage propriétaire : celui passé par l'appelant, sinon celui du joueur connecté
+    local charId = extra.charId
+    if charId == nil and VFW and VFW.GetPlayerFromIdentifier then
+        local owner = VFW.GetPlayerFromIdentifier(identifier)
+        charId = owner and owner.charId or nil
+    end
+
     local encoded = json.encode(properties)
     local values = {
         owner = identifier,
+        owner_charid = charId,
+        -- vehName est obligatoire (NOT NULL, sans défaut) dans owned_vehicles : sans lui, toute insertion échouait
+        -- (véhicule définitif du menu ALT, boutique, vCoins, récompenses quotidiennes)
+        vehName = model,
+        label = extra.label or model,
         identifier = identifier,
         citizenid = identifier,
         plate = plate,
@@ -501,11 +513,14 @@ function Feat27.Vehicles.Store(identifier, model, properties, plate, extra)
 
     if #names == 0 then return false, "columns_missing" end
 
-    local ok = pcall(MySQL.insert.await,
+    local ok, err = pcall(MySQL.insert.await,
         ("INSERT INTO owned_vehicles (%s) VALUES (%s)"):format(table.concat(names, ", "), table.concat(marks, ", ")),
         params
     )
-    if not ok then return false, "insert_failed" end
+    if not ok then
+        console.error(("[Vehicles.Store] %s (%s) non enregistré : %s"):format(tostring(model), tostring(plate), tostring(err)))
+        return false, "insert_failed"
+    end
     return true, plate
 end
 

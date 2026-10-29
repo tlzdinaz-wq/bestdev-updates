@@ -1283,6 +1283,49 @@ AddEventHandler("vfw:playerDropped", function(source)
     end
 end)
 
+--- « Donner le véhicule » sur un véhicule de spawn (pas encore en base) : on l'enregistre au nom du joueur visé.
+---@return table result { ok, msg | err }
+local function registerSpawnedFor(source, xPlayer, entity, plate, extra)
+    local xTarget = VFW.GetPlayerFromId(tonumber(extra.targetId))
+    if not xTarget then return { ok = false, err = "Ce joueur n'est pas connecté." } end
+
+    local model = cleanModel(extra.model)
+    if not model or joaat(model) ~= GetEntityModel(entity) then
+        return { ok = false, err = "Le nom de modèle de ce véhicule est introuvable" }
+    end
+
+    local api = vehiclesApi()
+    if not api then return { ok = false, err = "Le service des véhicules n'est pas prêt." } end
+
+    local trimmed, normalized = plateForms(plate)
+    if not trimmed then return { ok = false, err = "La plaque de ce véhicule est illisible." } end
+
+    local safeProps = type(extra.props) == "table" and extra.props or {}
+    safeProps.plate = normalized
+    safeProps.model = joaat(model)
+    local engineHealth, bodyHealth, fuelLevel, turbo = api.ExtractHealth(safeProps, nil)
+
+    local ok, err = pcall(MySQL.insert.await, [[
+        INSERT INTO owned_vehicles
+            (plate, owner, owner_charid, vehName, model, label, props, stored, pounded, engineHealth, bodyHealth, fuelLevel, modTurbo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?)
+    ]], {
+        normalized, xTarget.identifier, xTarget.charId, model, model, extra.label or model,
+        VFW.DB.Encode(safeProps), engineHealth, bodyHealth, fuelLevel, turbo and 1 or 0,
+    })
+    if not ok then
+        console.error(("[staff] enregistrement du véhicule %s impossible : %s"):format(normalized, tostring(err)))
+        return { ok = false, err = "Ce véhicule n'a pas pu être enregistré" }
+    end
+
+    Entity(entity).state:set("OwnedVehicle", true, true)
+    logStaff(source, "vehicle_give_spawned", { plate = normalized, model = model, target = xTarget.source, owner = xTarget.identifier })
+    if xTarget.source ~= source then
+        notify(xTarget.source, "SUCCESS", ("Le véhicule %s vous a été attribué."):format(normalized))
+    end
+    return { ok = true, msg = ("Véhicule %s enregistré au nom de %s"):format(normalized, xTarget.name or ("#" .. xTarget.source)) }
+end
+
 local function registerContextActions()
     if type(VFW.ContextMenu) ~= "table" then return false end
     if type(VFW.ContextMenu.RegisterAction) ~= "function" then return false end
@@ -1400,7 +1443,9 @@ local function registerContextActions()
         if not plate then return { ok = false, err = "La plaque de ce véhicule est illisible." } end
 
         local row = findRow(plate)
-        if not row then return { ok = false, err = "Ce véhicule n'est pas enregistré." } end
+        if not row then
+            return { ok = false, err = ("Le véhicule %s n'est pas enregistré (véhicule de spawn). Enregistrez-le d'abord avec « Donner le véhicule », ou sortez du garage le véhicule donné en définitif"):format(plate) }
+        end
 
         local targetId = tonumber(type(extra) == "table" and (extra.targetId or extra.target) or nil) or source
         local xTarget = VFW.GetPlayerFromId(targetId)
@@ -1428,6 +1473,11 @@ local function registerContextActions()
 
         local plate = plateForms(GetVehicleNumberPlateText(entity))
         if not plate then return { ok = false, err = "La plaque de ce véhicule est illisible." } end
+
+        -- véhicule de spawn : pas de propriétaire à changer, on l'enregistre directement au nom du joueur visé
+        if not findRow(plate) then
+            return registerSpawnedFor(source, xPlayer, entity, plate, extra)
+        end
 
         local ok = transferOwnership(source, xPlayer, plate, extra.targetId, "vehicle_transfer_context")
         if not ok then return { ok = false, err = "Le transfert n'a pas abouti." } end

@@ -10,6 +10,7 @@ SN_SAMS.Config = {
     Jobs = {
         "sams_pib",
         "sams_pab",
+        "ambulance", -- le métier « EMS » de la base : mêmes secours que le SAMS (hôpital par défaut : Pillbox)
     },
 
     -- Hôpitaux avec coordonnées (pour calcul distance)
@@ -66,6 +67,16 @@ function SN_SAMS.HasJob()
         if job.name == j then
             return true
         end
+    end
+    return false
+end
+
+--- Ce nom de métier est-il un métier de secours (SAMS ou EMS) ?
+---@param name string|nil
+---@return boolean
+function SN_SAMS.IsSamsJob(name)
+    for _, j in ipairs(SN_SAMS.Config.Jobs) do
+        if name == j then return true end
     end
     return false
 end

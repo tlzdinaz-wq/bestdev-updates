@@ -166,8 +166,31 @@ RegisterServerCallback("legalBuilder:getStationRecipesForNUI", function(source, 
 
     local list = stationRecipes[id] or {}
     local out = {}
+    local function owned(name)
+        local item = xPlayer and xPlayer.getInventoryItem and xPlayer.getInventoryItem(name)
+        return item and tonumber(item.count) or 0
+    end
+    local function itemImage(name)
+        return VFW.ItemImageUrl and VFW.ItemImageUrl(name, VFW.Items and VFW.Items[name]) or nil
+    end
     for i = 1, #list do
         local slot = list[i]
+        -- format lu par la fenêtre de craft : composants (requirements), durée en secondes, maximum fabricable, image
+        local requirements, maxCraftable = {}, 99
+        for _, ing in ipairs(normalizeIngredients(slot.ingredients)) do
+            local has = owned(ing.item)
+            local def = VFW.Items and VFW.Items[ing.item]
+            requirements[#requirements + 1] = {
+                id = ing.item,
+                name = def and def.label or ing.item,
+                icon = itemImage(ing.item),
+                amount = ing.count,
+                playerHas = has,
+                hasEnough = has >= ing.count,
+            }
+            maxCraftable = math.min(maxCraftable, has // ing.count)
+        end
+        local outputItem = slot.outputItem or slot.item
         out[i] = {
             id = slot.id,
             recipeDbId = slot.recipeDbId,
@@ -177,9 +200,13 @@ RegisterServerCallback("legalBuilder:getStationRecipesForNUI", function(source, 
             item = slot.item,
             outputItem = slot.outputItem,
             outputCount = slot.outputCount,
-            craftTime = slot.craftTime,
+            quantity = slot.outputCount,
+            craftTime = math.max(1, math.floor((tonumber(slot.craftTime) or DEFAULT_CRAFT_TIME) / 1000)),
             isLegal = true,
             ingredients = slot.ingredients,
+            requirements = requirements,
+            maxCraftable = maxCraftable,
+            preview = (slot.image ~= nil and slot.image ~= "") and slot.image or (outputItem and itemImage(outputItem)) or nil,
         }
     end
     return out

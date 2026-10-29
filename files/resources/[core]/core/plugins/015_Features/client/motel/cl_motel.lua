@@ -67,12 +67,16 @@ local function SpawnMotelNPC(motelData)
     end
 
     local coords <const> = motelData.npcCoords
+    -- Position telle qu'enregistrée par le builder (celle du staff debout), comme les vendeurs des superettes.
+    -- Avant : z - 1.0 (vendeur enfoncé d'un mètre, collé au staff qui vient de poser le point) puis
+    -- PlaceObjectOnGroundProperly, une native prévue pour les objets, appelée ici sur un PNJ : juste
+    -- après « Créer le motel », le jeu du staff laguait puis crashait.
     local npc <const> = VFW.CreatePed(
-        vector4(coords.x, coords.y, coords.z - 1.0, coords.h or 0.0),
+        vector4(coords.x, coords.y, coords.z, coords.h or 0.0),
         motelData.npcModel or "s_f_y_shop_mid"
     )
+    if not npc or npc == 0 or not DoesEntityExist(npc) then return end
 
-    PlaceObjectOnGroundProperly(npc)
     FreezeEntityPosition(npc, true)
 
     local npcCoords <const> = GetEntityCoords(npc)

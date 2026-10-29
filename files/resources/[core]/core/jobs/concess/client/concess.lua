@@ -198,7 +198,8 @@ function SetupConcessionnaire(concess)
     if not concess then return end
 
     local hasCatalog = concess.catalog and type(concess.catalog) == "table" and #concess.catalog > 0
-    if hasCatalog then
+    -- « PNJ vendeur : non » (réglé à la création) : jamais de PNJ, même sans employé en service
+    if hasCatalog and concess.npc ~= false then
         -- automatic = true → Toujours PED (mode auto forcé)
         -- automatic = false → PED seulement si aucun employé en service
         if concess.automatic then
@@ -910,7 +911,7 @@ end)
 -- Rafraîchir les concessionnaires quand un employé se met en/hors service
 RegisterNetEvent("concess:refreshEmployeeStatus", function(jobName)
     for id, concess in pairs(CONCESS_LIST) do
-        if concess.job == jobName then
+        if concess.job == jobName and concess.npc ~= false then
             -- automatic = true → toujours PED, pas besoin de refresh
             -- automatic = false → mode dynamique, vérifier le statut
             if not concess.automatic then

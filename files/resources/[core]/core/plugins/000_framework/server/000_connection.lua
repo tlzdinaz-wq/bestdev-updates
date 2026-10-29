@@ -1,18 +1,42 @@
 local pendingAccounts = {}
 
+--- Remet au client les donnees de son loading screen (fond, musique, textes), avant qu'il ne l'affiche.
+---
+--- Elles viennent de la charte du serveur, qui vit en base : tant que les variables ne sont pas lues, la charte rendue est
+--- celle du fichier config/branding_overrides.json, vide ou perimee (dossier remplace par une mise a jour, dossier non
+--- inscriptible). Transmises des la connexion, juste apres un redemarrage, le fond et la musique regles dans Gestion ne
+--- s'affichaient pas et n'apparaissaient qu'a la fin du chargement, quand le serveur repoussait la charte a jour.
+--- On attend donc la lecture des variables (10 s au plus : sans base, on transmet ce que l'on a). Une fois l'attente
+--- abandonnee, les joueurs suivants ne la refont pas : un serveur dont les variables ne se lisent pas ne doit pas retenir
+--- chaque connexion 10 s de plus.
+local variablesGaveUp = false
+
+local function handOverLoadingScreen(deferrals)
+    if type(deferrals.handover) ~= "function"
+        or type(VFW.LoadingScreen) ~= "table"
+        or type(VFW.LoadingScreen.GetHandoverData) ~= "function" then
+        return
+    end
+
+    if not variablesGaveUp then
+        local waited = 0
+        while VFW.Variables and VFW.Variables.Loaded ~= true and waited < 10000 do
+            Wait(100)
+            waited = waited + 100
+        end
+        if VFW.Variables and VFW.Variables.Loaded ~= true then variablesGaveUp = true end
+    end
+
+    local ok, err = pcall(deferrals.handover, VFW.LoadingScreen.GetHandoverData())
+    if not ok then
+        console.warn(("[connexion] deferrals.handover a echoue : %s"):format(tostring(err)))
+    end
+end
+
 AddEventHandler("playerConnecting", function(name, setKickReason, deferrals)
     local source = source
     deferrals.defer()
     Wait(0)
-
-    if type(deferrals.handover) == "function"
-        and type(VFW.LoadingScreen) == "table"
-        and type(VFW.LoadingScreen.GetHandoverData) == "function" then
-        local okHandover, errHandover = pcall(deferrals.handover, VFW.LoadingScreen.GetHandoverData())
-        if not okHandover then
-            console.warn(("[connexion] deferrals.handover a echoue : %s"):format(tostring(errHandover)))
-        end
-    end
 
     local identifier = VFW.GetIdentifier(source)
     if not identifier then
@@ -39,6 +63,8 @@ AddEventHandler("playerConnecting", function(name, setKickReason, deferrals)
             return
         end
     end
+
+    handOverLoadingScreen(deferrals)
 
     -- Chargement du compte avec délai maximum : si la base de données ne répond pas,
     -- le joueur ne doit pas rester bloqué sur « chargement de votre compte… ».

@@ -7,6 +7,62 @@ local function depositChestId(pointId, citizenid)
     return ("deposit:%s:%s"):format(tostring(pointId), tostring(citizenid))
 end
 
+-- Tables du module : déjà dans le SQL fourni, recréées ici si elles manquent (base neuve ou ancienne), avec la colonne
+-- consult_jobs (jobs autorisés à consulter les dépôts du point, en lecture seule) qu'une base plus ancienne n'a pas.
+local TABLES_SQL = {
+    [[
+        CREATE TABLE IF NOT EXISTS `deposit_points` (
+            `id` INT(11) NOT NULL AUTO_INCREMENT,
+            `coords` LONGTEXT DEFAULT NULL,
+            `label` VARCHAR(100) DEFAULT NULL,
+            `access_name` VARCHAR(60) DEFAULT NULL,
+            `manager_grade` INT(11) NOT NULL DEFAULT 0,
+            `max_weight` INT(11) NOT NULL DEFAULT 100000,
+            `max_slots` INT(11) NOT NULL DEFAULT 40,
+            `consult_jobs` LONGTEXT DEFAULT NULL,
+            PRIMARY KEY (`id`)
+        )
+    ]],
+    [[
+        CREATE TABLE IF NOT EXISTS `deposit_entries` (
+            `id` INT(11) NOT NULL AUTO_INCREMENT,
+            `point_id` INT(11) NOT NULL,
+            `citizenid` VARCHAR(64) NOT NULL,
+            `name` VARCHAR(100) DEFAULT NULL,
+            `chest_id` VARCHAR(100) NOT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uk_deposit_entries` (`point_id`, `citizenid`)
+        )
+    ]],
+}
+
+local function prepareTables()
+    for i = 1, #TABLES_SQL do
+        MySQL.query.await(TABLES_SQL[i])
+    end
+
+    local exists = MySQL.scalar.await([[
+        SELECT COUNT(*) FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'deposit_points' AND COLUMN_NAME = 'consult_jobs'
+    ]])
+
+    if (tonumber(exists) or 0) == 0 then
+        MySQL.query.await("ALTER TABLE deposit_points ADD COLUMN `consult_jobs` LONGTEXT DEFAULT NULL")
+    end
+end
+
+--- Les jobs d'une colonne consult_jobs : une liste de noms, sinon rien.
+local function decodeJobs(value)
+    local list = VFW.DB.Decode(value, {})
+    local out = {}
+    if type(list) == "table" then
+        for i = 1, #list do
+            if type(list[i]) == "string" and list[i] ~= "" then out[#out + 1] = list[i] end
+        end
+    end
+    return out
+end
+
 local function rowToPoint(row)
     return {
         id = row.id,
@@ -16,10 +72,16 @@ local function rowToPoint(row)
         managerGrade = tonumber(row.manager_grade) or 0,
         maxWeight = tonumber(row.max_weight) or 1000,
         maxSlots = tonumber(row.max_slots) or 100,
+        consultJobs = decodeJobs(row.consult_jobs),
     }
 end
 
 function DepositBuilderServer.Load()
+    local prepared, why = pcall(prepareTables)
+    if not prepared then
+        console.warn(("[depositBuilder] préparation des tables impossible : %s"):format(tostring(why)))
+    end
+
     local rows = MySQL.query.await("SELECT * FROM deposit_points") or {}
     DepositBuilderServer.cache = {}
     for i = 1, #rows do
@@ -36,6 +98,7 @@ function DepositBuilderServer.List()
             id = point.id,
             coords = { x = point.coords.x, y = point.coords.y, z = point.coords.z },
             label = point.label,
+            consultJobs = { table.unpack(point.consultJobs or {}) },
         }
     end
     return out
@@ -65,6 +128,24 @@ function DepositBuilderServer.IsManager(xPlayer, point)
         return (tonumber(faction.grade) or 0) >= point.managerGrade
     end
 
+    return false
+end
+
+--- Consulter (lecture seule) les dépôts du point : un gestionnaire, ou un joueur dont le job figure dans la liste du point.
+function DepositBuilderServer.CanConsult(xPlayer, point)
+    if not point then return false end
+    if DepositBuilderServer.IsManager(xPlayer, point) then return true end
+
+    local jobs = point.consultJobs
+    if type(jobs) ~= "table" or #jobs == 0 then return false end
+
+    local mine = {}
+    if xPlayer.job and xPlayer.job.name then mine[xPlayer.job.name] = true end
+    if xPlayer.job2 and xPlayer.job2.name then mine[xPlayer.job2.name] = true end
+
+    for i = 1, #jobs do
+        if mine[jobs[i]] then return true end
+    end
     return false
 end
 
@@ -105,7 +186,7 @@ Inv.RegisterCallback("depositBuilder:getEntries", function(source, pointId)
     if not xPlayer then return {} end
 
     local point = DepositBuilderServer.Find(pointId)
-    if not point or not DepositBuilderServer.IsManager(xPlayer, point) then return {} end
+    if not point or not DepositBuilderServer.CanConsult(xPlayer, point) then return {} end
 
     local rows = MySQL.query.await("SELECT citizenid, name FROM deposit_entries WHERE point_id = ?", { point.id }) or {}
 
@@ -127,7 +208,7 @@ Inv.RegisterNet("depositBuilder:server:interact", function(pointId)
     local coords = Inv.PlayerCoords(source)
     if coords and Inv.Distance(coords, point.coords) > 5.0 then return end
 
-    if DepositBuilderServer.IsManager(xPlayer, point) then
+    if DepositBuilderServer.CanConsult(xPlayer, point) then
         TriggerClientEvent("depositBuilder:client:openConsult", source, point.id, point.label)
     else
         TriggerClientEvent("depositBuilder:client:openMenu", source, point.id, point.label)
@@ -236,7 +317,7 @@ Inv.RegisterNet("depositBuilder:server:openEntry", function(pointId, citizenid)
     if type(citizenid) ~= "string" or citizenid == "" then return end
 
     local point = DepositBuilderServer.Find(pointId)
-    if not point or not DepositBuilderServer.IsManager(xPlayer, point) then return end
+    if not point or not DepositBuilderServer.CanConsult(xPlayer, point) then return end
 
     local chestId = depositChestId(point.id, citizenid)
     Inv.ConfigureChest(chestId, {
@@ -284,6 +365,7 @@ VFW.RegisterCommand("createdeposit", "builder", function(source, xPlayer, args)
         managerGrade = managerGrade,
         maxWeight = 1000,
         maxSlots = 100,
+        consultJobs = {},
     }
 
     DepositBuilderServer.cache[id] = point
@@ -291,6 +373,7 @@ VFW.RegisterCommand("createdeposit", "builder", function(source, xPlayer, args)
         id = point.id,
         coords = point.coords,
         label = point.label,
+        consultJobs = {},
     })
 
     xPlayer.showNotification({ type = "VERT", content = ("Point de depot #%s cree."):format(tostring(id)) })

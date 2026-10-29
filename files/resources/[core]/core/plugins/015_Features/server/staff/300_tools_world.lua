@@ -325,7 +325,7 @@ RegisterNetEvent("vfw:staff:giveCar", function(targetId, model, plate, label)
 
     if not Feat27 or not Feat27.Vehicles or not Feat27.Vehicles.Store then return end
 
-    local ok, result = Feat27.Vehicles.Store(target.identifier, resolved, {}, wanted, { kind = "car" })
+    local ok, result = Feat27.Vehicles.Store(target.identifier, resolved, {}, wanted, { kind = "car", charId = target.charId })
     if not ok then
         notify(source, "ERROR", "Véhicule définitif", "Ce véhicule n'a pas pu être enregistré.")
         return

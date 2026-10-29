@@ -605,7 +605,9 @@ RegisterNetEvent("core:concess:create", function(data)
     local name = JC.Str(data.name, 128)
     if not name then return end
 
-    local automatic = JC.Bool(data.automatic)
+    -- PNJ vendeur : oui par défaut ; sans PNJ, le mode auto (PNJ toujours là, pas d'employés) n'a pas de sens
+    local npc = data.npc == nil or JC.Bool(data.npc)
+    local automatic = npc and JC.Bool(data.automatic)
     local job = JC.Str(data.job, 64) or ""
     if not automatic and job == "" then return end
 
@@ -637,13 +639,14 @@ RegisterNetEvent("core:concess:create", function(data)
     local showcase = Concess.DecodeShowcase(data.showcase or {})
 
     local insertId = JC.Insert([[
-        INSERT INTO concess (name, job, concess_type, automatic, ped_model, catalog, preview, spawn, showcase)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO concess (name, job, concess_type, automatic, ped_enabled, ped_model, catalog, preview, spawn, showcase)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ]], {
         name,
         job,
         concessType,
         automatic and 1 or 0,
+        npc and 1 or 0,
         JC.Str(data.pedModel, 64) or Concess.DefaultPed,
         JC.Encode(catalog),
         JC.Encode(preview),
@@ -672,7 +675,8 @@ RegisterNetEvent("core:concess:update", function(id, data)
     entry.name = JC.Str(data.name, 128) or entry.name
     entry.job = JC.Str(data.job, 64) or ""
     entry.concessType = JC.Int(data.concessType, 1, 3) or entry.concessType
-    entry.automatic = JC.Bool(data.automatic)
+    if data.npc ~= nil then entry.npc = JC.Bool(data.npc) end
+    entry.automatic = entry.npc ~= false and JC.Bool(data.automatic)
     entry.pedModel = JC.Str(data.pedModel, 64) or entry.pedModel
 
     if type(data.catalog) == "table" then

@@ -102,6 +102,13 @@ local function IngredientList(recipe)
     return out
 end
 
+--- Quantité d'un item comptée comme le fait la fabrication (haveItem / removeInventoryItem lisent la même entrée),
+--- pour que la fenêtre n'annonce jamais un craft possible que le serveur refuserait.
+local function ItemTotal(xPlayer, name)
+    local item = xPlayer and xPlayer.getInventoryItem and xPlayer.getInventoryItem(name)
+    return item and tonumber(item.count) or 0
+end
+
 local function HasIngredients(xPlayer, recipe, multiplier)
     local list = IngredientList(recipe)
     for i = 1, #list do
@@ -125,17 +132,35 @@ local function ConsumeIngredients(xPlayer, recipe, multiplier)
     return true
 end
 
+local function ItemImage(name)
+    return VFW.ItemImageUrl and VFW.ItemImageUrl(name, VFW.Items and VFW.Items[name]) or nil
+end
+
 local function RecipeSlot(xPlayer, recipe)
-    local ingredients = {}
+    local ingredients, requirements = {}, {}
+    local maxCraftable = 99
     local list = IngredientList(recipe)
     for i = 1, #list do
+        local name, count = list[i].item, list[i].count
+        local owned = ItemTotal(xPlayer, name)
+        local label = IL.ItemLabel(name)
         ingredients[#ingredients + 1] = {
-            name = list[i].item,
-            label = IL.ItemLabel(list[i].item),
-            count = list[i].count,
-            quantity = list[i].count,
-            has = xPlayer and xPlayer.haveItem(list[i].item, list[i].count) or false,
+            name = name,
+            label = label,
+            count = count,
+            quantity = count,
+            has = owned >= count,
         }
+        -- format lu par la fenêtre de craft (« Composants requis »)
+        requirements[#requirements + 1] = {
+            id = name,
+            name = label,
+            icon = ItemImage(name),
+            amount = count,
+            playerHas = owned,
+            hasEnough = owned >= count,
+        }
+        maxCraftable = math.min(maxCraftable, owned // count)
     end
     return {
         id = recipe.recipe_name,
@@ -145,10 +170,15 @@ local function RecipeSlot(xPlayer, recipe)
         name = recipe.output_item,
         label = recipe.label,
         quantity = recipe.output_quantity,
-        craftTime = recipe.craft_time,
+        -- la fenêtre affiche craftTime en secondes ; la durée réelle vient du serveur au lancement du craft
+        craftTime = math.max(1, math.floor((tonumber(recipe.craft_time) or 5000) / 1000)),
         time = recipe.craft_time,
         slot = recipe.slot_index,
         ingredients = ingredients,
+        requirements = requirements,
+        maxCraftable = maxCraftable,
+        preview = ItemImage(recipe.output_item),
+        image = ItemImage(recipe.output_item),
         isLegal = false,
     }
 end

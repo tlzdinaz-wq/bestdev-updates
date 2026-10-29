@@ -25,13 +25,25 @@ local function Var(name)
     return data
 end
 
+--- Enregistre une config et l'écrit tout de suite en base.
+---@return boolean ok, string|nil err  faux si la base a refusé : le réglage ne survivrait pas à un redémarrage
 local function SaveVar(name, data)
     VFW.Variables.SetVariable(name, data)
     -- Écriture immédiate : le vidage automatique ne passe que toutes les 60 s, et un redémarrage avant lui
     -- faisait perdre le réglage (webhooks, etc.). Pas avant le chargement : on écraserait la base avec une table vide.
-    if VFW.Variables.Loaded and VFW.Variables.Flush then
-        pcall(VFW.Variables.Flush, name)
+    if not VFW.Variables.Loaded then
+        return false, "les réglages du serveur ne sont pas encore chargés, réessayez dans quelques secondes"
     end
+    if not VFW.Variables.Flush then return true end
+    local ok, flushed, err = pcall(VFW.Variables.Flush, name)
+    if not ok then return false, tostring(flushed) end
+    if not flushed then return false, err or "écriture refusée" end
+    return true
+end
+
+--- Message d'erreur affiché au staff quand un réglage n'a pas pu être écrit en base.
+local function NotSaved(err)
+    return "Non enregistré en base (" .. tostring(err) .. ") : le réglage serait perdu au redémarrage. Voir la console du serveur."
 end
 
 local function Require(source, ...)
@@ -102,7 +114,8 @@ Staff29.Cb("vfw:antiban:add", function(source, uniqueId)
     local data = Var("dev_antiban")
     if data[id] then return { success = false, message = name .. " est déjà protégé." } end
     data[id] = { name = name, by = xPlayer.name, at = os.time() }
-    SaveVar("dev_antiban", data)
+    local saved, err = SaveVar("dev_antiban", data)
+    if not saved then return { success = false, message = NotSaved(err) } end
     Audit(source, "dev_antiban_add", { target = id, name = name })
     return { success = true, message = name .. " est maintenant protégé contre ban / kick." }
 end)
@@ -114,7 +127,8 @@ Staff29.Cb("vfw:antiban:remove", function(source, uniqueId)
     if not data[id] then return { success = false, message = "Ce joueur n'est pas protégé." } end
     local name = data[id].name
     data[id] = nil
-    SaveVar("dev_antiban", data)
+    local saved, err = SaveVar("dev_antiban", data)
+    if not saved then return { success = false, message = NotSaved(err) } end
     Audit(source, "dev_antiban_remove", { target = id, name = name })
     return { success = true, message = (name or "Le joueur") .. " n'est plus protégé." }
 end)
@@ -574,17 +588,19 @@ Staff29.Cb("starterpack:getConfig", function(source)
     return StarterConfig()
 end)
 
+---@return boolean ok, string|nil err
 local function StarterSave(mutator)
     local data = Var("dev_starterpack")
     data.items = type(data.items) == "table" and data.items or {}
     mutator(data)
-    SaveVar("dev_starterpack", data)
+    return SaveVar("dev_starterpack", data)
 end
 
 Staff29.Cb("starterpack:setBank", function(source, amount)
     if not Require(source, "dev") then return false end
     local v = math.floor(tonumber(amount) or -1); if v < 0 then return false end
-    StarterSave(function(d) d.bank = v end)
+    local saved, err = StarterSave(function(d) d.bank = v end)
+    if not saved then return false, NotSaved(err) end
     Audit(source, "dev_starterpack", { bank = v })
     return true
 end)
@@ -592,7 +608,8 @@ end)
 Staff29.Cb("starterpack:setCash", function(source, amount)
     if not Require(source, "dev") then return false end
     local v = math.floor(tonumber(amount) or -1); if v < 0 then return false end
-    StarterSave(function(d) d.cash = v end)
+    local saved, err = StarterSave(function(d) d.cash = v end)
+    if not saved then return false, NotSaved(err) end
     Audit(source, "dev_starterpack", { cash = v })
     return true
 end)
@@ -602,25 +619,27 @@ Staff29.Cb("starterpack:addItem", function(source, name, count)
     name = Clean(name, 64)
     local c = math.floor(tonumber(count) or 0)
     if not name or not VFW.Items[name] or c <= 0 then return false end
-    StarterSave(function(d)
+    local saved, err = StarterSave(function(d)
         d.itemsConfigured = true
         for _, it in ipairs(d.items) do
             if it.name == name then it.count = c return end
         end
         d.items[#d.items + 1] = { name = name, count = c }
     end)
+    if not saved then return false, NotSaved(err) end
     return true
 end)
 
 Staff29.Cb("starterpack:removeItem", function(source, name)
     if not Require(source, "dev") then return false end
-    StarterSave(function(d)
+    local saved, err = StarterSave(function(d)
         -- la liste des items est désormais réglée par le staff : même vide, elle remplace les items par défaut
         d.itemsConfigured = true
         for i = #d.items, 1, -1 do
             if d.items[i].name == name then table.remove(d.items, i) end
         end
     end)
+    if not saved then return false, NotSaved(err) end
     return true
 end)
 

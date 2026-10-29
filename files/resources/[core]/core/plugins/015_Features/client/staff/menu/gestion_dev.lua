@@ -1203,16 +1203,18 @@ CALL.starterpack = function(action, a)
             local current = StarterConfig()
             amount = math.max(0, (action == "setBank" and current.bank or current.cash) + amount)
         end
-        local saved = TriggerServerCallback(action == "setBank" and "starterpack:setBank" or "starterpack:setCash", amount)
-        if not saved then return Fail("Le serveur a refusé la modification (permission développeur ?).") end
+        local saved, why = TriggerServerCallback(action == "setBank" and "starterpack:setBank" or "starterpack:setCash", amount)
+        if not saved then return Fail(why or "Le serveur a refusé la modification (permission développeur ?).") end
         return Ok({ config = StarterConfig() })
     elseif action == "addItem" then
         local name = Str(a.name, 64); if not name or not VFW.Items[name] then return Fail("Item introuvable.") end
         local count = math.floor(tonumber(a.count) or 0); if count <= 0 then return Fail("Quantité invalide.") end
-        if not TriggerServerCallback("starterpack:addItem", name, count) then return Fail("Le serveur a refusé l'ajout.") end
+        local added, why = TriggerServerCallback("starterpack:addItem", name, count)
+        if not added then return Fail(why or "Le serveur a refusé l'ajout.") end
         return Ok({ config = StarterConfig() })
     elseif action == "removeItem" then
-        if not TriggerServerCallback("starterpack:removeItem", a.name) then return Fail("Le serveur a refusé la suppression.") end
+        local removed, why = TriggerServerCallback("starterpack:removeItem", a.name)
+        if not removed then return Fail(why or "Le serveur a refusé la suppression.") end
         return Ok({ config = StarterConfig() })
     elseif action == "items" then
         local q = Str(a.query); q = q and string.lower(q) or nil
