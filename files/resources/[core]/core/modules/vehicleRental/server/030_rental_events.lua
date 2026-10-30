@@ -16,6 +16,11 @@ function Rental.EndRental(plate, notifySource)
     Vehicles.DeleteByPlate(normalized)
     MySQL.update.await("DELETE FROM vehicle_rental_active WHERE sPlate = ?", { normalized })
 
+    -- la clé de location part avec le véhicule (objet « keys », modules/garage/server/050_vehicle_keys.lua)
+    if VFW.VehicleKeys and VFW.VehicleKeys.RemoveEverywhere then
+        VFW.VehicleKeys.RemoveEverywhere(normalized)
+    end
+
     for i = #Rental.active, 1, -1 do
         if Rental.active[i].sPlate == normalized then
             table.remove(Rental.active, i)
@@ -150,6 +155,13 @@ RegisterNetEvent("core:vehicleRental:rent", function(tData, iOpenId)
 
     TriggerClientEvent("garage:placeVehicleOnGround", source, netId)
     Vehicles.Notify(source, "VERT", "Location", ("Véhicule loué : %s (%s)."):format(vehicle.label, plate))
+
+    if VFW.VehicleKeys and VFW.VehicleKeys.Give then
+        local given, why = VFW.VehicleKeys.Give(xPlayer, plate)
+        if not given then
+            Vehicles.Notify(source, "ROUGE", "Location", ("Vos clés n'ont pas pu être remises : %s."):format(tostring(why or "raison inconnue")))
+        end
+    end
 end)
 
 RegisterNetEvent("core:vehicleRental:return", function(iOpenType)

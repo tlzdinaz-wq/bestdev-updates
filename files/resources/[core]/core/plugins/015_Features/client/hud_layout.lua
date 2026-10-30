@@ -406,6 +406,8 @@ local function focusEditor()
     end
 end
 
+local showFichePreview
+
 local function ensurePreviewMenu()
     if previewMenu then return previewMenu end
     local banner = GetVUIBanner and GetVUIBanner("f5") or nil
@@ -429,7 +431,7 @@ local function ensurePreviewMenu()
     return previewMenu
 end
 
-local function showFichePreview()
+showFichePreview = function()
     if not editingServer or not previewMenu then return end
     local payload = {
         { type = "header", iconUrl = "people.png", label = "", value = "Aperçu fiche" },
@@ -463,17 +465,26 @@ local function showFichePreview()
     end)
 end
 
+--- Après exports.VUI:CloseAll(), VUI refuse toute ouverture pendant 400 ms (garde contre les OnClose qui rouvrent un
+--- menu). L'éditeur démarre juste après une fermeture : une seule tentative était refusée sans bruit et l'aperçu du menu
+--- n'apparaissait jamais. On réessaie donc jusqu'à ce qu'il soit vraiment ouvert.
 local function openPreviewMenu()
-    pcall(function()
-        local menu = ensurePreviewMenu()
-        applyVuiOffset(false)
-        applyPreviewOffset(false)
-        if menu and not menu.opened then
-            menu.open()
-        end
-        showFichePreview()
-    end)
     CreateThread(function()
+        for _ = 1, 12 do
+            if not editing then return end
+            pcall(function()
+                local menu = ensurePreviewMenu()
+                applyVuiOffset(false)
+                applyPreviewOffset(false)
+                if menu and not menu.opened then
+                    menu.open()
+                end
+            end)
+            if previewMenu and previewMenu.opened then break end
+            Wait(150)
+        end
+        if not editing then return end
+        pcall(showFichePreview)
         Wait(50)
         if editing then
             focusEditor()

@@ -927,7 +927,7 @@ policeActionsSubMenu.OnOpen(function()
 
     policeActionsSubMenu.Button(
         "Bracelet électronique",
-        "Posez ou retirez un bracelet électronique",
+        "Posez ou retirez un bracelet électronique (nécessite un bracelet)",
         nil, "arrow", false,
         function()
             if policeIsProcessing then return end

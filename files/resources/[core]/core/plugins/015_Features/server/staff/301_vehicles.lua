@@ -258,17 +258,12 @@ local function grantTemporaryKey(target, plate, identifier)
     return true
 end
 
-local function grantPermanentKey(plate, identifier, grantedBy)
-    local trimmed = plateForms(plate)
-    if not trimmed then return false end
-    if type(identifier) ~= "string" or identifier == "" then return false end
-
-    local ok = pcall(MySQL.insert.await, [[
-        INSERT IGNORE INTO concess_key_duplicates (plate, identifier, granted_by, concess_id)
-        VALUES (?, ?, ?, NULL)
-    ]], { trimmed, identifier, tostring(grantedBy or "") })
-
-    return ok == true
+--- Remet une clé permanente : l'objet `keys` avec la plaque en métadonnée (voir modules/garage/server/050_vehicle_keys.lua),
+--- celui que lisent toutes les vérifications de clés et qui reste dans l'inventaire du joueur.
+--- Renvoie "given" ou "already", sinon nil et la raison.
+local function giveKeyItem(xTarget, plate)
+    if not (VFW.VehicleKeys and VFW.VehicleKeys.Give) then return nil, "les clés de véhicule sont indisponibles" end
+    return VFW.VehicleKeys.Give(xTarget, plate)
 end
 
 local function transferOwnership(source, xPlayer, plate, targetId, action)
@@ -308,6 +303,14 @@ local function transferOwnership(source, xPlayer, plate, targetId, action)
 
     notify(source, "SUCCESS", ("Le véhicule %s appartient maintenant à %s."):format(row.plate, xTarget.name))
     notify(xTarget.source, "SUCCESS", ("Vous avez reçu le véhicule %s."):format(row.plate))
+
+    -- l'ancien propriétaire perd sa clé, le nouveau reçoit la sienne si le véhicule est sorti
+    if VFW.VehicleKeys and VFW.VehicleKeys.Transfer then
+        local given, why = VFW.VehicleKeys.Transfer(row.plate, row.owner, xTarget)
+        if not given then
+            notify(source, "ERROR", ("Le véhicule est transféré, mais les clés n'ont pas pu être remises : %s."):format(tostring(why or "raison inconnue")))
+        end
+    end
 
     logStaff(source, action or "vehicle_transfer", {
         plate = row.plate,
@@ -708,6 +711,11 @@ RegisterServerCallback("vfw:staff:assignSelfVehicle", function(source, plate, mo
     notify(source, "SUCCESS", ("Le véhicule %s est enregistré à votre nom."):format(normalized))
     logStaff(source, "vehicle_assign_self", { plate = normalized, model = cleaned })
 
+    local given, why = giveKeyItem(xPlayer, normalized)
+    if not given then
+        notify(source, "ERROR", ("Les clés n'ont pas pu être remises : %s."):format(tostring(why or "raison inconnue")))
+    end
+
     return { success = true, plate = normalized, stored = "sorti", model = cleaned }
 end)
 
@@ -751,32 +759,15 @@ RegisterServerCallback("vfw:vehicle:changePlate", function(source, oldPlate, new
     return true
 end)
 
---- Le joueur est-il le locataire de ce véhicule ? Une voiture louée n'est pas dans `owned_vehicles`
---- (elle vit dans `vehicle_rental_active`) : sans ce test, son locataire n'aurait aucune clé.
----@param xPlayer table
----@param trimmed string
----@param normalized string
----@return boolean
-local function isRenter(xPlayer, trimmed, normalized)
-    local active = VFW.Rental and VFW.Rental.active
-    if type(active) ~= "table" then return false end
-
-    for i = 1, #active do
-        local entry = active[i]
-        if entry.owner == xPlayer.identifier and (entry.sPlate == trimmed or entry.sPlate == normalized) then
-            return true
-        end
-    end
-    return false
-end
-
---- Le joueur a-t-il les clés de ce véhicule ? (propriétaire, véhicule de son job / sa faction,
---- locataire, objet « keys », clé temporaire job / staff, double de clé concession.)
+--- Le joueur a-t-il les clés de ce véhicule ?
 ---
---- Un véhicule absent de la base (PNJ de la circulation, voiture de décor) n'a PAS de clé : il
---- était auparavant « accessible à tous », et n'importe qui pouvait verrouiller et déverrouiller
---- les voitures des PNJ. Seuls y échappent les détenteurs d'une clé (objet, clé temporaire de job
---- ou de staff, locataire) et le staff habilité à gérer les véhicules.
+--- Il lui faut l'objet « keys » de cette plaque dans son inventaire. Être propriétaire, membre du job ou de la faction du
+--- véhicule, locataire ou titulaire d'un double enregistré ne suffit plus : ces clés sont remises sous forme d'objet à la
+--- sortie du garage, à l'achat, à la location… (VFW.VehicleKeys, modules/garage/server/050_vehicle_keys.lua).
+---
+--- Restent valables, car ce ne sont pas des clés d'inventaire : la clé temporaire de job ou de staff (posée par le serveur,
+--- perdue au redémarrage) et, pour un véhicule absent de la base (PNJ de la circulation, voiture de décor), le staff
+--- habilité à gérer les véhicules.
 ---@param source number
 ---@param plate string
 ---@return boolean
@@ -787,37 +778,18 @@ function Staff29.PlayerHasVehicleKey(source, plate)
     local trimmed, normalized = plateForms(plate)
     if not trimmed then return false end
 
-    local api = vehiclesApi()
-    if not api then return false end
-
-    local row = api.GetByPlate(normalized) or api.GetByPlate(trimmed)
-
-    if row then
-        if api.OwnsVehicle(xPlayer, row) then return true end
-
-        local groupType = row.group_type
-        if type(groupType) == "string" and groupType ~= "" then
-            local groupName = tostring(row.group_name or "")
-            if groupName ~= "" then
-                if groupType == "society" and api.GetJob(xPlayer) == groupName then return true end
-                if groupType ~= "society" then
-                    local factionName = api.GetFaction(xPlayer)
-                    if factionName ~= "" and factionName == groupName then return true end
-                end
-            end
-        end
+    local keys = VFW.VehicleKeys
+    if keys and type(keys.Has) == "function" then
+        if keys.Has(xPlayer, normalized) then return true end
     else
-        if isRenter(xPlayer, trimmed, normalized) then return true end
-        if xPlayer.hasPermission("alt_vehicle_management") then return true end
-    end
-
-    local inventory = xPlayer.inventory
-    if type(inventory) == "table" then
-        for i = 1, #inventory do
-            local entry = inventory[i]
-            if entry.name == "keys" and type(entry.meta) == "table" then
-                local owned = entry.meta.plate
-                if owned == trimmed or owned == normalized then return true end
+        local inventory = xPlayer.inventory
+        if type(inventory) == "table" then
+            for i = 1, #inventory do
+                local entry = inventory[i]
+                if entry.name == "keys" and type(entry.meta) == "table" then
+                    local owned = entry.meta.plate
+                    if owned == trimmed or owned == normalized then return true end
+                end
             end
         end
     end
@@ -831,10 +803,9 @@ function Staff29.PlayerHasVehicleKey(source, plate)
         if Staff29.HasTemporaryVehicleKey(normalized, xPlayer.identifier) then return true end
     end
 
-    local concess = VFW.Concess
-    if concess and type(concess.HasKeyDuplicate) == "function" then
-        if concess.HasKeyDuplicate(trimmed, xPlayer.identifier) then return true end
-        if concess.HasKeyDuplicate(normalized, xPlayer.identifier) then return true end
+    local api = vehiclesApi()
+    if api and not (api.GetByPlate(normalized) or api.GetByPlate(trimmed)) then
+        return xPlayer.hasPermission("alt_vehicle_management") and true or false
     end
 
     return false
@@ -1320,6 +1291,11 @@ local function registerSpawnedFor(source, xPlayer, entity, plate, extra)
 
     Entity(entity).state:set("OwnedVehicle", true, true)
     logStaff(source, "vehicle_give_spawned", { plate = normalized, model = model, target = xTarget.source, owner = xTarget.identifier })
+
+    local given, why = giveKeyItem(xTarget, normalized)
+    if not given then
+        notify(source, "ERROR", ("Le véhicule est enregistré, mais les clés n'ont pas pu être remises : %s."):format(tostring(why or "raison inconnue")))
+    end
     if xTarget.source ~= source then
         notify(xTarget.source, "SUCCESS", ("Le véhicule %s vous a été attribué."):format(normalized))
     end
@@ -1451,11 +1427,14 @@ local function registerContextActions()
         local xTarget = VFW.GetPlayerFromId(targetId)
         if not xTarget then return { ok = false, err = "Ce joueur n'est pas connecté." } end
 
-        if not grantPermanentKey(row.plate, xTarget.identifier, xPlayer and xPlayer.identifier) then
-            return { ok = false, err = "Les clés n'ont pas pu être remises." }
+        local given, why = giveKeyItem(xTarget, row.plate)
+        if not given then
+            return { ok = false, err = ("Les clés n'ont pas pu être remises : %s."):format(tostring(why or "raison inconnue")) }
         end
 
-        grantTemporaryKey(xTarget.source, plate, xTarget.identifier)
+        if given == "already" then
+            return { ok = true, msg = "Les clés de ce véhicule sont déjà dans l'inventaire" }
+        end
         logStaff(source, "vehicle_keys_permanent", { plate = row.plate, target = xTarget.source, owner = row.owner })
 
         if xTarget.source ~= source then

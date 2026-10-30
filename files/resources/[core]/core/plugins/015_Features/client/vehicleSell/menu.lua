@@ -123,7 +123,7 @@ function VFW.OpenSellMenu(locationId, vehicleToSell)
             price = sale.price,
             seller = sale.sellerName or "Inconnu",
             owner = sale.owner,
-            image = "https://docs.fivem.net/vehicles/" .. modelName .. ".webp",
+            image = (VFW.VehicleImage and VFW.VehicleImage(modelName)) or ("https://docs.fivem.net/vehicles/" .. modelName .. ".webp"),
             performance = {
                 moteur = sale.props and sale.props.modEngine or 0,
                 frein = sale.props and sale.props.modBrakes or 0,
@@ -159,7 +159,7 @@ function VFW.OpenSellMenu(locationId, vehicleToSell)
             price = sale.price,
             createdAt = sale.created_at,
             expiresAt = sale.expires_at,
-            image = "https://docs.fivem.net/vehicles/" .. modelName .. ".webp",
+            image = (VFW.VehicleImage and VFW.VehicleImage(modelName)) or ("https://docs.fivem.net/vehicles/" .. modelName .. ".webp"),
             performance = {
                 moteur = sale.props and sale.props.modEngine or 0,
                 frein = sale.props and sale.props.modBrakes or 0,
@@ -181,7 +181,7 @@ function VFW.OpenSellMenu(locationId, vehicleToSell)
             name = (validVehicleToSell.displayName and validVehicleToSell.displayName ~= "NULL") and validVehicleToSell.displayName or modelName:upper(),
             model = modelName,
             plate = validVehicleToSell.plate,
-            image = "https://docs.fivem.net/vehicles/" .. modelName .. ".webp",
+            image = (VFW.VehicleImage and VFW.VehicleImage(modelName)) or ("https://docs.fivem.net/vehicles/" .. modelName .. ".webp"),
             condition = validVehicleToSell.condition or 100,
             performance = {
                 moteur = validVehicleToSell.mods and validVehicleToSell.mods.modEngine or 0,

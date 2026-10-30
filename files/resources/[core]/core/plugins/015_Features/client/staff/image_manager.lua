@@ -15,26 +15,60 @@ local VANILLA_VEHICLE_CATEGORIES = {
     ["Militaire"] = true, ["Urgences (Vanilla)"] = true, ["Service"] = true,
 }
 
--- Build vanilla/addon split from the local carlist + CDN already-photographed set.
-local function buildVehicleLists(cdnVehicles)
+-- Véhicules GTA absents de la carlist (remorques, trains, wagons) : GetAllVehicleModels les renvoie aussi, ce ne sont pas des add-ons.
+local VANILLA_NOT_IN_CARLIST = {}
+for _, m in ipairs({
+    "armytanker", "armytrailer", "armytrailer2", "baletrailer", "boattrailer", "boattrailer2", "boattrailer3",
+    "docktrailer", "freighttrailer", "graintrailer", "proptrailer", "raketrailer", "tr2", "tr3", "tr4", "trflat",
+    "trailerlarge", "trailerlogs", "trailers", "trailers2", "trailers3", "trailers4", "trailers5", "trailersmall",
+    "trailersmall2", "tvtrailer", "tvtrailer2", "tanker", "tanker2", "cablecar", "freight", "freight2", "freightcar",
+    "freightcar2", "freightcont1", "freightcont2", "freightgrain", "metrotrain", "tankercar",
+}) do VANILLA_NOT_IN_CARLIST[m] = true end
+
+--- Nom lisible d'un modèle chargé : libellé du jeu, sinon nom d'affichage, sinon le modèle.
+local function vehicleLabel(model, hash)
+    local display = GetDisplayNameFromVehicleModel(hash)
+    if display and display ~= "" and display ~= "CARNOTFOUND" then
+        local label = GetLabelText(display)
+        if label and label ~= "" and label ~= "NULL" then return label end
+        return display
+    end
+    return model
+end
+
+--- Le modèle est-il vraiment chargé sur ce serveur ? Certains add-ons répondent false à IsModelInCdimage tant qu'ils n'ont
+--- pas été demandés : IsModelValid les reconnaît.
+local function modelLoaded(hash)
+    return IsModelInCdimage(hash) or IsModelValid(hash)
+end
+
+-- Vanilla : la liste des véhicules GTA de la carlist. Add-ons : les véhicules déclarés par les ressources démarrées du
+-- serveur (vehicles.meta lus par server/staff/323_addon_vehicles.lua) et chargés dans le jeu. Une ressource ajoutée apporte
+-- ses véhicules, une ressource retirée les enlève, sans liste à tenir à jour. Si le serveur ne peut pas lire ses
+-- ressources, repli sur les modèles chargés (GetAllVehicleModels) qui ne sont pas dans la carlist GTA : cette liste-là
+-- contient aussi des véhicules GTA absents de la carlist. Les modèles déjà photographiés (CDN) sont dans l'onglet CDN.
+local function buildVehicleLists(cdnVehicles, serverAddons)
     local vanillaVehicles, addonVehicles = {}, {}
     local seenVanilla, seenAddon = {}, {}
 
     local cdnSet = {}
     if cdnVehicles then
         for _, v in ipairs(cdnVehicles) do
-            if v and v.name then cdnSet[v.name] = true end
+            if v and v.name then cdnSet[tostring(v.name):lower()] = true end
         end
     end
 
+    local carlistInfo = {}
     local cat = VFW.Staff and VFW.Staff.Carlist
     if cat then
         for catName, vehs in pairs(cat) do
             local isVanilla = VANILLA_VEHICLE_CATEGORIES[catName] == true
             for _, vd in ipairs(vehs) do
-                if isVanilla then
-                    if not seenVanilla[vd.model] then
-                        seenVanilla[vd.model] = true
+                local model = tostring(vd.model or ""):lower()
+                if model ~= "" then
+                    carlistInfo[model] = carlistInfo[model] or { label = vd.label, category = catName }
+                    if isVanilla and not seenVanilla[model] then
+                        seenVanilla[model] = true
                         vanillaVehicles[#vanillaVehicles + 1] = {
                             name = vd.label or vd.model,
                             model = vd.model,
@@ -42,19 +76,35 @@ local function buildVehicleLists(cdnVehicles)
                             category = catName,
                         }
                     end
-                else
-                    if not seenAddon[vd.model] and not cdnSet[vd.model] then
-                        seenAddon[vd.model] = true
-                        addonVehicles[#addonVehicles + 1] = {
-                            name = vd.label or vd.model,
-                            model = vd.model,
-                            category = catName,
-                        }
-                    end
                 end
             end
         end
     end
+
+    local function addAddon(model)
+        model = tostring(model or ""):lower()
+        if model == "" or seenVanilla[model] or seenAddon[model] or cdnSet[model] or VANILLA_NOT_IN_CARLIST[model] then return end
+        local hash = joaat(model)
+        if not modelLoaded(hash) or IsThisModelATrain(hash) then return end
+        seenAddon[model] = true
+        local info = carlistInfo[model]
+        addonVehicles[#addonVehicles + 1] = {
+            name = (info and info.label) or vehicleLabel(model, hash),
+            model = model,
+            category = (info and info.category) or "Add-on",
+        }
+    end
+
+    local loaded = GetAllVehicleModels and GetAllVehicleModels() or nil
+    if type(serverAddons) == "table" and serverAddons.ok == true and type(serverAddons.models) == "table" then
+        for i = 1, #serverAddons.models do addAddon(serverAddons.models[i]) end
+    elseif type(loaded) == "table" and #loaded > 0 then
+        for i = 1, #loaded do addAddon(loaded[i]) end
+    else
+        -- natif indisponible : on garde la carlist, mais seulement les modèles présents sur le serveur
+        for model in pairs(carlistInfo) do addAddon(model) end
+    end
+
     table.sort(vanillaVehicles, function(a, b) return a.name < b.name end)
     table.sort(addonVehicles, function(a, b) return a.name < b.name end)
     return vanillaVehicles, addonVehicles
@@ -64,7 +114,7 @@ end
 -- imageManager:patch as each server callback / native enumeration completes.
 function StaffMenu.GetImageVehicleLists()
     local vehicles = TriggerServerCallback("vfw:server:getCdnVehicles") or {}
-    local vanillaVehicles, addonVehicles = buildVehicleLists(vehicles)
+    local vanillaVehicles, addonVehicles = buildVehicleLists(vehicles, TriggerServerCallback("vfw:server:getAddonVehicleModels"))
     return vehicles, vanillaVehicles, addonVehicles
 end
 
@@ -108,7 +158,7 @@ function StaffMenu.OpenImageManager(defaultTab)
 
     CreateThread(function()
         local vehicles = TriggerServerCallback("vfw:server:getCdnVehicles") or {}
-        local vanillaVehicles, addonVehicles = buildVehicleLists(vehicles)
+        local vanillaVehicles, addonVehicles = buildVehicleLists(vehicles, TriggerServerCallback("vfw:server:getAddonVehicleModels"))
         patch("vehicles", {
             vehicles = vehicles,
             vanillaVehicles = vanillaVehicles,

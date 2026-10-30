@@ -6,12 +6,40 @@ local Concess = VFW.Concess
 
 local activeTests = {}
 
+-- Un point de sortie est « libre » quand aucun véhicule ne se trouve à moins de 3 m.
+local SPAWN_CLEARANCE = 3.0
+
+local function spotIsFree(point, vehicles)
+    for i = 1, #vehicles do
+        local vehicle = vehicles[i]
+        if DoesEntityExist(vehicle) then
+            local at = GetEntityCoords(vehicle)
+            local dx, dy, dz = at.x - point.x, at.y - point.y, at.z - point.z
+            if dx * dx + dy * dy + dz * dz < SPAWN_CLEARANCE * SPAWN_CLEARANCE then return false end
+        end
+    end
+    return true
+end
+
+--- Où sort un véhicule acheté, d'essai ou remis par un employé : sur un point de sortie du concessionnaire, de préférence
+--- un point libre (sans véhicule dessus). Les points du catalogue, là où se tient l'acheteur dans la salle d'exposition, ne
+--- servent que si aucun point de sortie n'est défini : ils étaient tirés au sort avec les points de sortie, et le véhicule
+--- pouvait apparaître sur l'acheteur, retourné, au lieu du point défini.
 local function findSpawnPoint(entry)
-    local candidates = {}
-    for i = 1, #(entry.spawn or {}) do candidates[#candidates + 1] = entry.spawn[i] end
-    for i = 1, #(entry.catalog or {}) do candidates[#candidates + 1] = entry.catalog[i] end
-    if #candidates == 0 then return nil end
-    return candidates[math.random(1, #candidates)]
+    local pool = entry.spawn
+    if type(pool) ~= "table" or #pool == 0 then pool = entry.catalog end
+    if type(pool) ~= "table" or #pool == 0 then return nil end
+
+    local listed, vehicles = pcall(GetAllVehicles)
+    if listed and type(vehicles) == "table" then
+        local free = {}
+        for i = 1, #pool do
+            if spotIsFree(pool[i], vehicles) then free[#free + 1] = pool[i] end
+        end
+        if #free > 0 then pool = free end
+    end
+
+    return pool[math.random(1, #pool)]
 end
 
 Concess.FindSpawnPoint = findSpawnPoint
@@ -23,6 +51,16 @@ local function sanitizeColor(color)
     local b = JC.Int(color.b, 0, 255)
     if not r or not g or not b then return nil end
     return { r = r, g = g, b = b }
+end
+
+--- Remet à l'acheteur la clé du véhicule qui vient de sortir : l'objet « keys » (modules/garage/server/050_vehicle_keys.lua),
+--- sans lequel il ne peut ni verrouiller ni déverrouiller sa voiture.
+local function giveBuyerKey(targetSource, xTarget, plate)
+    if not (VFW.VehicleKeys and VFW.VehicleKeys.Give) then return end
+    local given, why = VFW.VehicleKeys.Give(xTarget, plate)
+    if not given then
+        JC.Notify(targetSource, ("Vos cles n'ont pas pu etre remises : %s."):format(tostring(why or "raison inconnue")), true)
+    end
 end
 
 RegisterNetEvent("core:concess:buyVehicle", function(concessId, model, price, paymentMethod, vehicleLabel, color)
@@ -87,6 +125,7 @@ RegisterNetEvent("core:concess:buyVehicle", function(concessId, model, price, pa
         local spawned = VFW.Vehicles.Spawn(source, modelName, spawnPoint, spawnPoint.h or 0.0, props)
         if spawned and DoesEntityExist(spawned) then
             pcall(SetVehicleNumberPlateText, spawned, plate)
+            giveBuyerKey(source, xPlayer, plate)
         end
     end
 
@@ -378,6 +417,7 @@ RegisterNetEvent("core:concess:sellFromStock", function(concessId, model, target
         local spawned = VFW.Vehicles.Spawn(targetId, modelName, spawnPoint, spawnPoint.h or 0.0, props)
         if spawned and DoesEntityExist(spawned) then
             pcall(SetVehicleNumberPlateText, spawned, plate)
+            giveBuyerKey(targetId, target, plate)
         end
     end
 
@@ -573,10 +613,17 @@ RegisterNetEvent("core:concess:giveKeyDuplicate", function(targetPlayerId, plate
         return
     end
 
-    JC.Exec([[
-        INSERT IGNORE INTO concess_key_duplicates (plate, identifier, granted_by, concess_id)
-        VALUES (?, ?, ?, ?)
-    ]], { plateName, target.identifier, xPlayer.identifier, entry.id })
+    -- le double est un objet « keys » de plus (le client peut le confier à quelqu'un) ; la ligne en base n'en garde que la trace
+    if not (VFW.VehicleKeys and VFW.VehicleKeys.Give) then
+        JC.Notify(source, "Les cles de vehicule sont indisponibles.", true)
+        return
+    end
+    local given, why = VFW.VehicleKeys.Give(target, row.plate, true)
+    if not given then
+        JC.Notify(source, ("Le double de cles n'a pas pu etre remis : %s."):format(tostring(why or "raison inconnue")), true)
+        return
+    end
+    Concess.GrantKeyDuplicate(row.plate, target.identifier, xPlayer.identifier, entry.id)
 
     Concess.Log(entry.id, "sale", ("Double de cles %s"):format(plateName), JC.PlayerName(xPlayer), 0)
 

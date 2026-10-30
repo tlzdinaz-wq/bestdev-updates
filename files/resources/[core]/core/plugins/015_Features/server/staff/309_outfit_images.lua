@@ -106,41 +106,69 @@ local function readManifestFile()
     return sanitizeManifest(decoded)
 end
 
+--- Images enregistrées alors que la base n'était pas encore lue. Elles étaient perdues : loadManifest rendait une table
+--- neuve à chaque appel, manifestSet y écrivait et plus personne ne la relisait (l'image était sur FiveManage, la boutique
+--- ne la voyait jamais). Elles sont maintenant gardées ici, puis versées dans la liste dès que la base est lue.
+local pending = {}
+
+local function mergeInto(target, source)
+    for sex, kinds in pairs(source) do
+        for kind, folders in pairs(kinds) do
+            for folder, files in pairs(folders) do
+                for filename, url in pairs(files) do
+                    target[sex] = target[sex] or {}
+                    target[sex][kind] = target[sex][kind] or {}
+                    target[sex][kind][folder] = target[sex][kind][folder] or {}
+                    target[sex][kind][folder][filename] = url
+                end
+            end
+        end
+    end
+    return target
+end
+
 local function loadManifest()
     if manifest then return manifest end
 
     local stored, consulted = readFromDatabase()
     if stored then
         manifest = sanitizeManifest(stored)
-        return manifest
+    else
+        local fromFile = readManifestFile()
+
+        -- Base pas encore lue : on s'en sert sans le retenir, sinon cette liste tiendrait lieu de
+        -- verite pour toute la duree du serveur. Les images en attente y sont ajoutées.
+        if not consulted then return mergeInto(fromFile or {}, pending) end
+
+        manifest = fromFile or {}
+        if next(manifest) then
+            -- premiere fois : le fichier existant devient la copie de la base
+            mirrorToDatabase(manifest)
+            console.warn("[outfits] liste reprise depuis manifest.json et enregistrée en base.")
+        end
     end
 
-    local fromFile = readManifestFile()
-
-    -- Base pas encore lue : on s'en sert sans le retenir, sinon cette liste tiendrait lieu de
-    -- verite pour toute la duree du serveur.
-    if not consulted then return fromFile or {} end
-
-    manifest = fromFile or {}
-    if next(manifest) then
-        -- premiere fois : le fichier existant devient la copie de la base
+    if next(pending) then
+        mergeInto(manifest, pending)
+        pending = {}
         mirrorToDatabase(manifest)
-        console.warn("[outfits] liste reprise depuis manifest.json et enregistrée en base.")
     end
     return manifest
 end
 
 local function saveManifest()
     local data = loadManifest()
-    -- la base d'abord : c'est elle qui compte, meme si le dossier de la ressource n'est pas inscriptible
-    mirrorToDatabase(data)
+    -- la base d'abord : c'est elle qui compte, meme si le dossier de la ressource n'est pas inscriptible.
+    -- Tant qu'elle n'est pas lue, on ne l'écrase pas : les images attendent dans `pending` (fichier mis à jour quand même).
+    if manifest then mirrorToDatabase(data) end
     local ok = SaveResourceFile(GetCurrentResourceName(), MANIFEST_FILE, json.encode(data), -1)
     if not ok then console.warn("[outfits] écriture de " .. MANIFEST_FILE .. " refusée (la liste reste enregistrée en base).") end
     return true
 end
 
 local function manifestSet(sex, kind, folder, filename, url)
-    local m = loadManifest()
+    loadManifest()
+    local m = manifest or pending
     m[sex] = m[sex] or {}
     m[sex][kind] = m[sex][kind] or {}
     m[sex][kind][folder] = m[sex][kind][folder] or {}

@@ -154,6 +154,15 @@ RegisterNetEvent("garage:exitVehicle", function(garageId, plate, spawnCoords, re
         UPDATE owned_vehicles SET stored = 0, engineHealth = ?, bodyHealth = ? WHERE plate = ?
     ]], { row.engineHealth, row.bodyHealth, normalized })
 
+    -- Les clés reviennent avec le véhicule (objet `keys`, personnel ou de société). Une clé qui ne peut pas être remise
+    -- (inventaire plein...) ne bloque pas la sortie : le propriétaire et le groupe y ont accès sans elle.
+    if VFW.VehicleKeys then
+        local given, why = VFW.VehicleKeys.Give(xPlayer, normalized)
+        if not given then
+            Vehicles.Notify(source, "ROUGE", "Garage", ("Vos clés n'ont pas pu être remises : %s."):format(tostring(why)))
+        end
+    end
+
     TriggerClientEvent("garage:placeVehicleOnGround", source, netId)
     if doRepair then
         TriggerClientEvent("vfw:repairVehicle", source, netId)
@@ -242,6 +251,16 @@ RegisterNetEvent("garage:storeVehicle", function(garageId, props)
         turbo and 1 or 0,
         normalized,
     })
+
+    -- Rangé : les clés repartent avec le véhicule. Un véhicule de société n'a qu'un jeu de clés : tous les employés connectés
+    -- qui en tiennent une la rendent, pas seulement celui qui le range.
+    if VFW.VehicleKeys then
+        if isGroupVehicle then
+            VFW.VehicleKeys.RemoveEverywhere(normalized)
+        else
+            VFW.VehicleKeys.Remove(xPlayer, normalized)
+        end
+    end
 
     Vehicles.Notify(source, "VERT", "Garage", "Véhicule rangé.")
 end)

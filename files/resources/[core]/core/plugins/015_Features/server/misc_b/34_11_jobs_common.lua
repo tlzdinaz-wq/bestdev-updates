@@ -728,7 +728,139 @@ AddEventHandler("vfw:playerLoaded", function(source)
 end)
 
 local bracelets = {}
+local braceletBlips = {}
 
+local BRACELET_ITEM = "bracelet_electronique"
+local BRACELET_RANGE = 8.0
+
+--- État du bracelet d'un joueur : nil s'il n'en porte pas, sinon { since, item } (item : posé avec un objet, rendu au retrait).
+--- La mémoire est perdue au redémarrage mais pas les métadonnées du personnage : on les lit en second.
+local function braceletInfo(xTarget)
+    local entry = bracelets[xTarget.identifier]
+    if entry then return entry end
+
+    local meta = xTarget.getMeta and xTarget.getMeta("bracelet")
+    if meta == true then return { since = os.time(), item = false } end
+    if type(meta) == "table" and meta.isBracelet == true then
+        return { since = tonumber(meta.since) or os.time(), item = meta.item == true }
+    end
+    return nil
+end
+
+--- Retire du plan des agents qui suivent les bracelets le point d'un porteur qui n'en a plus.
+local function dropBraceletBlip(wearerSource)
+    for watcher in pairs(braceletBlips) do
+        TriggerClientEvent("CORE:JOBS:BLIP:ACTIONS", watcher, { ACTION = "DELETE", VALUE = wearerSource })
+    end
+end
+
+--- Pose (status = true) ou retire (false) le bracelet. L'état vit en mémoire pour le panneau de la police et dans les
+--- métadonnées du personnage, sous la forme `bracelet = { isBracelet, since, item }` que lit le client : il survit ainsi
+--- à une reconnexion et à un redémarrage.
+local function applyBracelet(xTarget, status, withItem)
+    if status then
+        local since = os.time()
+        bracelets[xTarget.identifier] = { source = xTarget.source, since = since, item = withItem == true }
+        xTarget.setMeta("bracelet", { isBracelet = true, since = since, item = withItem == true })
+    else
+        bracelets[xTarget.identifier] = nil
+        xTarget.setMeta("bracelet", { isBracelet = false })
+        dropBraceletBlip(xTarget.source)
+    end
+
+    TriggerClientEvent("core:jobs:setBracelet", xTarget.source, status)
+end
+
+--- Vérifications communes à la pose et au retrait depuis le menu police. Renvoie xPlayer, xTarget, info (nil si la cible
+--- n'a pas de bracelet), ou nil et le motif du refus.
+local function braceletCheck(source, targetServerId)
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if not xPlayer or not MiscB.IsLawEnforcement(xPlayer) then
+        return nil, "Réservé aux forces de l'ordre."
+    end
+
+    local target = tonumber(targetServerId)
+    local xTarget = target and target ~= source and VFW.GetPlayerFromId(target) or nil
+    if not xTarget then return nil, "Aucun citoyen à proximité." end
+
+    if MiscB.Dist(MiscB.PlayerCoords(source), MiscB.PlayerCoords(target)) > BRACELET_RANGE then
+        return nil, "Le citoyen est trop loin."
+    end
+
+    local Inv = VFW.Inventory
+    if not (Inv and Inv.HasItem and Inv.GivePlayerItem and Inv.TakePlayerItem) then
+        return nil, "L'inventaire est indisponible."
+    end
+
+    local info = braceletInfo(xTarget)
+    if not info and not Inv.HasItem(xPlayer, BRACELET_ITEM, 1) then
+        return nil, "Vous n'avez pas de bracelet électronique sur vous."
+    end
+    if info and info.item and Inv.CanCarry and not Inv.CanCarry(xPlayer, BRACELET_ITEM, 1) then
+        return nil, "Votre inventaire est trop lourd pour récupérer le bracelet."
+    end
+    return xPlayer, xTarget, info
+end
+
+--- Pose ou retire le bracelet. `useItem` : la pose consomme un objet « bracelet_electronique » (menu police) ; sans lui
+--- (menu radial) rien n'est consommé. Un bracelet posé avec un objet le rend à l'agent qui le retire, par quelque menu que ce soit.
+local function toggleBracelet(source, xPlayer, xTarget, info, useItem)
+    local Inv = VFW.Inventory
+
+    if info then
+        if info.item then
+            local given = Inv and Inv.GivePlayerItem and Inv.GivePlayerItem(xPlayer, BRACELET_ITEM, 1, nil, true)
+            if (given or 0) < 1 then
+                MiscB.Notify(source, "Votre inventaire est plein : impossible de récupérer le bracelet.")
+                return false
+            end
+        end
+        applyBracelet(xTarget, false)
+        MiscB.Notify(source, "Bracelet retiré.", "VERT")
+        MiscB.Notify(xTarget.source, "Votre bracelet électronique a été retiré.", "VERT")
+        return true
+    end
+
+    if useItem then
+        local taken = Inv and Inv.TakePlayerItem and Inv.TakePlayerItem(xPlayer, BRACELET_ITEM, 1, true)
+        if (taken or 0) < 1 then
+            MiscB.Notify(source, "Vous n'avez pas de bracelet électronique sur vous.")
+            return false
+        end
+    end
+
+    applyBracelet(xTarget, true, useItem == true)
+    MiscB.Notify(source, ("Bracelet posé sur %s."):format(MiscB.CharName(xTarget)), "VERT")
+    MiscB.Notify(xTarget.source, "Un bracelet électronique vous a été posé.")
+    return true
+end
+
+-- Menu police : le client interroge d'abord le serveur (avant l'animation), puis déclenche la pose ou le retrait.
+MiscB.Cb("police:canToggleBracelet", function(source, targetServerId)
+    if not MiscB.Rate(source, "braceletCheck", 500) then return false end
+
+    local xPlayer, reason = braceletCheck(source, targetServerId)
+    if not xPlayer then
+        MiscB.Notify(source, reason)
+        return false
+    end
+    return true
+end)
+
+RegisterNetEvent("police:toggleBracelet", function(targetServerId)
+    local source = source
+    if not MiscB.Rate(source, "bracelet", 1500) then return end
+
+    local xPlayer, xTarget, info = braceletCheck(source, targetServerId)
+    if not xPlayer then
+        MiscB.Notify(source, xTarget) -- sans agent valide, le 2e retour est le motif du refus
+        return
+    end
+
+    toggleBracelet(source, xPlayer, xTarget, info, true)
+end)
+
+-- Menu radial : pose et retrait sans objet, comme avant ; le serveur vérifie désormais aussi la distance.
 RegisterNetEvent("core:jobs:setBracelet", function(targetServerId)
     local source = source
     local target = tonumber(targetServerId)
@@ -739,26 +871,75 @@ RegisterNetEvent("core:jobs:setBracelet", function(targetServerId)
     local xTarget = VFW.GetPlayerFromId(target)
     if not xPlayer or not xTarget then return end
     if not MiscB.IsLawEnforcement(xPlayer) then return end
+    if MiscB.Dist(MiscB.PlayerCoords(source), MiscB.PlayerCoords(target)) > BRACELET_RANGE then return end
 
-    local status = not bracelets[xTarget.identifier]
-    if status then
-        bracelets[xTarget.identifier] = { source = target, since = os.time() }
-    else
-        bracelets[xTarget.identifier] = nil
-    end
-
-    xTarget.setMeta("bracelet", status)
-    TriggerClientEvent("core:jobs:setBracelet", target, status)
-    VFW.ShowNotification(source, { type = "VERT", content = status and "Bracelet pose." or "Bracelet retire." })
+    toggleBracelet(source, xPlayer, xTarget, braceletInfo(xTarget), false)
 end)
 
-local braceletBlips = {}
+-- Un porteur qui se reconnecte (ou après un redémarrage) retrouve sa place dans le panneau de la police.
+AddEventHandler("vfw:playerLoaded", function(source)
+    CreateThread(function()
+        Wait(4000)
+        local xPlayer = VFW.GetPlayerFromId(source)
+        if not xPlayer then return end
+
+        local info = braceletInfo(xPlayer)
+        if info then
+            bracelets[xPlayer.identifier] = { source = source, since = info.since, item = info.item == true }
+        end
+    end)
+end)
 
 RegisterNetEvent("core:jobs:activeBlips", function(activeState)
     local source = source
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer or not MiscB.IsLawEnforcement(xPlayer) then return end
-    braceletBlips[source] = activeState == true
+
+    if activeState == true then
+        braceletBlips[source] = true
+    else
+        braceletBlips[source] = nil
+        TriggerClientEvent("CORE:JOBS:BLIP:ACTIONS", source, { ACTION = "DELETE", VALUE = "ALL" })
+    end
+end)
+
+AddEventHandler("vfw:playerDropped", function(source)
+    braceletBlips[source] = nil
+end)
+
+--- Position de chaque porteur en ligne, au format attendu par le client (factions/bracelet.lua).
+local function braceletPositions()
+    local out = {}
+    for identifier in pairs(bracelets) do
+        local xTarget = VFW.GetPlayerFromIdentifier(identifier)
+        local ped = xTarget and GetPlayerPed(xTarget.source)
+        if ped and ped ~= 0 then
+            out[tostring(xTarget.source)] = {
+                NAME = MiscB.CharName(xTarget),
+                COORDS = { POS = GetEntityCoords(ped), HEADING = GetEntityHeading(ped) },
+            }
+        end
+    end
+    return out
+end
+
+-- Les agents qui ont activé les blips du panneau reçoivent la position des porteurs toutes les 3 secondes.
+CreateThread(function()
+    while true do
+        Wait(3000)
+        if next(braceletBlips) then
+            local positions
+            for watcher in pairs(braceletBlips) do
+                local xWatcher = VFW.GetPlayerFromId(watcher)
+                if xWatcher and MiscB.IsLawEnforcement(xWatcher) then
+                    positions = positions or braceletPositions()
+                    TriggerClientEvent("CORE:JOBS:BLIP:ACTIONS", watcher, { ACTION = "LIST", VALUE = positions })
+                else
+                    braceletBlips[watcher] = nil
+                end
+            end
+        end
+    end
 end)
 
 MiscB.Cb("police:getBraceletPlayers", function(source)

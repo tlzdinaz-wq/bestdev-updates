@@ -131,8 +131,19 @@ if isServerSide then
 
     -- Load system. Ce fichier est un shared_script : il s'exécute avant
     -- @oxmysql/lib/MySQL.lua (server_scripts). On attend donc l'API.
+    -- oxmysql donne à `MySQL.ready` la forme d'un objet appelable (une table munie de __call), pas d'une fonction : tester
+    -- type(MySQL.ready) == "function" n'était donc jamais vrai. Les réglages ne se chargeaient jamais (Loaded restait faux,
+    -- GetVariable rendait toujours une table vide) et le starter pack, l'antiban, etc. ne s'enregistraient pas en base.
+    local function mysqlReadyUsable()
+        if type(MySQL) ~= "table" then return false end
+        local ready = MySQL.ready
+        if type(ready) == "function" then return true end
+        local meta = type(ready) == "table" and getmetatable(ready) or nil
+        return type(meta) == "table" and meta.__call ~= nil
+    end
+
     CreateThread(function()
-        while type(MySQL) ~= "table" or type(MySQL.ready) ~= "function" do
+        while not mysqlReadyUsable() do
             Wait(100)
         end
 

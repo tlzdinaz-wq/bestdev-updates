@@ -436,7 +436,8 @@ local function OpenConcessCatalog(concess)
     for category, vehicles in pairs(allVehicles) do
         formattedVehicles[category] = {}
         for _, vehData in pairs(vehicles) do
-            local cdnImage = VFW.CDN_BASE .. "/vehicles/" .. vehData.model .. ".png"
+            -- image générée dans Gestion > Images > Véhicules (FiveManage) en priorité, sinon le CDN, sinon la doc FiveM
+            local cdnImage = (VFW.VehicleImage and VFW.VehicleImage(vehData.model)) or (VFW.CDN_BASE .. "/vehicles/" .. vehData.model .. ".png")
             local fallbackImage = ("https://docs.fivem.net/vehicles/%s.webp"):format(vehData.model)
             formattedVehicles[category][#formattedVehicles[category] + 1] = {
                 model = vehData.model,

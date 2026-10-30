@@ -867,25 +867,34 @@ Staff29.Cb("vfw:server:getMugshotsWithInfo", function(source)
     return listMugshots()
 end)
 
+-- Véhicules qui ont une image : celles du CDN (si configuré) et celles générées depuis Gestion (322_vehicle_images.lua,
+-- hébergées sur FiveManage). L'image générée prime sur celle du CDN pour un même modèle.
 Staff29.Cb("vfw:server:getCdnVehicles", function(source)
     if not staffOk(source) then return {} end
-    if not (VFW.CDN and VFW.CDN.IsConfigured and VFW.CDN.IsConfigured() and VFW.CDN.List) then
-        return {}
+    local out, index = {}, {}
+    if VFW.CDN and VFW.CDN.IsConfigured and VFW.CDN.IsConfigured() and VFW.CDN.List then
+        local ok, files = VFW.CDN.List("vehicles")
+        if ok and type(files) == "table" then
+            for i = 1, #files do
+                local entry = files[i]
+                local path = entry.path or entry.name or ""
+                local stem = path:match("([^/]+)%.[^/%.]+$") or path:match("([^/]+)$") or path
+                out[#out + 1] = {
+                    name = stem,
+                    model = stem,
+                    imageUrl = entry.url or resolveUrl(path),
+                    url = entry.url or resolveUrl(path),
+                }
+                index[stem:lower()] = #out
+            end
+        end
     end
-    local ok, files = VFW.CDN.List("vehicles")
-    if not ok or type(files) ~= "table" then return {} end
-    local out = {}
-    for i = 1, #files do
-        local entry = files[i]
-        local path = entry.path or entry.name or ""
-        local stem = path:match("([^/]+)%.[^/%.]+$") or path:match("([^/]+)$") or path
-        out[#out + 1] = {
-            name = stem,
-            model = stem,
-            imageUrl = entry.url or resolveUrl(path),
-            url = entry.url or resolveUrl(path),
-        }
+    local generated = VFW.VehicleImages and VFW.VehicleImages.All and VFW.VehicleImages.All() or {}
+    for model, url in pairs(generated) do
+        local row = { name = model, model = model, imageUrl = url, url = url, generated = true }
+        if index[model] then out[index[model]] = row else out[#out + 1] = row end
     end
+    table.sort(out, function(a, b) return tostring(a.name) < tostring(b.name) end)
     return out
 end)
 

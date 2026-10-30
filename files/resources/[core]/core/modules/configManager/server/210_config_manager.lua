@@ -206,8 +206,18 @@ function ConfigManager.Unset(key)
     return true
 end
 
+-- oxmysql donne à `MySQL.ready` la forme d'un objet appelable (une table munie de __call), pas d'une fonction : l'ancien
+-- test « est une fonction » échouait toujours, et la table vfw_config n'était jamais lue.
+local function mysqlReadyUsable()
+    if type(MySQL) ~= "table" then return false end
+    local ready = MySQL.ready
+    if type(ready) == "function" then return true end
+    local meta = type(ready) == "table" and getmetatable(ready) or nil
+    return type(meta) == "table" and meta.__call ~= nil
+end
+
 local function loadOverrides()
-    if type(MySQL) ~= "table" or type(MySQL.ready) ~= "function" then
+    if not mysqlReadyUsable() then
         ConfigManager.Loaded = true
         rebuild()
         return

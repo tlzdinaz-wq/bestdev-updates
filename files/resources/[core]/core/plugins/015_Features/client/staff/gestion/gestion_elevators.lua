@@ -13,6 +13,7 @@ local CONFIG = {
 ElevatorsData = {}
 
 local elevatorCenterCache = {}
+local elevatorRadiusCache = {}
 local whitelistCache = {}
 local lastHelpShown = 0
 
@@ -65,21 +66,42 @@ local function calculateElevatorCenter(elevator)
     return vector3(totalX / validFloors, totalY / validFloors, totalZ / validFloors)
 end
 
+--- Distance du centre à l'étage le plus éloigné : un ascenseur dont les étages sont loin les uns des autres (tour de
+--- 300 m, tunnel) doit rester détectable depuis chacun de ses étages, pas seulement près de son centre.
+local function calculateElevatorRadius(elevator, center)
+    local radius = 0.0
+    for i = 1, #(elevator.floors or {}) do
+        local coords = elevator.floors[i].coords
+        if coords and coords.x and coords.y and coords.z then
+            local dx, dy, dz = coords.x - center.x, coords.y - center.y, coords.z - center.z
+            local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+            if distance > radius then radius = distance end
+        end
+    end
+    return radius
+end
+
 local function initializeCaches()
     elevatorCenterCache = {}
+    elevatorRadiusCache = {}
     whitelistCache = {}
 
     for elevatorIndex, elevator in pairs(ElevatorsData) do
-        elevatorCenterCache[elevatorIndex] = calculateElevatorCenter(elevator)
+        local center = calculateElevatorCenter(elevator)
+        elevatorCenterCache[elevatorIndex] = center
+        elevatorRadiusCache[elevatorIndex] = calculateElevatorRadius(elevator, center)
     end
 end
 
 local function updateElevatorCacheEntry(elevatorIndex)
     local elevator = ElevatorsData[elevatorIndex]
     if elevator then
-        elevatorCenterCache[elevatorIndex] = calculateElevatorCenter(elevator)
+        local center = calculateElevatorCenter(elevator)
+        elevatorCenterCache[elevatorIndex] = center
+        elevatorRadiusCache[elevatorIndex] = calculateElevatorRadius(elevator, center)
     else
         elevatorCenterCache[elevatorIndex] = nil
+        elevatorRadiusCache[elevatorIndex] = nil
     end
 end
 
@@ -126,13 +148,14 @@ end
 local function getClosestFloorFromPlayer(playerCoords)
     local closestDistance = math.huge
     local closestFloor, closestElevatorIndex, closestFloorIndex = nil, nil, nil
-    local renderRangeSq = (CONFIG.RENDER_DISTANCE * 1.5) * (CONFIG.RENDER_DISTANCE * 1.5)
+    local renderRange = CONFIG.RENDER_DISTANCE * 1.5
 
     for elevatorIndex, centerCoords in pairs(elevatorCenterCache) do
         local dx = playerCoords.x - centerCoords.x
         local dy = playerCoords.y - centerCoords.y
         local dz = playerCoords.z - centerCoords.z
-        if (dx * dx + dy * dy + dz * dz) <= renderRangeSq then
+        local reach = renderRange + (elevatorRadiusCache[elevatorIndex] or 0.0)
+        if (dx * dx + dy * dy + dz * dz) <= reach * reach then
             local elevator = ElevatorsData[elevatorIndex]
             if elevator and elevator.floors then
                 for floorIndex = 1, #elevator.floors do
@@ -358,6 +381,7 @@ RegisterNetEvent("core:player:removeElevator", function(elevatorIndex)
 
     ElevatorsData[elevatorIndex] = nil
     elevatorCenterCache[elevatorIndex] = nil
+    elevatorRadiusCache[elevatorIndex] = nil
     clearAllCaches()
 
     if selectedElevatorIndex == elevatorIndex then

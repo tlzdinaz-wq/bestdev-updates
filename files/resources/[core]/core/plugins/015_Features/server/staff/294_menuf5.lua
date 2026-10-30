@@ -337,8 +337,17 @@ RegisterNetEvent("vfw:vehicle:respondSale", function(accepted, paymentMethod)
 
     Staff29.Update("UPDATE owned_vehicles SET owner = ? WHERE plate = ?", { buyer.identifier, offer.plate })
 
+    -- le vendeur perd sa clé ; l'acheteur reçoit la sienne si le véhicule est sorti (objet « keys », modules/garage/server/050_vehicle_keys.lua)
+    local keyNote = ""
+    if VFW.VehicleKeys and VFW.VehicleKeys.Transfer then
+        local given, why = VFW.VehicleKeys.Transfer(offer.plate, offer.sellerIdentifier, buyer)
+        if not given then
+            keyNote = (" Vos clés n'ont pas pu être remises : %s."):format(tostring(why or "raison inconnue"))
+        end
+    end
+
     buyer.triggerEvent("vfw:vehicle:saleResult", true,
-        ("Vous avez acheté %s (%s)."):format(offer.label, offer.plate))
+        ("Vous avez acheté %s (%s)."):format(offer.label, offer.plate) .. keyNote)
     seller.triggerEvent("vfw:vehicle:saleResult", true,
         ("Vous avez vendu %s (%s)."):format(offer.label, offer.plate))
 end)

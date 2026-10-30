@@ -159,6 +159,14 @@ html.hud-layout-on .notistack-SnackbarContainer {
   top: var(--hud-notif-top) !important;
   right: auto !important;
   bottom: auto !important;
+  flex-direction: column-reverse !important;
+}
+
+/* Une fois la première notification mesurée, son bord inférieur devient
+   l'ancre de la pile. Les suivantes grandissent alors uniquement vers le haut. */
+html.hud-layout-on.hud-notif-anchored .notistack-SnackbarContainer {
+  top: auto !important;
+  bottom: var(--hud-notif-live-bottom, 20%) !important;
 }
 
 .hud-layout-notif-preview {
@@ -340,8 +348,10 @@ html.hud-layout-edit .notistack-SnackbarContainer {
   pointer-events: auto;
   position: absolute;
   box-sizing: border-box;
-  border: 2px dashed #9b91f3;
+  /* Pas de contour : seules les interfaces se voient. Un léger halo au survol montre ce qu'on attrape. */
+  border: 2px solid transparent;
   background: transparent !important;
+  transition: border-color .12s ease;
   box-shadow: none;
   border-radius: 10px;
   color: #fff;
@@ -352,11 +362,17 @@ html.hud-layout-edit .notistack-SnackbarContainer {
   padding: 6px 8px;
 }
 
+.hud-layout-box:hover {
+  border-color: rgba(255, 255, 255, .18);
+}
+
 .hud-layout-box:active {
   cursor: grabbing;
+  border-color: rgba(255, 255, 255, .28);
 }
 
 .hud-layout-box b {
+  display: none;
   font-size: 11px;
   letter-spacing: .04em;
   text-transform: uppercase;

@@ -141,6 +141,11 @@ RegisterServerCallback("vfw:enterVehicle", function(source, propertyId, plate, m
 
     PS.Log(row.id, "vehicle_store", xPlayer, cleanPlate)
 
+    -- rangé, le véhicule n'a plus de clé : elle est remise à la sortie (objet « keys », modules/garage/server/050_vehicle_keys.lua)
+    if VFW.VehicleKeys and VFW.VehicleKeys.Remove then
+        VFW.VehicleKeys.Remove(xPlayer, cleanPlate)
+    end
+
     local payload = PS.EnterProperty(source, row)
     return true, payload
 end)
@@ -271,6 +276,13 @@ RegisterNetEvent("vfw:property:exitGarageWithVehicle", function(propertyId, plat
             local ped = GetPlayerPed(source)
             if ped and ped ~= 0 then
                 SetPedIntoVehicle(ped, vehicle, -1)
+            end
+
+            if VFW.VehicleKeys and VFW.VehicleKeys.Give then
+                local given, why = VFW.VehicleKeys.Give(xPlayer, cleanPlate)
+                if not given then
+                    xPlayer.showNotification({ type = "ROUGE", content = ("Vos clés n'ont pas pu être remises : %s."):format(tostring(why or "raison inconnue")) })
+                end
             end
         end
     end

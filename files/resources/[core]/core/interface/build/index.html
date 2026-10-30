@@ -1731,5 +1731,68 @@
         });
       })();
     </script>
+    <script>
+      /* Notifications : la première se place en haut du cadre choisi dans « Déplacer les interfaces ». Dès qu'elle est
+         posée, sa position devient l'ancre de la pile (règle html.hud-notif-anchored de skin/nui-fallbacks.css) : les
+         suivantes s'ajoutent au-dessus sans faire descendre celles déjà affichées. À partir de 3 cartes, l'interface
+         compacte les anciennes de ~15 px : on compense pour que la carte du bas ne bouge pas. Pile vide : ancrage haut. */
+      (function () {
+        var root = document.documentElement;
+        var pending = false;
+        var lastHeight = -1;
+        var anchor = null; // { top, pad, el, height } : la carte du bas au moment de l'ancrage
+        var watched = null;
+        var resizeObs = window.ResizeObserver ? new ResizeObserver(schedule) : null;
+        function reset() {
+          lastHeight = -1;
+          anchor = null;
+          root.classList.remove('hud-notif-anchored');
+        }
+        function update() {
+          pending = false;
+          var editor = document.getElementById('hud-layout-editor');
+          var editing = editor && editor.classList.contains('is-on');
+          var c = document.querySelector('.notistack-SnackbarContainer');
+          if (resizeObs && c !== watched) {
+            if (watched) resizeObs.unobserve(watched);
+            if (c) resizeObs.observe(c);
+            watched = c;
+          }
+          if (!c || !c.children.length || editing) {
+            if (anchor || root.classList.contains('hud-notif-anchored')) reset();
+            lastHeight = -1;
+            return;
+          }
+          var bottomCard = c.firstElementChild; // la plus ancienne est en bas de la pile
+          if (!anchor) {
+            // On attend la fin de l'animation d'entrée (même hauteur sur deux mesures) pour ancrer sans bouger.
+            var rect = c.getBoundingClientRect();
+            if (Math.abs(rect.height - lastHeight) > 0.5) {
+              lastHeight = rect.height;
+              setTimeout(schedule, 80);
+              return;
+            }
+            var cr = bottomCard.getBoundingClientRect();
+            anchor = { top: cr.top, pad: Math.max(0, rect.bottom - cr.bottom), el: bottomCard, height: cr.height };
+          }
+          var bottomPx = anchor.top + anchor.height + anchor.pad;
+          if (bottomCard === anchor.el) {
+            // Compactage (quelques px) : la carte du bas garde son haut. Une sortie (hauteur qui fond) n'est pas compensée :
+            // les cartes du dessus redescendent alors normalement.
+            var h = bottomCard.getBoundingClientRect().height;
+            if (h < anchor.height && anchor.height - h <= 30) bottomPx = anchor.top + h + anchor.pad;
+          }
+          root.style.setProperty('--hud-notif-live-bottom', Math.max(0, window.innerHeight - bottomPx) + 'px');
+          root.classList.add('hud-notif-anchored');
+        }
+        function schedule() {
+          if (pending) return;
+          pending = true;
+          setTimeout(update, 0);
+        }
+        new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+        window.addEventListener('resize', function () { reset(); schedule(); });
+      })();
+    </script>
   </body>
 </html>

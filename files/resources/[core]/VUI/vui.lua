@@ -618,6 +618,10 @@ end
 function CreateMenu(title, banner, autoRefresh)
     local menu = {}
     local crtIdx = 1
+    -- Les callbacks des items peuvent appartenir à une autre ressource (souvent
+    -- `core`). Conserver leur propriétaire permet de fermer le menu avant que
+    -- ses références de fonctions ne deviennent invalides lors d'un restart.
+    menu._ownerResource = GetInvokingResource() or GetCurrentResourceName()
     menu.title = title
     menu.banner = ResolveBanner(banner)
     menu.index = 1
@@ -1666,8 +1670,78 @@ end
 function CreateSubMenu(parent, title, banner, autoRefresh)
     local menu = CreateMenu(title, banner, autoRefresh)
     menu.parent = parent
+    -- Un sous-menu est construit dans VUI depuis l'appel du menu parent ; selon
+    -- le chemin d'appel, GetInvokingResource() peut donc être nil ou valoir VUI.
+    -- L'héritage garantit que toute la chaîne est nettoyée avec son propriétaire.
+    if parent and parent._ownerResource then
+        menu._ownerResource = parent._ownerResource
+    end
     return menu
 end
+
+-- Une ressource arrêtée invalide immédiatement toutes les funcrefs qu'elle a
+-- fournies à VUI. Sans ce nettoyage, le menu reste visible et le clic suivant
+-- produit "Execution of function reference in script host failed".
+AddEventHandler('onClientResourceStop', function(resourceName)
+    if not resourceName or resourceName == GetCurrentResourceName() then return end
+
+    local ownsOpenChain = VUI_CurrentMenu and VUI_CurrentMenu._ownerResource == resourceName
+    if not ownsOpenChain and VUI_MenuStack then
+        for i = 1, #VUI_MenuStack do
+            local entry = VUI_MenuStack[i]
+            local stackedMenu = type(entry) == "table" and (entry.menu or entry) or nil
+            if stackedMenu and stackedMenu._ownerResource == resourceName then
+                ownsOpenChain = true
+                break
+            end
+        end
+    end
+
+    -- Neutraliser également les menus enregistrés mais fermés. Leurs callbacks
+    -- ne doivent jamais être rappelés si un autre script conserve la table.
+    local ownedMenus = {}
+    for menu in pairs(VUI_AllMenus) do
+        if menu._ownerResource == resourceName then
+            ownedMenus[#ownedMenus + 1] = menu
+        end
+    end
+    for _, menu in ipairs(ownedMenus) do
+        menu.opened = false
+        menu._openFn = nil
+        menu._closeFn = nil
+        menu._idxChangeFn = nil
+        for _, item in ipairs(menu.items or {}) do
+            item.callback = nil
+            item.onEnter = nil
+        end
+        VUI_AllMenus[menu] = nil
+    end
+
+    if not ownsOpenChain then return end
+
+    if VUI_CurrentMenu then VUI_CurrentMenu.opened = false end
+    if VUI_MenuStack then
+        for i = 1, #VUI_MenuStack do
+            local entry = VUI_MenuStack[i]
+            local stackedMenu = type(entry) == "table" and (entry.menu or entry) or nil
+            if stackedMenu then stackedMenu.opened = false end
+        end
+    end
+
+    VUI_CurrentMenu = nil
+    VUI_MenuStack = {}
+    VUI_HubMode = false
+    VUI_HubReturnProxy = nil
+    VUI_HubEndToken = VUI_HubEndToken + 1
+    VUI_ColorPickerCallbacks = nil
+    VUI_RoleColorPickerCallbacks = nil
+    VUI_ColorPickerKeyThread = false
+    VUI_RoleColorPickerKeyThread = false
+
+    _SendNUIMessageNative({ action = "vui:menu:close" })
+    SetNuiFocus(false, false)
+    TriggerEvent('chat:setVisible', true)
+end)
 
 --- Affiche ou masque une alerte staff dans le NUI.
 ---@param name string Nom de l'alerte

@@ -1178,7 +1178,7 @@ RegisterNUICallback("gestion:images:generateOutfits", function(data, cb)
         cb({ ok = false, error = "Vous n'avez pas la permission de gérer les images." })
         return
     end
-    if autoJob or isOutfitCaptureBusy() then
+    if autoJob or isOutfitCaptureBusy() or (VFW.VehicleImageCaptureBusy and VFW.VehicleImageCaptureBusy()) then
         cb({ ok = false, error = "Une capture est déjà en cours." })
         return
     end
@@ -1229,11 +1229,22 @@ end)
 RegisterNUICallback("gestion:images:generateStop", function(_, cb)
     cb({ ok = true })
     if autoJob then autoJob.stop = true end
+    if VFW.VehicleImageCaptureStop then VFW.VehicleImageCaptureStop() end
 end)
+
+--- Pour vehicle_image_capture.lua : une capture de vêtements est-elle en cours ?
+function VFW.OutfitCaptureBusy()
+    return autoJob ~= nil or isOutfitCaptureBusy()
+end
 
 -- Retour de la page NUI : image détourée (webp base64) → serveur.
 RegisterNUICallback("gestion:images:captureProcessed", function(data, cb)
     cb({ ok = true })
+    -- images de véhicules (vehicle_image_capture.lua) : identifiant « veh_<modèle>_<horodatage> »
+    if type(data) == "table" and type(data.id) == "string" and data.id:sub(1, 4) == "veh_" then
+        if VFW.VehicleImageProcessed then VFW.VehicleImageProcessed(data) end
+        return
+    end
     if not autoJob or type(data) ~= "table" or type(data.id) ~= "string" then return end
     if not data.ok or type(data.base64) ~= "string" or data.base64 == "" then
         autoResolve(data.id, { ok = false, error = data.error or "Détourage impossible." })

@@ -148,6 +148,14 @@ RegisterNetEvent("pound:restoreVehicle", function(plate, poundId, paymentMethod)
     TriggerClientEvent("garage:placeVehicleOnGround", source, netId)
     TriggerClientEvent("vfw:repairVehicle", source, netId)
     Vehicles.Notify(source, "VERT", "Fourrière", "Véhicule récupéré.")
+
+    -- la clé revient avec le véhicule (objet « keys », modules/garage/server/050_vehicle_keys.lua)
+    if VFW.VehicleKeys and VFW.VehicleKeys.Give then
+        local given, why = VFW.VehicleKeys.Give(xPlayer, normalized)
+        if not given then
+            Vehicles.Notify(source, "ROUGE", "Fourrière", ("Vos clés n'ont pas pu être remises : %s."):format(tostring(why or "raison inconnue")))
+        end
+    end
 end)
 
 RegisterServerCallback("core:getAllPounds", function(source)

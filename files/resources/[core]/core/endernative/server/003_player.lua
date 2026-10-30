@@ -79,65 +79,76 @@ function VFW.CreateExtendedPlayer(source, row, account)
         TriggerClientEvent(event, self.source, ...)
     end
 
-    -- ── Liquide ──────────────────────────────────────────────────
-    -- Le liquide est l'objet « money » de l'inventaire : celui que montrent l'inventaire, la banque et le
-    -- HUD. Le compte « money » n'en est qu'une vue : getAccount, setAccountMoney, addAccountMoney,
-    -- removeAccountMoney et getMoney lisent et écrivent cet objet, si bien que tous les achats paient avec
-    -- l'argent que le joueur voit. Avant, les magasins lisaient le compte (0 $) pendant que l'argent retiré
-    -- à la banque était un objet : « vous n'avez pas assez d'argent » avec 4500 $ dans le sac.
-    -- Ce que le compte garde en base reste à 0 (rien n'est compté deux fois) ; un ancien solde est versé
-    -- dans l'inventaire au chargement du personnage (foldStoredCash).
+    -- ── Liquide et argent sale ───────────────────────────────────
+    -- Le liquide est l'objet « money » de l'inventaire et l'argent sale l'objet « dirty_money » : ce sont eux que
+    -- montrent l'inventaire, la banque et le HUD. Les comptes « money » et « black_money » n'en sont que des vues :
+    -- getAccount, setAccountMoney, addAccountMoney, removeAccountMoney (et getMoney pour le liquide) lisent et écrivent
+    -- ces objets, si bien que tout paie et encaisse avec l'argent que le joueur voit. Avant, les magasins lisaient le
+    -- compte (0 $) pendant que l'argent retiré à la banque était un objet : « vous n'avez pas assez d'argent » avec
+    -- 4500 $ dans le sac ; de même le blanchiment refusait l'argent sale du sac (go-fast, téléphone) pendant que les
+    -- braquages et la drogue créditaient un compte invisible.
+    -- Ce que ces comptes gardent en base reste à 0 (rien n'est compté deux fois) ; un ancien solde est versé dans
+    -- l'inventaire au chargement du personnage (foldStoredCash).
     local CASH = "money"
+    local BAG_ACCOUNTS = { money = "money", black_money = "dirty_money" }
+    local BAG_LABELS = { money = "Espèces", black_money = "Argent sale" }
 
-    local function cashInInventory()
+    local function itemInInventory(item)
         local total = 0
         for i = 1, #self.inventory do
             local entry = self.inventory[i]
-            if entry.name == CASH then total = total + (tonumber(entry.count) or 0) end
+            if entry.name == item then total = total + (tonumber(entry.count) or 0) end
         end
         return total
     end
 
-    local function cashTotal()
-        local stored = findAccount(self.accounts, CASH)
-        return cashInInventory() + math.max(0, tonumber(stored and stored.money) or 0)
+    local function bagTotal(account)
+        local stored = findAccount(self.accounts, account)
+        return itemInInventory(BAG_ACCOUNTS[account]) + math.max(0, tonumber(stored and stored.money) or 0)
     end
 
-    local function cashAccount()
-        local stored = findAccount(self.accounts, CASH)
+    local function bagAccount(account)
+        local stored = findAccount(self.accounts, account)
         return {
-            name = CASH,
-            money = cashTotal(),
-            label = stored and stored.label or "Espèces",
+            name = account,
+            money = bagTotal(account),
+            label = stored and stored.label or BAG_LABELS[account],
             round = stored == nil or stored.round ~= false,
         }
+    end
+
+    local function cashTotal()
+        return bagTotal(CASH)
     end
 
     local function accountsForClient()
         local list = {}
         for i = 1, #self.accounts do
-            list[i] = self.accounts[i].name == CASH and cashAccount() or self.accounts[i]
+            local name = self.accounts[i].name
+            list[i] = BAG_ACCOUNTS[name] and bagAccount(name) or self.accounts[i]
         end
         return list
     end
 
-    --- Verse dans l'inventaire un solde resté dans le compte, sans événement (appelé au chargement).
+    --- Verse dans l'inventaire les soldes restés dans ces comptes, sans événement (appelé au chargement).
     local function foldStoredCash()
-        local stored = findAccount(self.accounts, CASH)
-        local amount = math.floor(tonumber(stored and stored.money) or 0)
-        if not stored or amount <= 0 then return end
-        if not (VFW.Items and VFW.Items[CASH]) then return end -- objet inconnu : le solde reste dans le compte
-
-        for i = 1, #self.inventory do
-            if self.inventory[i].name == CASH then
-                self.inventory[i].count = (tonumber(self.inventory[i].count) or 0) + amount
+        for account, item in pairs(BAG_ACCOUNTS) do
+            local stored = findAccount(self.accounts, account)
+            local amount = math.floor(tonumber(stored and stored.money) or 0)
+            -- objet inconnu : le solde reste dans le compte
+            if stored and amount > 0 and VFW.Items and VFW.Items[item] then
+                local merged = false
+                for i = 1, #self.inventory do
+                    if self.inventory[i].name == item then
+                        self.inventory[i].count = (tonumber(self.inventory[i].count) or 0) + amount
+                        merged = true
+                        break
+                    end
+                end
+                if not merged then self.inventory[#self.inventory + 1] = { name = item, count = amount } end
                 stored.money = 0
-                return
             end
         end
-
-        self.inventory[#self.inventory + 1] = { name = CASH, count = amount }
-        stored.money = 0
     end
 
     function self.triggerEvent(event, ...)
@@ -264,7 +275,7 @@ function VFW.CreateExtendedPlayer(source, row, account)
     end
 
     function self.getAccount(name)
-        if name == CASH then return cashAccount() end
+        if BAG_ACCOUNTS[name] then return bagAccount(name) end
         return (findAccount(self.accounts, name))
     end
 
@@ -272,13 +283,14 @@ function VFW.CreateExtendedPlayer(source, row, account)
         money = math.floor(money + 0.5)
         if money < 0 then money = 0 end
 
-        if name == CASH then
-            local stored = ensureAccount(self.accounts, CASH)
-            local current = cashTotal()
+        local item = BAG_ACCOUNTS[name]
+        if item then
+            local stored = ensureAccount(self.accounts, name)
+            local current = bagTotal(name)
 
             if money > current then
                 local added = money - current
-                if not self.addInventoryItem(CASH, added, nil, false) then
+                if not self.addInventoryItem(item, added, nil, false) then
                     stored.money = (tonumber(stored.money) or 0) + added -- objet inconnu : le compte garde la différence
                 end
             elseif money < current then
@@ -289,15 +301,15 @@ function VFW.CreateExtendedPlayer(source, row, account)
                 missing = missing - fromStored
 
                 while missing > 0 do
-                    local item = self.getInventoryItem(CASH)
-                    local take = item and math.min(tonumber(item.count) or 0, missing) or 0
-                    if take <= 0 or not self.removeInventoryItem(CASH, take, nil, false) then break end
+                    local entry = self.getInventoryItem(item)
+                    local take = entry and math.min(tonumber(entry.count) or 0, missing) or 0
+                    if take <= 0 or not self.removeInventoryItem(item, take, nil, false) then break end
                     missing = missing - take
                 end
             end
 
-            push("vfw:setAccountMoney", cashAccount())
-            TriggerEvent("vfw:setAccountMoney", self.source, name, cashTotal(), reason)
+            push("vfw:setAccountMoney", bagAccount(name))
+            TriggerEvent("vfw:setAccountMoney", self.source, name, bagTotal(name), reason)
             return
         end
 
@@ -310,14 +322,14 @@ function VFW.CreateExtendedPlayer(source, row, account)
 
     function self.addAccountMoney(name, money, reason)
         if money <= 0 then return end
-        if name == CASH then return self.setAccountMoney(name, cashTotal() + money, reason) end
+        if BAG_ACCOUNTS[name] then return self.setAccountMoney(name, bagTotal(name) + money, reason) end
         local account = ensureAccount(self.accounts, name)
         self.setAccountMoney(name, account.money + money, reason)
     end
 
     function self.removeAccountMoney(name, money, reason)
         if money <= 0 then return end
-        if name == CASH then return self.setAccountMoney(name, cashTotal() - money, reason) end
+        if BAG_ACCOUNTS[name] then return self.setAccountMoney(name, bagTotal(name) - money, reason) end
         local account = findAccount(self.accounts, name)
         if not account then return end
         self.setAccountMoney(name, account.money - money, reason)
