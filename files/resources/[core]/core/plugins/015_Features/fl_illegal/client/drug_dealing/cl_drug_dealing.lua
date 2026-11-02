@@ -93,6 +93,13 @@ AddEventHandler("core:drugdealing:requestToggleWithZone", function(newState)
     TriggerServerEvent("core:drugdealing:toggleSystem", newState, zoneName)
 end)
 
+-- La commande n'était que suggérée dans le chat, jamais enregistrée : rien ne lançait la vente. Touche libre (à choisir
+-- dans Paramètres > Raccourcis clavier > FiveM).
+RegisterCommand(Config.DrugDealing.ToggleCommand, function()
+    DrugDealing.ToggleSystem()
+end, false)
+RegisterKeyMapping(Config.DrugDealing.ToggleCommand, 'Vente de drogue (activer / désactiver)', 'keyboard', '')
+
 RegisterNetEvent("core:drugdealing:sendNotification")
 AddEventHandler("core:drugdealing:sendNotification", function(notification)
     if VFW and VFW.ShowNotification then

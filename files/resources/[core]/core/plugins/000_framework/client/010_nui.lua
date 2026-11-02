@@ -1418,6 +1418,8 @@ end
 RegisterNUICallback("illegalCrafting:close", function(_, cb)
     VFW.Nui.IllegalCrafting(false)
     VFW.Nui.Focus(false)
+    -- les tables (illégales / légales) oublient la table ouverte ; sans ça elle restait « ouverte » après fermeture
+    TriggerEvent('core:illegalCrafting:close')
     cb('ok')
 end)
 

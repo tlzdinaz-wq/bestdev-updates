@@ -461,7 +461,7 @@
     <link rel="stylesheet" href="./skin/notifications.css?v=9">
     <link rel="stylesheet" href="./skin/status-hud.css?v=9">
     <link rel="stylesheet" href="./skin/char-creator.css?v=4">
-    <link rel="stylesheet" href="./skin/clothing-shop.css?v=4">
+    <link rel="stylesheet" href="./skin/clothing-shop.css?v=5">
     <link rel="stylesheet" href="./skin/salon.css?v=1">
     <link rel="stylesheet" href="./skin/inventory.css?v=10">
     <link rel="stylesheet" href="./skin/inventory-themes.css?v=3">
@@ -1271,6 +1271,62 @@
           send(d);
           e.stopImmediatePropagation();
           if (d.action === 'nui:vehicleStorage:open') {
+            frame.style.cssText = SHOWN;
+            setTimeout(function () {
+              if (frame.contentWindow) frame.contentWindow.focus();
+            }, 0);
+          }
+        });
+      })();
+    </script>
+    <script>
+      // Magasin LTD (superettes) : page dédiée (interface/ltd/) qui remplace l'écran du bundle. Les messages
+      // openShopLTD / updateShopLTDMoney / closeShopLTD lui sont transmis et ne parviennent plus au bundle
+      // (stopImmediatePropagation). Callbacks NUI inchangés (purchaseItems, closeShopLTD).
+      (function () {
+        var ACTIONS = ['openShopLTD', 'updateShopLTDMoney', 'closeShopLTD'];
+        var BASE = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;z-index:10012;';
+        var HIDDEN = BASE + 'display:none;pointer-events:none;';
+        var SHOWN = BASE + 'display:block;pointer-events:auto;';
+        var ready = false;
+        var pending = [];
+        var frame = document.createElement('iframe');
+        frame.id = 'ltd-shop';
+        frame.src = '../ltd/index.html';
+        frame.setAttribute('scrolling', 'no');
+        frame.style.cssText = HIDDEN;
+        frame.addEventListener('load', function () {
+          ready = true;
+          while (pending.length) {
+            var queued = pending.shift();
+            if (frame.contentWindow) frame.contentWindow.postMessage(queued, '*');
+          }
+        });
+        window.__nuiAppend(frame);
+        window.__uiDev.register(frame, 'ltd', function () { ready = false; });
+
+        function send(d) {
+          if (ready && frame.contentWindow) frame.contentWindow.postMessage(d, '*');
+          else pending.push(d);
+        }
+        function passive() {
+          frame.style.cssText = HIDDEN;
+          frame.blur();
+          window.focus();
+        }
+
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (!d || typeof d.action !== 'string') return;
+          if (d.action === 'ltdshop:passive') {
+            if (e.source === frame.contentWindow) passive();
+            return;
+          }
+          if (d.action === 'core:branding:apply') { send(d); return; }
+          if (ACTIONS.indexOf(d.action) === -1) return;
+          send(d);
+          e.stopImmediatePropagation();
+          if (d.action === 'openShopLTD') {
             frame.style.cssText = SHOWN;
             setTimeout(function () {
               if (frame.contentWindow) frame.contentWindow.focus();

@@ -32,6 +32,7 @@ local function panel()
         loadingScreenMusic = built.loadingScreenMusic or "",
         loadingSocialTitle = built.loadingSocialTitle or "",
         loadingTicker = built.loadingTicker or {},
+        loadingOptions = built.loadingOptions,
         links = {
             website = links.website or "",
             discord = links.discord or "",
@@ -75,4 +76,32 @@ Staff29.Cb("gestionLoadingScreen:save", function(source, data)
     local out = panel()
     out.message = data.reset and "Loading screen d’origine rétabli." or "Loading screen enregistré dans branding_overrides.json."
     return out
+end)
+
+-- Équipe du loading screen : membres du staff du serveur (pseudo + grade et couleur du grade, réglés dans
+-- Gestion > Permissions), du plus haut grade au plus bas. Le staff complète ensuite (photos) ou retire des lignes.
+Staff29.Cb("gestionLoadingScreen:staffImport", function(source)
+    if not staffOk(source) then return fail("Permission refusée.") end
+    local roles = VFW.Variables and VFW.Variables.GetVariable and VFW.Variables.GetVariable("staff_roles") or {}
+    if type(roles) ~= "table" then roles = {} end
+    local rows = Staff29.Query([[
+        SELECT name, role FROM users WHERE role IS NOT NULL AND role <> '' AND role <> 'user' LIMIT 200
+    ]], {}) or {}
+    local out = {}
+    for i = 1, #rows do
+        local row = rows[i]
+        local role = type(roles[row.role]) == "table" and roles[row.role] or {}
+        out[#out + 1] = {
+            name = tostring(row.name or "?"):sub(1, 40),
+            grade = (type(role.name) == "string" and role.name ~= "") and role.name or tostring(row.role),
+            color = type(role.color) == "string" and role.color or "",
+            level = tonumber(role.level) or 0,
+        }
+    end
+    table.sort(out, function(a, b)
+        if a.level ~= b.level then return a.level > b.level end
+        return a.name:lower() < b.name:lower()
+    end)
+    for i = 1, #out do out[i].level = nil end
+    return { ok = true, staff = out }
 end)

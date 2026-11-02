@@ -41,3 +41,13 @@ RegisterNuiCallback("gestion:loadingscreen:save", function(data, cb)
     end
     cb(res)
 end)
+
+RegisterNuiCallback("gestion:loadingscreen:staffImport", function(_, cb)
+    if not Guard() then cb({ ok = false, error = "Permission refusée." }) return end
+    local res = TriggerServerCallback("gestionLoadingScreen:staffImport")
+    if type(res) ~= "table" or res.ok ~= true then
+        cb({ ok = false, error = (type(res) == "table" and res.error) or "Import impossible." })
+        return
+    end
+    cb(res)
+end)

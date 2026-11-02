@@ -89,6 +89,7 @@ local function mergePayload(payload)
     liveAssets.loadingScreenMusic = payload.loadingScreenMusic
     liveAssets.loadingSocialTitle = payload.loadingSocialTitle
     liveAssets.loadingTicker = payload.loadingTicker
+    if type(payload.loadingOptions) == 'table' then liveAssets.loadingOptions = payload.loadingOptions end
     liveAssets.background = payload.background
     if type(payload.notificationLogo) == "string" and payload.notificationLogo ~= "" then
         liveAssets.notificationLogo = payload.notificationLogo
@@ -107,6 +108,7 @@ local function buildBrandingResponse()
     out.loadingScreenMusic = liveAssets.loadingScreenMusic
     out.loadingSocialTitle = liveAssets.loadingSocialTitle
     out.loadingTicker = liveAssets.loadingTicker
+    out.loadingOptions = liveAssets.loadingOptions
     out.notificationLogo = liveAssets.notificationLogo
     out.background = liveAssets.background
     -- Bannière de marque (panel/ConVar `core_brand_vui_banner`) exposée sous la clé
@@ -183,6 +185,7 @@ RegisterNetEvent('core:branding:apply', function(payload)
         loadingScreenMusic = liveAssets.loadingScreenMusic,
         loadingSocialTitle = liveAssets.loadingSocialTitle,
         loadingTicker = liveAssets.loadingTicker,
+        loadingOptions = liveAssets.loadingOptions,
         logo = BRANDING.logo,
         colors = BRANDING.colors,
         links = BRANDING.links,

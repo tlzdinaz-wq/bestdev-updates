@@ -41,7 +41,7 @@ end
 
 -- Déclaration avant VFW.GestionImages.Persist : sinon `persistSetting` y est compilé en
 -- variable globale (nil à l'appel) au lieu de pointer sur la locale définie plus bas.
-local persistSetting, loadSettingsCache, applyPersistedImages
+local persistSetting, loadSettingsCache, applyPersistedImages, pauseRaw
 
 function VFW.GestionImages.Get(scope, key)
     return cacheGet(scope, key)
@@ -201,7 +201,11 @@ applyPersistedImages = function()
         end
     end
 
-    if VFW.Variables and VFW.Variables.SetVariable then
+    -- Logo / bannière / tuiles pause : seulement une fois les réglages lus en base. Avant (passage à 4 s), la charte
+    -- connue était vide ou celle du fichier : la réenregistrer effaçait l'écran de chargement, la musique, les liens et
+    -- les couleurs du serveur, et marquait le réglage « modifié » (le chargement suivant ne le relisait plus).
+    -- vfw:variables:loaded relance ce passage dès que la lecture est faite.
+    if VFW.Variables and VFW.Variables.SetVariable and VFW.Variables.Loaded == true then
         local branding = (VFW.Branding and VFW.Branding.GetOverrides and VFW.Branding.GetOverrides()) or {}
         local logo = cacheGet("global", "logo")
         local banner = cacheGet("global", "banner")
@@ -217,11 +221,8 @@ applyPersistedImages = function()
             end
         end
 
-        local pause = {}
-        for i = 1, #PAUSE_TILES do
-            local id = PAUSE_TILES[i]
-            pause[id] = cacheGet("pause", id)
-        end
+        -- tuile absente du cache : on garde l'image enregistrée dans le réglage au lieu de la vider
+        local pause = pauseRaw()
         VFW.Variables.SetVariable("pause_menu", pause)
         local resolved = {}
         for i = 1, #PAUSE_TILES do
@@ -515,7 +516,7 @@ local function listMugshots()
     return out
 end
 
-local function pauseRaw()
+pauseRaw = function()
     local raw = VFW.Variables and VFW.Variables.GetVariable and VFW.Variables.GetVariable(PAUSE_STORE)
     if type(raw) ~= "table" then raw = {} end
     local out = {}

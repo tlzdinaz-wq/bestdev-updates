@@ -191,69 +191,137 @@ local function StationsMap()
     return out
 end
 
-local function QueuePayload(stationId)
-    local queue = Crafting.queues[stationId] or {}
+-- File de fabrication des tables du builder (onglet « File d'attente » de la fenêtre) : les ingrédients sont pris au
+-- lancement, les objets se fabriquent un par un même si le joueur s'éloigne, il les récupère à la table
+-- (« Récupérer ») ou annule (objets finis rendus, ingrédients des objets pas encore faits remboursés). Tout est gardé
+-- en base (illegal_craft_queue) : un redémarrage ne fait rien perdre.
+local QUEUE_ACTIVE <const> = "active"
+local MAX_ENTRIES_PER_STATION <const> = 3
+
+local QUEUE_COLUMNS <const> = {
+    { column = "started_at", definition = "BIGINT NOT NULL DEFAULT 0" },
+    { column = "unit_time", definition = "INT NOT NULL DEFAULT 5" },
+    { column = "collected", definition = "INT NOT NULL DEFAULT 0" },
+    { column = "output_item", definition = "VARCHAR(64) NULL" },
+    { column = "output_quantity", definition = "INT NOT NULL DEFAULT 1" },
+    { column = "label", definition = "VARCHAR(100) NULL" },
+    { column = "ingredients", definition = "LONGTEXT NULL" },
+}
+
+-- `ADD COLUMN IF NOT EXISTS` n'existe pas sur MySQL : on regarde le schéma avant
+local function EnsureQueueColumns()
+    for i = 1, #QUEUE_COLUMNS do
+        local entry = QUEUE_COLUMNS[i]
+        local exists = IL.Scalar([[
+            SELECT COUNT(*) FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'illegal_craft_queue' AND COLUMN_NAME = ?
+        ]], { entry.column })
+        if (tonumber(exists) or 0) == 0 then
+            IL.Execute(("ALTER TABLE illegal_craft_queue ADD COLUMN `%s` %s"):format(entry.column, entry.definition))
+        end
+    end
+end
+
+local function QueueEntry(row)
+    return {
+        id = row.id,
+        stationId = row.station_id,
+        playerName = row.player_name,
+        total = math.max(1, IL.Int(row.quantity, 1)),
+        startedAt = IL.Int(row.started_at, 0),
+        unitTime = math.max(1, IL.Int(row.unit_time, 5)),
+        collected = IL.Int(row.collected, 0),
+        output = row.output_item,
+        outputQty = math.max(1, IL.Int(row.output_quantity, 1)),
+        label = row.label or IL.ItemLabel(row.output_item),
+        ingredients = IL.Decode(row.ingredients, {}),
+    }
+end
+
+local function Completed(entry, now)
+    local elapsed = math.max(0, (now or IL.Now()) - entry.startedAt)
+    return math.min(entry.total, elapsed // entry.unitTime)
+end
+
+local function PlayerEntries(identifier, stationId)
+    local rows = IL.Query(
+        "SELECT * FROM illegal_craft_queue WHERE identifier = ? AND station_id = ? AND status = ? ORDER BY id",
+        { identifier, stationId, QUEUE_ACTIVE }
+    )
     local out = {}
-    for i = 1, #queue do
-        local entry = queue[i]
+    for i = 1, #rows do out[i] = QueueEntry(rows[i]) end
+    return out
+end
+
+local function OwnEntry(xPlayer, queueId)
+    local row = IL.Single(
+        "SELECT * FROM illegal_craft_queue WHERE id = ? AND identifier = ? AND status = ?",
+        { queueId, xPlayer.identifier, QUEUE_ACTIVE }
+    )
+    return row and QueueEntry(row) or nil
+end
+
+--- Format lu par l'onglet « File d'attente » (progression calculée par la fenêtre à partir de startedAt)
+local function QueuePayload(xPlayer, stationId)
+    local out = {}
+    if not xPlayer then return out end
+    local now = IL.Now()
+    local entries = PlayerEntries(xPlayer.identifier, stationId)
+    for i = 1, #entries do
+        local entry = entries[i]
         out[#out + 1] = {
             id = entry.id,
             position = i,
             playerName = entry.playerName,
-            recipeName = entry.recipeName,
-            itemLabel = entry.itemLabel,
-            quantity = entry.quantity,
-            status = entry.status,
+            recipeLabel = entry.label,
+            itemLabel = entry.label,
+            recipePreview = ItemImage(entry.output),
+            startedAt = entry.startedAt,
+            craftTimePerUnit = entry.unitTime,
+            totalQuantity = entry.total,
+            collectedQuantity = entry.collected,
+            quantity = entry.total,
+            status = Completed(entry, now) >= entry.total and "done" or "running",
+            serverTime = now,
         }
     end
     return out
 end
 
-local function PushQueue(stationId)
-    local payload = QueuePayload(stationId)
-    local viewers = Crafting.viewers[stationId]
-    if not viewers then return end
-    for source in pairs(viewers) do
-        TriggerClientEvent("illegalCrafting:queueUpdated", source, stationId, payload)
+local function PushQueue(source, stationId)
+    TriggerClientEvent("illegalCrafting:queueUpdated", source, stationId, QueuePayload(IL.Player(source), stationId))
+end
+
+local function NearStation(source, station)
+    if IL.DistanceTo(source, station.coords_x, station.coords_y, station.coords_z) <= STATION_RANGE then return true end
+    local mx, my, mz = tonumber(station.marker_x), tonumber(station.marker_y), tonumber(station.marker_z)
+    return mx ~= nil and my ~= nil and mz ~= nil and IL.DistanceTo(source, mx, my, mz) <= STATION_RANGE
+end
+
+--- Rend des objets au joueur même au-delà de son poids max (ce sont ses ingrédients ou des objets déjà payés)
+local function ForceGive(xPlayer, name, count)
+    if count <= 0 or not IL.ItemExists(name) then return false end
+    return xPlayer.addInventoryItem(name, count, nil, false) ~= false
+end
+
+local function RefundIngredients(xPlayer, ingredients, units)
+    if units <= 0 or not IL.IsTable(ingredients) then return end
+    for i = 1, #ingredients do
+        local entry = ingredients[i]
+        local name = IL.IsTable(entry) and IL.Str(entry.item or entry.name, nil)
+        local count = IL.IsTable(entry) and IL.Int(entry.count or entry.amount, 1) or 0
+        if name and count > 0 then ForceGive(xPlayer, name, count * units) end
     end
 end
 
-local function AdvanceQueue(stationId)
-    local queue = Crafting.queues[stationId]
-    if not queue or #queue == 0 then
-        Crafting.running[stationId] = nil
-        return
-    end
-    if Crafting.running[stationId] then return end
-
-    local entry = queue[1]
-    local xPlayer = IL.Player(entry.source)
-    if not xPlayer then
-        table.remove(queue, 1)
-        PushQueue(stationId)
-        return AdvanceQueue(stationId)
-    end
-
-    entry.status = "running"
-    Crafting.running[stationId] = entry
-    PushQueue(stationId)
-
-    TriggerClientEvent("illegalBuilder:startDynamicCraft", entry.source, stationId, entry.recipeDbId, entry.recipeName, entry.quantity)
-end
-
-local function FinishQueueEntry(stationId)
-    local queue = Crafting.queues[stationId]
-    if queue and #queue > 0 then
-        table.remove(queue, 1)
-    end
-    Crafting.running[stationId] = nil
-    PushQueue(stationId)
-    AdvanceQueue(stationId)
-end
+-- une seule action à la fois par fabrication (deux clics rapides sur « Récupérer » ne donnent pas deux fois)
+local queueBusy = {}
 
 IL.OnReady(function()
     LoadStations()
     LoadRecipes()
+    EnsureQueueColumns()
+    -- anciennes entrées (fabrication à barre de progression) : jamais reprises
     IL.Execute("UPDATE illegal_craft_queue SET status = 'cancelled' WHERE status IN ('queued','running')")
 end)
 
@@ -267,22 +335,6 @@ IL.OnPlayerDropped(function(source)
     Crafting.dynamicOrders[source] = nil
     for stationId, viewers in pairs(Crafting.viewers) do
         viewers[source] = nil
-    end
-    for stationId, queue in pairs(Crafting.queues) do
-        local i = 1
-        while i <= #queue do
-            if queue[i].source == source then
-                table.remove(queue, i)
-            else
-                i = i + 1
-            end
-        end
-        local running = Crafting.running[stationId]
-        if running and running.source == source then
-            Crafting.running[stationId] = nil
-            AdvanceQueue(stationId)
-        end
-        PushQueue(stationId)
     end
 end)
 
@@ -491,7 +543,7 @@ IL.RegisterCallback("illegalBuilder:getStationQueue", function(source, stationId
     Crafting.viewers[id] = Crafting.viewers[id] or {}
     Crafting.viewers[id][source] = true
 
-    return QueuePayload(id)
+    return QueuePayload(IL.Player(source), id)
 end)
 
 IL.RegisterCallback("illegalBuilder:getRecipeIdByName", function(source, recipeName)
@@ -515,132 +567,128 @@ end)
 
 IL.RegisterCallback("illegalBuilder:startQueueCraft", function(source, stationId, recipeDbId, quantity)
     local xPlayer = IL.Player(source)
-    if not xPlayer then return false end
+    if not xPlayer then return { success = false, message = "Joueur introuvable." } end
 
     local id = IL.Int(stationId, nil)
     local recipeId = IL.Int(recipeDbId, nil)
     quantity = IL.Int(quantity, 1)
-    if not id or not recipeId or quantity <= 0 or quantity > 50 then return false end
+    if not id or not recipeId or quantity <= 0 or quantity > 50 then
+        return { success = false, message = "Quantité invalide." }
+    end
 
     local station = Crafting.stations[id]
     local recipe = Crafting.recipesById[recipeId]
-    if not station or not recipe or recipe.station_id ~= id then return false end
-    if not CanUseStation(xPlayer, station) then return false end
-
-    Crafting.queues[id] = Crafting.queues[id] or {}
-    local queue = Crafting.queues[id]
-
-    for i = 1, #queue do
-        if queue[i].source == source then
-            return false
-        end
+    if not station or not recipe or recipe.station_id ~= id then
+        return { success = false, message = "Recette introuvable sur cette table." }
+    end
+    if not CanUseStation(xPlayer, station) then return { success = false, message = "Accès refusé." } end
+    if not NearStation(source, station) then return { success = false, message = "Vous êtes trop loin de la table." } end
+    if not IL.ItemExists(recipe.output_item) then
+        return { success = false, message = ("L'objet « %s » n'existe pas : recette à corriger."):format(tostring(recipe.output_item)) }
+    end
+    if #PlayerEntries(xPlayer.identifier, id) >= MAX_ENTRIES_PER_STATION then
+        return { success = false, message = ("Déjà %d fabrications en cours ici : récupérez-les d'abord."):format(MAX_ENTRIES_PER_STATION) }
     end
 
-    local queueDbId = IL.Insert([[
-        INSERT INTO illegal_craft_queue (station_id, recipe_id, identifier, player_name, quantity, status)
-        VALUES (?, ?, ?, ?, ?, 'queued')
-    ]], { id, recipeId, xPlayer.identifier, xPlayer.name, quantity })
+    local ok, missing = HasIngredients(xPlayer, recipe, quantity)
+    if not ok then return { success = false, message = ("Il vous manque : %s."):format(IL.ItemLabel(missing)) } end
+    if not ConsumeIngredients(xPlayer, recipe, quantity) then
+        return { success = false, message = "Composants manquants." }
+    end
 
-    queue[#queue + 1] = {
-        id = queueDbId or (#queue + 1),
-        source = source,
-        identifier = xPlayer.identifier,
-        playerName = xPlayer.name,
-        recipeDbId = recipeId,
-        recipeName = recipe.recipe_name,
-        itemLabel = recipe.label,
-        quantity = quantity,
-        status = "queued",
-    }
+    local ingredients = IngredientList(recipe)
+    local unitTime = math.max(1, math.floor((tonumber(recipe.craft_time) or 5000) / 1000 + 0.5))
+    local queueId = IL.Insert([[
+        INSERT INTO illegal_craft_queue
+            (station_id, recipe_id, identifier, player_name, quantity, status, started_at, unit_time, collected,
+             output_item, output_quantity, label, ingredients)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+    ]], {
+        id, recipeId, xPlayer.identifier, xPlayer.name, quantity, QUEUE_ACTIVE, IL.Now(), unitTime,
+        recipe.output_item, recipe.output_quantity, recipe.label, IL.Encode(ingredients),
+    })
+    if not queueId then
+        RefundIngredients(xPlayer, ingredients, quantity)
+        return { success = false, message = "Fabrication impossible, composants rendus." }
+    end
 
     Crafting.viewers[id] = Crafting.viewers[id] or {}
     Crafting.viewers[id][source] = true
-
-    PushQueue(id)
-    AdvanceQueue(id)
-    return true
+    PushQueue(source, id)
+    return { success = true, label = recipe.label, quantity = quantity }
 end)
 
-IL.RegisterCallback("illegalBuilder:prepareDynamicCraft", function(source, data)
+IL.RegisterCallback("illegalBuilder:collectQueueCraft", function(source, queueId)
     local xPlayer = IL.Player(source)
-    if not xPlayer then return { success = false, craftTime = 5000, totalCycles = 1 } end
-    if not IL.IsTable(data) then return { success = false, craftTime = 5000, totalCycles = 1 } end
+    local id = IL.Int(queueId, nil)
+    if not xPlayer or not id then return { success = false, error = "Fabrication introuvable." } end
+    if queueBusy[id] then return { success = false, error = "Patientez…" } end
+    queueBusy[id] = true
 
-    local stationId = IL.Int(data.stationId, nil)
-    local recipeId = IL.Int(data.recipeId, nil)
-    local quantity = IL.Int(data.quantity, 1)
-    if not stationId or not recipeId or quantity <= 0 or quantity > 50 then
-        return { success = false, craftTime = 5000, totalCycles = 1 }
+    local result
+    local entry = OwnEntry(xPlayer, id)
+    local station = entry and Crafting.stations[entry.stationId]
+    if not entry then
+        result = { success = false, error = "Fabrication introuvable." }
+    elseif station and not NearStation(source, station) then
+        result = { success = false, error = "Revenez à la table pour récupérer vos objets." }
+    elseif not IL.ItemExists(entry.output) then
+        result = { success = false, error = "Objet inconnu : annulez pour récupérer vos composants." }
+    else
+        local available = Completed(entry) - entry.collected
+        local given = 0
+        for _ = 1, available do
+            if not IL.GiveItem(xPlayer, entry.output, entry.outputQty, false) then break end
+            given = given + 1
+        end
+        if available <= 0 then
+            result = { success = false, error = "Rien à récupérer pour le moment." }
+        elseif given == 0 then
+            result = { success = false, error = "Inventaire plein." }
+        else
+            entry.collected = entry.collected + given
+            local status = entry.collected >= entry.total and "done" or QUEUE_ACTIVE
+            IL.Execute("UPDATE illegal_craft_queue SET collected = ?, status = ? WHERE id = ?", { entry.collected, status, id })
+            result = {
+                success = true, label = entry.label,
+                collected = given * entry.outputQty, totalCollected = given * entry.outputQty,
+                inventoryFull = given < available,
+            }
+        end
     end
 
-    local station = Crafting.stations[stationId]
-    local recipe = Crafting.recipesById[recipeId]
-    if not station or not recipe or recipe.station_id ~= stationId then
-        return { success = false, craftTime = 5000, totalCycles = 1 }
-    end
-    if not CanUseStation(xPlayer, station) then
-        return { success = false, craftTime = 5000, totalCycles = 1 }
-    end
-    if IL.DistanceTo(source, station.coords_x, station.coords_y, station.coords_z) > STATION_RANGE then
-        return { success = false, craftTime = 5000, totalCycles = 1 }
+    queueBusy[id] = nil
+    if entry then PushQueue(source, entry.stationId) end
+    return result
+end)
+
+IL.RegisterCallback("illegalBuilder:cancelQueueCraft", function(source, queueId)
+    local xPlayer = IL.Player(source)
+    local id = IL.Int(queueId, nil)
+    if not xPlayer or not id then return { success = false, error = "Fabrication introuvable." } end
+    if queueBusy[id] then return { success = false, error = "Patientez…" } end
+    queueBusy[id] = true
+
+    local entry = OwnEntry(xPlayer, id)
+    if not entry then
+        queueBusy[id] = nil
+        return { success = false, error = "Fabrication introuvable." }
     end
 
-    local ok = HasIngredients(xPlayer, recipe, quantity)
-    if not ok then
-        FinishQueueEntry(stationId)
-        return { success = false, craftTime = 5000, totalCycles = 1 }
-    end
+    -- marquée annulée avant de rendre quoi que ce soit : un second appel ne la retrouve plus
+    IL.Execute("UPDATE illegal_craft_queue SET status = 'cancelled' WHERE id = ?", { id })
+    local completed = Completed(entry)
+    local finished = math.max(0, completed - entry.collected)
+    if finished > 0 then ForceGive(xPlayer, entry.output, finished * entry.outputQty) end
+    local refunded = entry.total - completed
+    RefundIngredients(xPlayer, entry.ingredients, refunded)
 
-    Crafting.dynamicOrders[source] = {
-        stationId = stationId,
-        recipe = recipe,
-        remaining = quantity,
-        startedAt = IL.Now(),
-    }
-
+    queueBusy[id] = nil
+    PushQueue(source, entry.stationId)
     return {
-        success = true,
-        craftTime = math.max(500, recipe.craft_time),
-        totalCycles = quantity,
+        success = true, label = entry.label,
+        itemsCollected = finished, outputQuantity = entry.outputQty, ingredientsRefunded = refunded,
     }
-end)
-
-RegisterNetEvent("illegalBuilder:completeDynamicCraftCycle", function()
-    local source = source
-    local xPlayer = IL.Player(source)
-    if not xPlayer then return end
-
-    local order = Crafting.dynamicOrders[source]
-    if not order or order.remaining <= 0 then return end
-
-    local station = Crafting.stations[order.stationId]
-    if station and IL.DistanceTo(source, station.coords_x, station.coords_y, station.coords_z) > STATION_RANGE then
-        Crafting.dynamicOrders[source] = nil
-        FinishQueueEntry(order.stationId)
-        return
-    end
-
-    if not ConsumeIngredients(xPlayer, order.recipe, 1) then
-        Crafting.dynamicOrders[source] = nil
-        FinishQueueEntry(order.stationId)
-        return
-    end
-
-    order.remaining = order.remaining - 1
-    IL.GiveItem(xPlayer, order.recipe.output_item, order.recipe.output_quantity, true)
-
-    if order.remaining <= 0 then
-        Crafting.dynamicOrders[source] = nil
-        FinishQueueEntry(order.stationId)
-    end
-end)
-
-RegisterNetEvent("illegalBuilder:cancelDynamicCraft", function()
-    local source = source
-    local order = Crafting.dynamicOrders[source]
-    if not order then return end
-    Crafting.dynamicOrders[source] = nil
-    FinishQueueEntry(order.stationId)
 end)
 
 AddEventHandler("illegal:internal:reloadCraft", function()

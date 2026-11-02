@@ -1,8 +1,12 @@
 CreateThread(function()
+    -- l'inventaire n'expose pas de global `Inv` (local dans ses fichiers) : on attendait jusqu'à abandonner, et la
+    -- radio, le mégaphone, le sac sur la tête et la tablette restaient « pas utilisables »
+    local Inv = VFW.Inventory
     local tries = 0
     while (type(Inv) ~= "table" or type(Inv.RegisterUsableItem) ~= "function") and tries < 200 do
         Wait(100)
         tries = tries + 1
+        Inv = VFW.Inventory
     end
 
     if type(Inv) ~= "table" or type(Inv.RegisterUsableItem) ~= "function" then

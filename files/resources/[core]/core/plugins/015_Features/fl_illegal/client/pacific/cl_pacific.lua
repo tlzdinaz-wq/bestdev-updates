@@ -1850,7 +1850,7 @@ end)
 -- ============================================
 
 RegisterNetEvent("core:pacific:createPoliceBlip")
-AddEventHandler("core:pacific:createPoliceBlip", function(position)
+AddEventHandler("core:pacific:createPoliceBlip", function(position, durationMs)
     if IsPoliceJob(VFW.PlayerData.job.name) then
         local blip = AddBlipForCoord(position.x, position.y, position.z)
         SetBlipSprite(blip, 161)
@@ -1863,7 +1863,8 @@ AddEventHandler("core:pacific:createPoliceBlip", function(position)
 
         robberyBlip = blip
 
-        SetTimeout(PacificSettings.PoliceBlipDuration, function()
+        -- durée réglée dans le builder (envoyée par le serveur), sinon celle d'origine
+        SetTimeout(tonumber(durationMs) or PacificSettings.PoliceBlipDuration, function()
             if DoesBlipExist(blip) then
                 RemoveBlip(blip)
             end

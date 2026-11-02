@@ -1191,9 +1191,29 @@ RegisterNUICallback("gestion:images:generateOutfits", function(data, cb)
     end
     local onlyMissing = not (data and data.onlyMissing == false)
 
+    -- « Refaire la photo » d'un vêtement : la liste exacte des drawables / textures est fournie par la page
+    local explicit = nil
+    if data and type(data.items) == "table" then
+        explicit = {}
+        for _, it in ipairs(data.items) do
+            local d, t = math.tointeger(tonumber(it.d)), math.tointeger(tonumber(it.t) or 0)
+            if d and t and d >= 0 and t >= 0 and #explicit < 200 then explicit[#explicit + 1] = { d = d, t = t } end
+        end
+        if #explicit == 0 then
+            cb({ ok = false, error = "Aucun vêtement à photographier." })
+            return
+        end
+    end
+
     cb({ ok = true })
 
     CreateThread(function()
+        if explicit then
+            autoJob = { sex = sex, category = category, conf = conf, items = explicit, index = 0, ok = 0, fail = 0, stop = false, drawing = false }
+            outfitCaptureActive = true
+            autoRun(autoJob)
+            return
+        end
         -- Liste des drawables / textures à photographier
         local idx = {}
         if onlyMissing then

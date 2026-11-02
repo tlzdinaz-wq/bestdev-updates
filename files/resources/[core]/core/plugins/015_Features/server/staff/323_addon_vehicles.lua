@@ -5,7 +5,6 @@
 -- ressource (io.popen) ; si le serveur la refuse, seuls les chemins exacts sont lus.
 
 local cache = nil
-local IS_WINDOWS = package.config:sub(1, 1) == "\\"
 
 local function staffOk(source)
     local xPlayer = VFW.GetPlayerFromId(source)
@@ -37,7 +36,9 @@ end
 local function listFiles(resource)
     local root = GetResourcePath(resource)
     if type(root) ~= "string" or root == "" or not io or not io.popen then return nil end
-    local cmd = IS_WINDOWS and ('dir "%s" /s /b /a-d 2>nul'):format(root:gsub("/", "\\"))
+    -- `package` n'existe pas dans le Lua de FiveM : Windows se reconnaît à la lettre de lecteur du chemin
+    local isWindows = root:match("^%a:[/\\]") ~= nil
+    local cmd = isWindows and ('dir "%s" /s /b /a-d 2>nul'):format(root:gsub("/", "\\"))
         or ("find '%s' -type f 2>/dev/null"):format(root:gsub("'", ""))
     local ok, handle = pcall(io.popen, cmd)
     if not ok or not handle then return nil end
@@ -94,8 +95,9 @@ local function scan()
     for name in pairs(models) do list[#list + 1] = name end
     table.sort(list)
     if #unreadable > 0 then
-        console.warn(("[add-ons] liste des fichiers refusée par le serveur pour %s : leurs véhicules ne sont pas détectés."):format(table.concat(unreadable, ", ")))
+        console.warn(("[add-ons] liste des fichiers refusée par le serveur pour %s : leurs véhicules sont repris des modèles chargés en jeu."):format(table.concat(unreadable, ", ")))
     end
+    print(("[add-ons] %d véhicules add-on lus dans %d fichiers vehicles.meta"):format(#list, listed))
     return { ok = #unreadable == 0 or #list > 0, models = list, files = listed, unreadable = unreadable }
 end
 

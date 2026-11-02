@@ -106,9 +106,33 @@ local function ClearPlayerNpcs(source)
     if session then session.npcIds = {} end
 end
 
+-- Prix proposés au premier démarrage (pochons de la base) : sans aucun prix, personne ne pouvait vendre (« Vous n'avez
+-- rien à vendre » même avec de la drogue sur soi). Une seule fois : une drogue retirée de la vente par le staff ne revient pas.
+local DEFAULT_PRICES <const> = {
+    { "pochon_weed", 80, 130 },
+    { "pochon_ecstasy", 120, 180 },
+    { "pochon_meth", 160, 240 },
+    { "pochon_cocaine", 200, 300 },
+}
+
+local function SeedDefaultPrices()
+    if IL.Single("SELECT setting_value FROM drugdealing_settings WHERE setting_key = 'prices_seeded'") then return end
+    if next(Drug.prices) == nil then
+        for i = 1, #DEFAULT_PRICES do
+            local entry = DEFAULT_PRICES[i]
+            if IL.ItemExists(entry[1]) then
+                IL.Execute("INSERT INTO drugdealing_prices (item_name, min_price, max_price) VALUES (?, ?, ?)", { entry[1], entry[2], entry[3] })
+            end
+        end
+        LoadPrices()
+    end
+    IL.SaveSetting("drugdealing_settings", "prices_seeded", true)
+end
+
 IL.OnReady(function()
     LoadSettings()
     LoadPrices()
+    SeedDefaultPrices()
     LoadZones()
 end)
 
@@ -176,10 +200,17 @@ RegisterNetEvent("core:drugdealing:toggleSystem", function(newState, zoneName)
     end
 
     if #PlayerDrugs(xPlayer) == 0 then
+        local text
+        if next(Drug.prices) == nil then
+            text = "Aucune drogue n'est en vente sur ce serveur (prix à régler dans Gestion > Vente de drogue)."
+        else
+            local labels = {}
+            for name in pairs(Drug.prices) do labels[#labels + 1] = IL.ItemLabel(name) end
+            table.sort(labels)
+            text = ("Vous n'avez rien à vendre. Drogues acceptées : %s."):format(table.concat(labels, ", ", 1, math.min(#labels, 5)))
+        end
         TriggerClientEvent("core:drugdealing:setEnabled", source, false)
-        TriggerClientEvent("core:drugdealing:sendNotification", source, {
-            type = "ILLEGAL", text = "Vous n'avez rien a vendre.",
-        })
+        TriggerClientEvent("core:drugdealing:sendNotification", source, { type = "ILLEGAL", text = text })
         return
     end
 

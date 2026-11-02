@@ -6542,6 +6542,8 @@ function StaffMenu.BuildCreateBurglaryHouseMenu()
                 h = heading
             },
             selectedIPL = selectedIPL, -- Utiliser l'IPL sélectionné au lieu de interiorId
+            iplLabel = selectedIplData and selectedIplData.displayName or selectedIPL,
+            spawnPos = (selectedIplData and selectedIplData.previewPos) or GetIPLPositionFromDB(selectedIPL),
             active = burglaryData.active,
             blipEnabled = burglaryData.blipEnabled
         }
@@ -6666,6 +6668,75 @@ function StaffMenu.BuildEditBurglaryHouseMenu()
     StaffMenu.EditBurglaryHouse.Checkbox(":pin: BLIP VISIBLE", "Afficher un blip sur la carte", false, house.blipEnabled, function(checked)
         TriggerServerEvent('core:burglary:updateHouse', houseId, 'blipEnabled', checked)
     end)
+
+    -- Intérieur et points de fouille (partagés par les maisons du même intérieur)
+    local interior = house.interiorId and burglaryInteriors[house.interiorId]
+    StaffMenu.EditBurglaryHouse.Separator("INTÉRIEUR & POINTS DE FOUILLE")
+
+    if not interior then
+        StaffMenu.EditBurglaryHouse.Button(":x: AUCUN INTÉRIEUR", "Recréez la maison avec un intérieur", nil, "arrow", true, function() end)
+    else
+        local inside = previewingIPL ~= "" and previewingIPL == interior.iplName
+
+        StaffMenu.EditBurglaryHouse.Button(":home: ENTRER DANS L'INTÉRIEUR",
+            ("%s | %d point(s) de fouille"):format(interior.name or interior.iplName, tonumber(house.lootPoints) or 0),
+            "Partagé par toutes les maisons utilisant cet intérieur", "arrow", false, function()
+            PreviewIPL({ name = interior.iplName, displayName = interior.name or interior.iplName, previewPos = interior.spawnPos })
+            StaffMenu.EditBurglaryHouse.refresh()
+        end)
+
+        StaffMenu.EditBurglaryHouse.Button(":plus: AJOUTER UN POINT ICI", "Place un point de fouille à votre position", nil, "arrow", not inside, function()
+            local coords = GetEntityCoords(PlayerPedId())
+            local points = TriggerServerCallback("core:burglary:addLootPoint", house.interiorId, { x = coords.x, y = coords.y, z = coords.z })
+            if not points then
+                VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Builder', message = "Impossible d'ajouter le point." })
+                return
+            end
+            previewLootPoints = points
+            showingLootPointMarkers = #previewLootPoints > 0
+            CreatePreviewLootBlips()
+            house.lootPoints = #previewLootPoints
+            VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder', message = ("Point de fouille ajouté (%d au total)."):format(#previewLootPoints) })
+            StaffMenu.EditBurglaryHouse.refresh()
+        end)
+
+        StaffMenu.EditBurglaryHouse.Button(":trash: SUPPRIMER LE POINT LE PLUS PROCHE", "Dans un rayon de 3 mètres", nil, "arrow", not inside, function()
+            local coords = GetEntityCoords(PlayerPedId())
+            local nearest, nearestDist = nil, 3.0
+            for _, point in ipairs(previewLootPoints) do
+                local dist = #(coords - vector3(point.pos.x, point.pos.y, point.pos.z))
+                if dist <= nearestDist then nearest, nearestDist = point, dist end
+            end
+            if not nearest then
+                VFW.ShowNotification({ type = 'STAFF', variant = 'ERROR', subtitle = 'Builder', message = "Aucun point de fouille à proximité." })
+                return
+            end
+            local points = TriggerServerCallback("core:burglary:removeLootPoint", nearest.id)
+            if points then
+                previewLootPoints = points
+                showingLootPointMarkers = #previewLootPoints > 0
+                CreatePreviewLootBlips()
+                house.lootPoints = #previewLootPoints
+                VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder', message = "Point de fouille supprimé." })
+            end
+            StaffMenu.EditBurglaryHouse.refresh()
+        end)
+
+        StaffMenu.EditBurglaryHouse.Button(":target: DÉFINIR L'ARRIVÉE ICI", "Position où les joueurs apparaissent dans l'intérieur", nil, "arrow", not inside, function()
+            local ped = PlayerPedId()
+            local coords = GetEntityCoords(ped)
+            local ok = TriggerServerCallback("core:burglary:setInteriorSpawn", house.interiorId, { x = coords.x, y = coords.y, z = coords.z, h = GetEntityHeading(ped) })
+            if ok then
+                interior.spawnPos = { x = coords.x, y = coords.y, z = coords.z, h = GetEntityHeading(ped) }
+            end
+            VFW.ShowNotification({ type = 'STAFF', variant = ok and 'SUCCESS' or 'ERROR', subtitle = 'Builder', message = ok and "Point d'arrivée enregistré." or "Impossible d'enregistrer le point d'arrivée." })
+        end)
+
+        StaffMenu.EditBurglaryHouse.Button(":back: SORTIR DE L'INTÉRIEUR", nil, nil, "arrow", not inside, function()
+            StopPreview()
+            StaffMenu.EditBurglaryHouse.refresh()
+        end)
+    end
 
     StaffMenu.EditBurglaryHouse.Separator("ACTIONS DANGEREUSES")
 

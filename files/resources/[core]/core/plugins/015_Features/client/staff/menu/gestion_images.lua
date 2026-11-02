@@ -7,6 +7,19 @@ local function Guard()
     return perms["dev"] == true or perms["gestion_items"] == true or perms["staff"] == true or perms["server_management"] == true
 end
 
+-- Listes de véhicules plafonnées en temps : si le serveur tarde (scan des add-ons, callback absent), le reste du
+-- panneau s'ouvre quand même au lieu d'expirer côté interface (« Impossible d'ouvrir les images » sur tous les onglets).
+local function VehicleListsWithin(ms)
+    local done, vehicles, vanillaVehicles, addonVehicles = false, nil, nil, nil
+    CreateThread(function()
+        vehicles, vanillaVehicles, addonVehicles = StaffMenu.GetImageVehicleLists()
+        done = true
+    end)
+    local deadline = GetGameTimer() + ms
+    while not done and GetGameTimer() < deadline do Wait(50) end
+    return vehicles, vanillaVehicles, addonVehicles
+end
+
 local function Panel(tab)
     local res = TriggerServerCallback("gestionImages:hubPanel")
     if type(res) ~= "table" or res.ok ~= true then
@@ -14,7 +27,7 @@ local function Panel(tab)
     end
     res.tab = tab or res.tab or "marque"
     if StaffMenu.GetImageVehicleLists then
-        local vehicles, vanillaVehicles, addonVehicles = StaffMenu.GetImageVehicleLists()
+        local vehicles, vanillaVehicles, addonVehicles = VehicleListsWithin(8000)
         res.vehicles = vehicles or {}
         res.vanillaVehicles = vanillaVehicles or {}
         res.addonVehicles = addonVehicles or {}

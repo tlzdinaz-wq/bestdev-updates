@@ -710,38 +710,7 @@ MiscB.Cb("burgershot:bag:removeItem", function(source, jobName, bagSlot, itemNam
     return true, nil, bagPayload(xPlayer, jobName)
 end)
 
-local stationOverrides = nil
-local stationsLoading = false
-
-local function loadStations()
-    if stationOverrides then return stationOverrides end
-    if stationsLoading then
-        local waited = 0
-        while stationsLoading and waited < 5000 do
-            Wait(10)
-            waited = waited + 10
-        end
-        return stationOverrides or {}
-    end
-    stationsLoading = true
-
-    local rows = MiscB.Query("SELECT resto_key, loc_key, station_key, data FROM restaurant_stations", {})
-    local loaded = {}
-    for i = 1, #rows do
-        local row = rows[i]
-        loaded[row.resto_key] = loaded[row.resto_key] or {}
-        loaded[row.resto_key][row.loc_key] = loaded[row.resto_key][row.loc_key] or {}
-        loaded[row.resto_key][row.loc_key][row.station_key] = VFW.DB.Decode(row.data, {})
-    end
-
-    stationOverrides = loaded
-    stationsLoading = false
-    return stationOverrides
-end
-
-MiscB.Cb("restaurant_stations:getAll", function(source)
-    return loadStations()
-end)
+-- Positions des stations (builder) : voir 34_12_restaurant_stations.lua
 
 AddEventHandler("vfw:playerDropped", function(source)
     deliveries[source] = nil

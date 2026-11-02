@@ -323,8 +323,19 @@ RegisterNUICallback("gestion:images:generateVehicles", function(data, cb)
     local onlyMissing = not (data and data.onlyMissing == false)
     cb({ ok = true })
 
+    -- « Refaire la photo » d'un véhicule : les modèles sont fournis par la page, déjà photographiés ou non
+    local explicit = nil
+    if data and type(data.models) == "table" then
+        explicit = {}
+        for _, m in ipairs(data.models) do
+            if type(m) == "string" and m:match("^[%w_%-]+$") and #explicit < 200 then
+                explicit[#explicit + 1] = { model = m:lower(), name = m:lower() }
+            end
+        end
+    end
+
     CreateThread(function()
-        local items = buildItems(set, onlyMissing)
+        local items = explicit or buildItems(set, onlyMissing)
         if #items == 0 then
             notify('INFO', "Rien à photographier : tous ces véhicules ont déjà une image.")
             send("gestion:images:generateDone", { kind = "vehicle", ok = 0, fail = 0, total = 0 })

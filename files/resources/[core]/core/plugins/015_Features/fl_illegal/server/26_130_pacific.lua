@@ -22,6 +22,31 @@ local GOLD_ITEM = "lingot_or"
 local SMALL_SAFE_COUNT = 20
 local BIG_SAFE_COUNT = 6
 
+-- Réglages modifiables depuis Gestion > Builders > Banques Pacific > Paramètres globaux, gardés dans les réglages du
+-- serveur (variable « pacific_settings »). Les valeurs ci-dessous sont celles d'origine, utilisées tant que rien n'est réglé.
+local SETTINGS_VARIABLE <const> = "pacific_settings"
+local SETTING_DEFAULTS = {
+    globalCooldown = COOLDOWN // 60,       -- minutes entre deux braquages
+    minPoliceRequired = MIN_POLICE,
+    safeRewardMin = 12000, safeRewardMax = 20000,           -- argent sale par grand coffre
+    smallSafeRewardMin = 4000, smallSafeRewardMax = 7000,   -- argent sale par petit coffre
+    goldRewardMin = 8, goldRewardMax = 14,                  -- lingots d'or
+    policeBlipDuration = 8,                -- minutes
+    doorOpenDuration = VAULT_OPEN_MS // 60000,              -- minutes
+}
+
+local function Setting(key)
+    local stored = VFW.Variables and VFW.Variables.GetVariable and VFW.Variables.GetVariable(SETTINGS_VARIABLE)
+    local value = type(stored) == "table" and tonumber(stored[key]) or nil
+    return value or SETTING_DEFAULTS[key]
+end
+
+local function Between(minKey, maxKey)
+    local a, b = math.floor(Setting(minKey)), math.floor(Setting(maxKey))
+    if b < a then a, b = b, a end
+    return math.random(a, b)
+end
+
 local function LoadPositions()
     Pacific.positions = {}
     local rows = IL.Query("SELECT * FROM pacific_positions")
@@ -126,7 +151,7 @@ IL.OnPlayerLoaded(function(source)
             TriggerClientEvent("core:pacific:syncComputer", source)
         end
         if Pacific.robbery.vaultOpen then
-            TriggerClientEvent("core:pacific:openVaultDoor", source, VAULT_OPEN_MS)
+            TriggerClientEvent("core:pacific:openVaultDoor", source, Setting("doorOpenDuration") * 60000)
         end
         for index in pairs(Pacific.drilledSmall) do
             TriggerClientEvent("core:pacific:smallSafeDrilled", source, index)
@@ -183,10 +208,11 @@ IL.RegisterCallback("core:pacific:canHackSecurityPC", function(source)
     if Pacific.securityPCHolder and Pacific.securityPCHolder ~= source then
         return false, "Le poste est deja occupe"
     end
-    if Pacific.lastRobbed > 0 and (IL.Now() - Pacific.lastRobbed) < COOLDOWN then
+    if Pacific.lastRobbed > 0 and (IL.Now() - Pacific.lastRobbed) < Setting("globalCooldown") * 60 then
         return false, "La banque a ete braquee recemment"
     end
-    if MIN_POLICE > 0 and IL.PoliceOnDutyCount() < MIN_POLICE then
+    local minPolice = Setting("minPoliceRequired")
+    if minPolice > 0 and IL.PoliceOnDutyCount() < minPolice then
         return false, "Trop peu de policiers en service"
     end
 
@@ -286,7 +312,7 @@ RegisterNetEvent("core:pacific:unlockDoor1", function()
     if not xPlayer then return end
 
     if Pacific.robbery then return end
-    if Pacific.lastRobbed > 0 and (IL.Now() - Pacific.lastRobbed) < COOLDOWN then return end
+    if Pacific.lastRobbed > 0 and (IL.Now() - Pacific.lastRobbed) < Setting("globalCooldown") * 60 then return end
 
     local now = IL.Now()
     Pacific.lastRobbed = now
@@ -312,7 +338,7 @@ RegisterNetEvent("core:pacific:unlockDoor1", function()
     if not blipPos and Pacific then
         blipPos = { x = 255.001, y = 225.855, z = 101.005 }
     end
-    IL.AlertPolice("core:pacific:createPoliceBlip", blipPos)
+    IL.AlertPolice("core:pacific:createPoliceBlip", blipPos, Setting("policeBlipDuration") * 60000)
 end)
 
 RegisterNetEvent("core:pacific:unlockComputer", function()
@@ -330,9 +356,10 @@ RegisterNetEvent("core:pacific:openVault", function()
     if Pacific.robbery.vaultOpen then return end
 
     Pacific.robbery.vaultOpen = true
-    TriggerClientEvent("core:pacific:openVaultDoor", -1, VAULT_OPEN_MS)
+    local openMs = Setting("doorOpenDuration") * 60000
+    TriggerClientEvent("core:pacific:openVaultDoor", -1, openMs)
 
-    SetTimeout(VAULT_OPEN_MS, function()
+    SetTimeout(openMs, function()
         TriggerClientEvent("core:pacific:closeVaultDoor", -1)
         if Pacific.robbery then
             Pacific.robbery.vaultOpen = false
@@ -356,7 +383,7 @@ RegisterNetEvent("core:pacific:collectGold", function()
 
     Pacific.goldCollected = true
 
-    local count = math.random(8, 14)
+    local count = Between("goldRewardMin", "goldRewardMax")
     if IL.ItemExists(GOLD_ITEM) and xPlayer.canCarryItem(GOLD_ITEM, count) then
         IL.GiveItem(xPlayer, GOLD_ITEM, count, true)
     else
@@ -421,7 +448,7 @@ RegisterNetEvent("core:pacific:completeDrill", function(safeIndex, isSmallSafe)
         Pacific.drilledBig[index] = true
     end
 
-    local amount = isSmall and math.random(4000, 7000) or math.random(12000, 20000)
+    local amount = isSmall and Between("smallSafeRewardMin", "smallSafeRewardMax") or Between("safeRewardMin", "safeRewardMax")
     IL.GiveMoney(xPlayer, "black_money", amount, "pacific-safe")
 
     if isSmall then
@@ -472,4 +499,144 @@ RegisterNetEvent("core:pacific:resetHeist", function()
     local xPlayer = IL.Player(source)
     if not xPlayer or not xPlayer.hasPermission(BUILDER_PERM) then return end
     ResetHeist()
+end)
+
+-- ═══════════════════════════════════════════════════════════════
+-- Menu staff (Gestion > Builders > Banques Pacific) : ces demandes n'avaient aucune réponse côté serveur, le menu
+-- n'affichait rien et n'enregistrait rien.
+-- ═══════════════════════════════════════════════════════════════
+
+local function isBuilder(source)
+    local xPlayer = IL.Player(source)
+    return xPlayer ~= nil and (xPlayer.hasPermission(BUILDER_PERM) or xPlayer.hasPermission("dev"))
+end
+
+local function settingsPayload()
+    local out = {}
+    for key in pairs(SETTING_DEFAULTS) do out[key] = Setting(key) end
+    out.accessCode = tostring(Pacific.codes.entry or "")
+    return out
+end
+
+local function saveCodes()
+    IL.Execute([[
+        INSERT INTO pacific_state (id, vault_code, entry_code, computer_code, security_code, last_robbed)
+        VALUES (1, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE vault_code = VALUES(vault_code), entry_code = VALUES(entry_code),
+            computer_code = VALUES(computer_code), security_code = VALUES(security_code), last_robbed = VALUES(last_robbed)
+    ]], { Pacific.codes.vault or "", Pacific.codes.entry or "", Pacific.codes.computer or "", Pacific.codes.securityPC or "", Pacific.lastRobbed or 0 })
+end
+
+-- bornes de chaque réglage numérique
+local SETTING_LIMITS = {
+    globalCooldown = { 0, 10080 }, minPoliceRequired = { 0, 50 },
+    safeRewardMin = { 0, 10000000 }, safeRewardMax = { 0, 10000000 },
+    smallSafeRewardMin = { 0, 10000000 }, smallSafeRewardMax = { 0, 10000000 },
+    goldRewardMin = { 0, 500 }, goldRewardMax = { 0, 500 },
+    policeBlipDuration = { 0, 120 }, doorOpenDuration = { 1, 240 },
+}
+
+IL.RegisterCallback("core:pacific:getSettings", function(source)
+    if not isBuilder(source) then return nil end
+    return settingsPayload()
+end)
+
+RegisterNetEvent("core:pacific:updateSettings", function(key, value)
+    local source = source
+    if not isBuilder(source) then return end
+
+    if key == "accessCode" then
+        local code = type(value) == "string" and value:match("^%w+$") and value:sub(1, 32) or nil
+        if not code then return end
+        Pacific.codes.entry = code
+        saveCodes()
+        return
+    end
+
+    local limits = SETTING_LIMITS[key]
+    local number = tonumber(value)
+    if not limits or not number or number ~= number then return end
+    number = math.floor(math.max(limits[1], math.min(limits[2], number)))
+
+    if not (VFW.Variables and VFW.Variables.SetVariable) then return end
+    local stored = VFW.Variables.GetVariable(SETTINGS_VARIABLE)
+    local data = {}
+    if type(stored) == "table" then for k, v in pairs(stored) do data[k] = v end end
+    data[key] = number
+    VFW.Variables.SetVariable(SETTINGS_VARIABLE, data)
+    if VFW.Variables.Flush then pcall(VFW.Variables.Flush, SETTINGS_VARIABLE) end
+end)
+
+-- « Recharger depuis la BDD » : relit les codes et les positions enregistrés
+RegisterNetEvent("core:pacific:requestSettings", function()
+    if not isBuilder(source) then return end
+    LoadState()
+    LoadPositions()
+    TriggerClientEvent("core:pacific:syncPositions", -1, Pacific.positions)
+end)
+
+-- « Reset timer » : fin du délai entre deux braquages et du braquage en cours
+RegisterNetEvent("core:pacific:resetTimer", function()
+    if not isBuilder(source) then return end
+    Pacific.lastRobbed = 0
+    IL.Execute("UPDATE pacific_state SET last_robbed = 0 WHERE id = 1")
+    ResetHeist()
+end)
+
+local function cleanPos(value, withHeading)
+    if not IL.IsTable(value) then return nil end
+    local x, y, z = tonumber(value.x), tonumber(value.y), tonumber(value.z)
+    if not (x and y and z) or math.abs(x) > 20000 or math.abs(y) > 20000 or math.abs(z) > 5000 then return nil end
+    return { x = x, y = y, z = z, heading = withHeading and (tonumber(value.heading) or 0.0) or 0.0 }
+end
+
+-- Toutes les positions du builder : positions uniques, petits et grands coffres, 9 portes
+RegisterNetEvent("core:pacific:updatePositions", function(cfg)
+    local source = source
+    if not isBuilder(source) or not IL.IsTable(cfg) then return end
+
+    for key, value in pairs(cfg) do
+        if type(key) == "string" and key ~= "smallSafes" and key ~= "bigSafes" and key ~= "doors" and #key <= 60 then
+            local p = cleanPos(value, true)
+            if p then
+                IL.Execute([[
+                    INSERT INTO pacific_positions (config_key, x, y, z, heading) VALUES (?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE x = VALUES(x), y = VALUES(y), z = VALUES(z), heading = VALUES(heading)
+                ]], { key, p.x, p.y, p.z, p.heading })
+            end
+        end
+    end
+
+    for listKey, safeType in pairs({ smallSafes = "small", bigSafes = "big" }) do
+        if IL.IsTable(cfg[listKey]) then
+            IL.Execute("DELETE FROM pacific_safes WHERE safe_type = ?", { safeType })
+            for i = 1, math.min(#cfg[listKey], 60) do
+                local p = cleanPos(cfg[listKey][i], true)
+                if p then
+                    IL.Execute("INSERT INTO pacific_safes (safe_type, safe_index, x, y, z, heading) VALUES (?, ?, ?, ?, ?, ?)",
+                        { safeType, i, p.x, p.y, p.z, p.heading })
+                end
+            end
+        end
+    end
+
+    if IL.IsTable(cfg.doors) then
+        IL.Execute("DELETE FROM pacific_doors")
+        for index, value in pairs(cfg.doors) do
+            local i = math.tointeger(tonumber(index))
+            local p = cleanPos(value, false)
+            if i and i >= 1 and i <= 20 and p then
+                IL.Execute("INSERT INTO pacific_doors (door_index, x, y, z) VALUES (?, ?, ?, ?)", { i, p.x, p.y, p.z })
+            end
+        end
+    end
+
+    LoadPositions()
+    TriggerClientEvent("core:pacific:syncPositions", -1, Pacific.positions)
+end)
+
+RegisterNetEvent("core:pacific:reloadPositions", function()
+    if not isBuilder(source) then return end
+    LoadPositions()
+    TriggerClientEvent("core:pacific:syncPositions", -1, Pacific.positions)
 end)

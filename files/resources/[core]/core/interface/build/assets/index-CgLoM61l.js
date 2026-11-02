@@ -242,32 +242,6 @@ and limitations under the License.
   const [sel, setSel] = r.useState(null)
   const server = tr()
   const rootRef = r.useRef(null)
-  r.useEffect(() => {
-    let tx = 0, ty = 0, mx = 0, my = 0, raf = 0
-    const MAX_RX = 3.5, MAX_RY = 5
-    const clamp = v => v < -1 ? -1 : v > 1 ? 1 : v
-    const apply = () => {
-      const el = rootRef.current
-      if (!el) return
-      el.style.setProperty("--sh-mx", mx.toFixed(3))
-      el.style.setProperty("--sh-my", my.toFixed(3))
-      el.style.setProperty("--sh-rx", (-my * MAX_RX).toFixed(2) + "deg")
-      el.style.setProperty("--sh-ry", (mx * MAX_RY).toFixed(2) + "deg")
-    }
-    const loop = () => {
-      mx += (tx - mx) * .12; my += (ty - my) * .12
-      apply()
-      if (Math.abs(tx - mx) > .002 || Math.abs(ty - my) > .002) raf = requestAnimationFrame(loop)
-      else raf = 0
-    }
-    const start = () => { if (!raf) raf = requestAnimationFrame(loop) }
-    const onMove = ev => { tx = clamp((ev.clientX / window.innerWidth - .5) * 2); ty = clamp((ev.clientY / window.innerHeight - .5) * 2); start() }
-    const onLeave = () => { tx = 0; ty = 0; start() }
-    window.addEventListener("mousemove", onMove, { passive: true })
-    document.addEventListener("mouseleave", onLeave)   // (pas mouseout : il remonte à chaque changement d'élément)
-    window.addEventListener("blur", onLeave)
-    return () => { window.removeEventListener("mousemove", onMove); document.removeEventListener("mouseleave", onLeave); window.removeEventListener("blur", onLeave); if (raf) cancelAnimationFrame(raf) }
-  }, [])
   const outfitMode = i === "outfits"
   const favKey = it => ({ category: it.category, drawableId: it.drawableId, textureId: 0, label: it.label, price: it.price })
   const catLabel = id => { if (id === "mask") return "Masques"; var c2; return ((c2 = w0.find(x2 => x2.id === id)) == null ? void 0 : c2.label) || "" }

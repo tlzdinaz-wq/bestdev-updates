@@ -63,6 +63,12 @@ local function trunkKg(model)
     return DEFAULT_TRUNK_KG
 end
 
+--- Réglages du builder « Stockage véhicules » pour ce véhicule (25_18_vehicle_storage_builder.lua), nil sinon
+local function storageOf(entity)
+    local store = VFW.VehicleStorage
+    return store and store.Get and store.Get(GetEntityModel(entity)) or nil
+end
+
 --- Ouvre le coffre `chestId` pour `source` avec la capacité voulue (rappliquée à chaque ouverture : un changement
 --- de config ou de palier VIP se voit tout de suite) et rend ce que le client attend.
 ---@return string|nil chestId, table|nil items, number|nil weight, number|nil maxWeight, string|nil label
@@ -95,9 +101,11 @@ Inv.RegisterCallback("vfw:trunk:get", function(source, ownedVehicle, plate, netI
     if VIPConfig and VIPConfig.GetTrunkBonus then
         bonus = tonumber(VIPConfig.GetTrunkBonus(tonumber(xPlayer.vipTier) or 0)) or 0
     end
-    local maxWeight = math.floor(trunkKg(model) * UNITS_PER_KG * (1 + bonus / 100))
+    local cfg = storageOf(entity)
+    local kg = cfg and cfg.trunk_weight or trunkKg(model)
+    local maxWeight = math.floor(kg * UNITS_PER_KG * (1 + bonus / 100))
 
-    return openChest(source, "veh:" .. key, "Coffre du véhicule", maxWeight, TRUNK_SLOTS)
+    return openChest(source, "veh:" .. key, "Coffre du véhicule", maxWeight, cfg and cfg.trunk_slots or TRUNK_SLOTS)
 end)
 
 Inv.RegisterCallback("vfw:glovebox:get", function(source, ownedVehicle, plate, netId)
@@ -110,7 +118,9 @@ Inv.RegisterCallback("vfw:glovebox:get", function(source, ownedVehicle, plate, n
         return nil
     end
 
-    return openChest(source, "glovebox:" .. key, "Boîte à gants", DEFAULT_GLOVEBOX_KG * UNITS_PER_KG, GLOVEBOX_SLOTS)
+    local cfg = storageOf(entity)
+    return openChest(source, "glovebox:" .. key, "Boîte à gants",
+        (cfg and cfg.glovebox_weight or DEFAULT_GLOVEBOX_KG) * UNITS_PER_KG, cfg and cfg.glovebox_slots or GLOVEBOX_SLOTS)
 end)
 
 -- Coffre ouvert par le staff depuis le menu contextuel du véhicule (lecture seule côté client).
@@ -125,6 +135,7 @@ Inv.RegisterCallback("vfw:trunk:get-staff", function(source, plate, netId, model
         return nil
     end
 
-    local maxWeight = math.floor(trunkKg(model) * UNITS_PER_KG)
-    return openChest(source, "veh:" .. key, "Coffre du véhicule", maxWeight, TRUNK_SLOTS)
+    local cfg = storageOf(entity)
+    local maxWeight = math.floor((cfg and cfg.trunk_weight or trunkKg(model)) * UNITS_PER_KG)
+    return openChest(source, "veh:" .. key, "Coffre du véhicule", maxWeight, cfg and cfg.trunk_slots or TRUNK_SLOTS)
 end)

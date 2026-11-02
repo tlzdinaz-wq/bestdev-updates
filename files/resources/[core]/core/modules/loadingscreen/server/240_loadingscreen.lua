@@ -15,6 +15,10 @@ local function buildHandover()
         loadingScreenMusic = built.loadingScreenMusic or "",
         loadingSocialTitle = built.loadingSocialTitle or "",
         loadingTicker = built.loadingTicker or {},
+        loadingOptions = built.loadingOptions,
+        -- affichés par le loading screen (« 64 / 128 joueurs ») : l'état au moment de la connexion
+        players = GetNumPlayerIndices(),
+        maxPlayers = GetConvarInt("sv_maxclients", 0),
         mentaServer = MENTA_SERVER,
     }
 

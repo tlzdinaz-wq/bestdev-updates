@@ -414,7 +414,8 @@ RegisterNUICallback("nui:inventory:use-item", function(data)
         RemoveWeaponProp()
     end
 
-    if data.item.name ~= "radio" then
+    -- les radios s'appellent radio_public / radio_job : les utiliser ne doit pas couper la radio en cours
+    if data.item.name ~= "radio_public" and data.item.name ~= "radio_job" then
         TriggerEvent("radio:deactivate")
     end
 

@@ -8,17 +8,6 @@ local currentOpenDynamicStationId = nil
 local currentDynamicRecipes = {}
 
 local RefreshDynamicStationBlips
-local StopDynamicCraftAnimation
-
-local currentDynamicCraftStation = nil
-local isDynamicCrafting = false
-local dynamicCraftStartTime = 0
-local dynamicCraftDuration = 0
-local dynamicCraftCurrentCycle = 0
-local dynamicCraftTotalCycles = 1
-local dynamicCraftRecipeId = nil
-local dynamicCraftStationId = nil
-local dynamicCraftAbsoluteDeadline = 0
 
 local function CanAccessStation(station)
     if not station.faction_restriction or station.faction_restriction == "" then
@@ -397,18 +386,6 @@ end)
 AddEventHandler('onResourceStop', function(resourceName)
     if GetCurrentResourceName() == resourceName then
         DeleteAllDynamicStations()
-        if isDynamicCrafting then
-            StopDynamicCraftAnimation()
-            isDynamicCrafting = false
-            dynamicCraftStartTime = 0
-            dynamicCraftDuration = 0
-            dynamicCraftCurrentCycle = 0
-            dynamicCraftTotalCycles = 1
-            dynamicCraftRecipeId = nil
-            dynamicCraftStationId = nil
-            currentDynamicCraftStation = nil
-            dynamicCraftAbsoluteDeadline = 0
-        end
     end
 end)
 
@@ -443,159 +420,44 @@ AddEventHandler("vfw:setFaction", function()
     RefreshDynamicStationBlips()
 end)
 
-StopDynamicCraftAnimation = function()
-    local playerPed = PlayerPedId()
-    ClearPedTasksImmediately(playerPed)
-    FreezeEntityPosition(playerPed, false)
+-- « Fabriquer » : les composants partent tout de suite, la fabrication continue côté serveur ; la fenêtre reste ouverte
+-- et passe d'elle-même sur l'onglet « File d'attente » (où l'on récupère les objets finis).
+AddEventHandler('core:illegalCrafting:craft', function(data)
+    if not currentOpenDynamicStationId or (data and data.isLegal) then return end
 
-    SendNUIMessage({
-        action = 'illegalHarvesting:hideProgress',
-        data = {}
-    })
-end
+    local recipeName = data.itemId or data.id
+    local recipeDbId = currentDynamicRecipes[recipeName]
+    local quantity = tonumber(data.quantity) or 1
+    local stationId = currentOpenDynamicStationId
 
-local function CancelDynamicCraft()
-    if not isDynamicCrafting then return end
-
-    StopDynamicCraftAnimation()
-
-    TriggerServerEvent("illegalBuilder:cancelDynamicCraft")
-
-    isDynamicCrafting = false
-    dynamicCraftStartTime = 0
-    dynamicCraftDuration = 0
-    dynamicCraftCurrentCycle = 0
-    dynamicCraftTotalCycles = 1
-    dynamicCraftRecipeId = nil
-    dynamicCraftStationId = nil
-    currentDynamicCraftStation = nil
-    dynamicCraftAbsoluteDeadline = 0
-end
-
-local function StartDynamicCraftCycles(stationId, recipeId, quantity, craftTime)
-    if isDynamicCrafting then
+    if not recipeDbId then
+        recipeDbId = TriggerServerCallback("illegalBuilder:getRecipeIdByName", recipeName)
+    end
+    if not recipeDbId then
+        VFW.ShowNotification({ type = 'ROUGE', content = "Recette introuvable" })
         return
     end
 
-    isDynamicCrafting = true
-    dynamicCraftStartTime = GetGameTimer()
-    dynamicCraftDuration = craftTime
-    dynamicCraftCurrentCycle = 1
-    dynamicCraftTotalCycles = quantity
-    dynamicCraftRecipeId = recipeId
-    dynamicCraftStationId = stationId
-    currentDynamicCraftStation = stationId
-    -- Filet de sécurité: deadline absolue couvrant tous les cycles + marge.
-    -- Si l'état reste bloqué (event serveur perdu, désync, etc.), force le
-    -- cleanup pour éviter que le joueur reste figé indéfiniment.
-    dynamicCraftAbsoluteDeadline = GetGameTimer() + (craftTime * quantity) + 15000
-
-    local playerPed = PlayerPedId()
-    FreezeEntityPosition(playerPed, true)
-
-    SendNUIMessage({
-        action = 'illegalHarvesting:startProgress',
-        data = {
-            spotId = "dynamic_craft",
-            coordIndex = 1,
-            harvestTime = craftTime
-        }
-    })
-end
-
-Citizen.CreateThread(function()
-    while true do
-        local sleep = 500
-
-        if isDynamicCrafting then
-            sleep = 0
-            local playerPed = PlayerPedId()
-
-            if IsEntityDead(playerPed) or IsPedDeadOrDying(playerPed, true) then
-                CancelDynamicCraft()
-                sleep = 500
-            else
-                local currentTime = GetGameTimer()
-
-                if dynamicCraftAbsoluteDeadline > 0 and currentTime >= dynamicCraftAbsoluteDeadline then
-                    StopDynamicCraftAnimation()
-                    isDynamicCrafting = false
-                    dynamicCraftStartTime = 0
-                    dynamicCraftDuration = 0
-                    dynamicCraftCurrentCycle = 0
-                    dynamicCraftTotalCycles = 1
-                    dynamicCraftRecipeId = nil
-                    dynamicCraftStationId = nil
-                    currentDynamicCraftStation = nil
-                    dynamicCraftAbsoluteDeadline = 0
-                else
-                    local elapsed = currentTime - dynamicCraftStartTime
-
-                    DisableJobMovementControls()
-
-                    if elapsed >= dynamicCraftDuration then
-                        TriggerServerEvent("illegalBuilder:completeDynamicCraftCycle")
-
-                        if dynamicCraftCurrentCycle < dynamicCraftTotalCycles then
-                            dynamicCraftCurrentCycle = dynamicCraftCurrentCycle + 1
-                            dynamicCraftStartTime = GetGameTimer()
-
-                            SendNUIMessage({
-                                action = 'illegalHarvesting:startProgress',
-                                data = {
-                                    spotId = "dynamic_craft",
-                                    coordIndex = dynamicCraftCurrentCycle,
-                                    harvestTime = dynamicCraftDuration
-                                }
-                            })
-                        else
-                            StopDynamicCraftAnimation()
-
-                            isDynamicCrafting = false
-                            dynamicCraftStartTime = 0
-                            dynamicCraftDuration = 0
-                            dynamicCraftCurrentCycle = 0
-                            dynamicCraftTotalCycles = 1
-                            dynamicCraftRecipeId = nil
-                            dynamicCraftStationId = nil
-                            currentDynamicCraftStation = nil
-                            dynamicCraftAbsoluteDeadline = 0
-                        end
-                    elseif IsControlJustPressed(0, 73) or IsControlJustPressed(0, 177) then
-                        CancelDynamicCraft()
-                    end
-                end
-            end
-        end
-
-        Citizen.Wait(sleep)
+    local result = TriggerServerCallback("illegalBuilder:startQueueCraft", tonumber(stationId), recipeDbId, quantity)
+    if not (result and result.success) then
+        VFW.ShowNotification({ type = 'ROUGE', content = result and result.message or "Fabrication impossible" })
+        return
     end
-end)
 
-AddEventHandler('core:illegalCrafting:craft', function(data)
-    if currentOpenDynamicStationId then
-        local recipeName = data.itemId or data.id
-        local recipeDbId = currentDynamicRecipes[recipeName]
-        local quantity = data.quantity or 1
-        local stationId = currentOpenDynamicStationId
+    SendNUIMessage({ action = "illegalCrafting:craftStart", data = { itemLabel = result.label, quantity = quantity } })
 
-        if not recipeDbId then
-            recipeDbId = TriggerServerCallback("illegalBuilder:getRecipeIdByName", recipeName)
-        end
-
-        if not recipeDbId then
-            return
-        end
-
-        VFW.Nui.IllegalCrafting(false)
-
-        TriggerServerCallback("illegalBuilder:startQueueCraft", stationId, recipeDbId, quantity)
-
-        if dynamicStations[stationId] then
-            OpenDynamicStationMenu(stationId)
-            Citizen.Wait(200)
-            SendNUIMessage({ action = "illegalCrafting:switchTab", data = "queue" })
-        end
+    -- quantités possibles recalculées (les composants viennent de partir)
+    local station = dynamicStations[stationId]
+    if station and currentOpenDynamicStationId == stationId then
+        local slots = TriggerServerCallback("illegalBuilder:getStationRecipesForNUI", tonumber(stationId))
+        VFW.Nui.IllegalCraftingUpdate({
+            title = station.name or 'FABRICATION',
+            stationId = stationId,
+            isDynamic = true,
+            type = 'illegal',
+            stationType = station.station_type or 'armes',
+            slots = slots or {},
+        })
     end
 end)
 
@@ -606,30 +468,3 @@ AddEventHandler('core:illegalCrafting:close', function()
         currentDynamicRecipes = {}
     end
 end)
-
-RegisterNetEvent('illegalBuilder:startDynamicCraft', function(stationId, recipeDbId, recipeName, quantity)
-    currentDynamicCraftStation = stationId
-
-    local result = TriggerServerCallback("illegalBuilder:prepareDynamicCraft", {
-        stationId = stationId,
-        recipeId = recipeDbId,
-        quantity = quantity or 1
-    })
-
-    if not result or not result.success then
-        return
-    end
-
-    VFW.Nui.IllegalCrafting(false)
-    if currentOpenDynamicStationId then
-        TriggerServerEvent("illegalBuilder:unregisterQueueViewer", tonumber(currentOpenDynamicStationId))
-    end
-    currentOpenDynamicStationId = nil
-    currentDynamicRecipes = {}
-
-    local craftTime = result.craftTime or 5000
-    local totalCycles = result.totalCycles or quantity or 1
-
-    StartDynamicCraftCycles(stationId, recipeDbId, totalCycles, craftTime)
-end)
-

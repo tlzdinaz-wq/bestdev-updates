@@ -138,6 +138,103 @@ local function normalizeTickerList(raw)
     return out
 end
 
+-- Options du loading screen (Gestion > Loading screen) : modèle d'affichage (3 au choix) et réglages. Tout est
+-- normalisé ici : la charte enregistrée ne contient jamais de valeur hors bornes.
+local LOADING_STYLES <const> = { aurora = true, cinema = true, panel = true }
+local LOADING_SHOW_KEYS <const> = { "logo", "ticker", "socials", "tips", "players", "stages", "music", "staff", "rules", "keys" }
+
+-- Touches réelles de la base, proposées tant que le staff n'a pas fait sa propre liste
+local DEFAULT_LOADING_KEYS <const> = {
+    { key = "TAB", label = "Inventaire" },
+    { key = "F1", label = "Boutique" },
+    { key = "F3", label = "Menu VIP" },
+    { key = "F4", label = "Menu métier" },
+    { key = "F5", label = "Menu personnel" },
+    { key = "F6", label = "Menu faction" },
+    { key = "F11", label = "Radio" },
+    { key = "U", label = "Ouvrir / fermer le véhicule" },
+    { key = "B", label = "Pointer du doigt" },
+    { key = "²", label = "Mains en l'air" },
+    { key = "X", label = "Annuler l'animation" },
+    { key = "Y / N", label = "Accepter / refuser une demande" },
+}
+
+local function cleanText(value, maxLen)
+    if type(value) ~= "string" then return "" end
+    local out = value:gsub("%c", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    return out:sub(1, maxLen)
+end
+
+local function cleanUrlList(raw, maxItems)
+    local out = {}
+    if type(raw) ~= "table" then return out end
+    for i = 1, #raw do
+        if #out >= maxItems then break end
+        local url = cleanText(raw[i], 1024)
+        if url:match("^https?://") then out[#out + 1] = url end
+    end
+    return out
+end
+
+local function clampInt(value, minV, maxV, default)
+    local n = tonumber(value)
+    if not n or n ~= n then return default end
+    return math.floor(math.max(minV, math.min(maxV, n)) + 0.5)
+end
+
+local function cleanEntries(raw, maxItems, fields)
+    local out = {}
+    if type(raw) ~= "table" then return out end
+    for i = 1, #raw do
+        if #out >= maxItems then break end
+        local entry = raw[i]
+        if type(entry) == "table" then
+            local item, filled = {}, false
+            for _, f in ipairs(fields) do
+                local name, maxLen, kind = f[1], f[2], f[3]
+                local value = cleanText(entry[name], maxLen)
+                if kind == "url" and not value:match("^https?://") then value = "" end
+                if kind == "hex" then value = (value ~= "" and VFW.Branding.NormalizeHex(value)) or "" end
+                item[name] = value
+                if f[4] and value ~= "" then filled = true end
+            end
+            if filled then out[#out + 1] = item end
+        end
+    end
+    return out
+end
+
+local function normalizeLoadingOptions(raw)
+    raw = type(raw) == "table" and raw or {}
+    local show = type(raw.show) == "table" and raw.show or {}
+    local out = {
+        style = LOADING_STYLES[raw.style] and raw.style or "aurora",
+        tagline = cleanText(raw.tagline, 80),
+        musicTitle = cleanText(raw.musicTitle, 60),
+        tips = normalizeTickerList(raw.tips),
+        slides = cleanUrlList(raw.slides, 8),
+        slideSeconds = clampInt(raw.slideSeconds, 4, 60, 8),
+        overlay = clampInt(raw.overlay, 0, 90, 45),
+        musicVolume = clampInt(raw.musicVolume, 0, 100, 50),
+        accent = type(raw.accent) == "string" and VFW.Branding.NormalizeHex(raw.accent) or "",
+        -- équipe : nom, grade, photo (URL), couleur du grade ; groupée par grade dans l'ordre de la liste
+        staff = cleanEntries(raw.staff, 40, { { "name", 40, nil, true }, { "grade", 32 }, { "avatar", 1024, "url" }, { "color", 7, "hex" } }),
+        rules = cleanEntries(raw.rules, 25, { { "title", 60, nil, true }, { "text", 300, nil, true } }),
+        rulesLink = (function()
+            local url = cleanText(raw.rulesLink, 512)
+            return url:match("^https?://") and url or ""
+        end)(),
+        -- jamais réglées : les touches de la base ; liste vidée par le staff : rien
+        keys = cleanEntries(raw.keys == nil and DEFAULT_LOADING_KEYS or raw.keys, 30, { { "key", 16, nil, true }, { "label", 60, nil, true } }),
+        show = {},
+    }
+    for _, key in ipairs(LOADING_SHOW_KEYS) do
+        out.show[key] = show[key] ~= false
+    end
+    return out
+end
+VFW.Branding.NormalizeLoadingOptions = normalizeLoadingOptions
+
 local function snapshotOverrides(current)
     local colors = nil
     if type(current.colors) == "table" and type(current.colors.primary) == "string" then
@@ -161,6 +258,7 @@ local function snapshotOverrides(current)
         loadingScreenMusic = current.loadingScreenMusic or "",
         loadingSocialTitle = current.loadingSocialTitle or "",
         loadingTicker = normalizeTickerList(current.loadingTicker),
+        loadingOptions = normalizeLoadingOptions(current.loadingOptions),
         colors = colors,
     }
 end
@@ -183,6 +281,7 @@ local function encodeOverridesJson(data)
         field("loadingScreenMusic", data.loadingScreenMusic),
         field("loadingSocialTitle", data.loadingSocialTitle),
         string.format('  "loadingTicker": %s,', tickerJson),
+        string.format('  "loadingOptions": %s,', json.encode(normalizeLoadingOptions(data.loadingOptions))),
     }
     if type(data.colors) == "table" and data.colors.primary then
         table.insert(lines, '  "colors": {')
@@ -304,11 +403,18 @@ function VFW.Branding.GetOverrides()
         loadingScreenMusic = type(raw.loadingScreenMusic) == "string" and raw.loadingScreenMusic or "",
         loadingSocialTitle = type(raw.loadingSocialTitle) == "string" and raw.loadingSocialTitle or "",
         loadingTicker = normalizeTickerList(raw.loadingTicker),
+        loadingOptions = normalizeLoadingOptions(raw.loadingOptions),
         colors = readColors(raw.colors),
     }
 end
 
 local function persistOverrides(current)
+    -- Avant la lecture des réglages en base, la charte connue est incomplète (fichier ou vide) : l'écrire effacerait
+    -- l'écran de chargement, la musique, les liens et les couleurs enregistrés par le serveur.
+    if VFW.Variables and VFW.Variables.Loaded ~= true then
+        console.warn("[Branding] réglages pas encore chargés : modification de la charte ignorée")
+        return false
+    end
     return writeOverridesFile(snapshotOverrides(current))
 end
 
@@ -372,7 +478,11 @@ function VFW.Branding.SetLoadingScreen(patch)
         current.loadingScreenMusic = ""
         current.loadingSocialTitle = ""
         current.loadingTicker = {}
+        current.loadingOptions = normalizeLoadingOptions(nil)
     else
+        if patch.loadingOptions ~= nil then
+            current.loadingOptions = normalizeLoadingOptions(patch.loadingOptions)
+        end
         if patch.loadingScreen ~= nil then
             current.loadingScreen = cleanMediaUrl(patch.loadingScreen, 1024)
         end
@@ -465,6 +575,7 @@ function VFW.Branding.Build()
             if #list > 0 then return list end
             return DEFAULT_LOADING_TICKER
         end)(),
+        loadingOptions = normalizeLoadingOptions(ov.loadingOptions),
         notificationLogo = notifLogo,
         background = manifest.background,
         discord = buildDiscord(),

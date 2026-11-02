@@ -43,10 +43,10 @@ local function modelLoaded(hash)
 end
 
 -- Vanilla : la liste des véhicules GTA de la carlist. Add-ons : les véhicules déclarés par les ressources démarrées du
--- serveur (vehicles.meta lus par server/staff/323_addon_vehicles.lua) et chargés dans le jeu. Une ressource ajoutée apporte
--- ses véhicules, une ressource retirée les enlève, sans liste à tenir à jour. Si le serveur ne peut pas lire ses
--- ressources, repli sur les modèles chargés (GetAllVehicleModels) qui ne sont pas dans la carlist GTA : cette liste-là
--- contient aussi des véhicules GTA absents de la carlist. Les modèles déjà photographiés (CDN) sont dans l'onglet CDN.
+-- serveur (vehicles.meta lus par server/staff/323_addon_vehicles.lua) plus les modèles chargés dans le jeu
+-- (GetAllVehicleModels) qui ne sont pas des véhicules GTA (vanilla_vehicle_models.lua + DLC du jeu). Une ressource
+-- ajoutée apporte ses véhicules, une ressource retirée les enlève, sans liste à tenir à jour. Les modèles déjà
+-- photographiés (CDN) sont dans l'onglet CDN.
 local function buildVehicleLists(cdnVehicles, serverAddons)
     local vanillaVehicles, addonVehicles = {}, {}
     local seenVanilla, seenAddon = {}, {}
@@ -81,11 +81,20 @@ local function buildVehicleLists(cdnVehicles, serverAddons)
         end
     end
 
+    -- Véhicules des DLC Rockstar connus du jeu (sécurité en plus de la liste vanilla_vehicle_models.lua)
+    local dlcHashes = {}
+    for i = 0, (GetNumDlcVehicles and GetNumDlcVehicles() or 0) - 1 do
+        local hash = GetDlcVehicleModel(i)
+        if hash and hash ~= 0 then dlcHashes[hash] = true end
+    end
+    local vanillaModels = VFW.VanillaVehicleModels or {}
+
     local function addAddon(model)
         model = tostring(model or ""):lower()
-        if model == "" or seenVanilla[model] or seenAddon[model] or cdnSet[model] or VANILLA_NOT_IN_CARLIST[model] then return end
+        if model == "" or seenVanilla[model] or seenAddon[model] or cdnSet[model] or VANILLA_NOT_IN_CARLIST[model]
+            or vanillaModels[model] then return end
         local hash = joaat(model)
-        if not modelLoaded(hash) or IsThisModelATrain(hash) then return end
+        if dlcHashes[hash] or not modelLoaded(hash) or IsThisModelATrain(hash) then return end
         seenAddon[model] = true
         local info = carlistInfo[model]
         addonVehicles[#addonVehicles + 1] = {
@@ -95,12 +104,16 @@ local function buildVehicleLists(cdnVehicles, serverAddons)
         }
     end
 
-    local loaded = GetAllVehicleModels and GetAllVehicleModels() or nil
-    if type(serverAddons) == "table" and serverAddons.ok == true and type(serverAddons.models) == "table" then
+    -- Deux sources additionnées : les vehicles.meta lus par le serveur, et les modèles chargés dans le jeu qui ne sont
+    -- pas des véhicules GTA (liste complète du jeu). La seconde suffit quand FXServer refuse de lister les dossiers des
+    -- ressources (packs déclarés en data/**/vehicles.meta, comme les packs Gabz).
+    if type(serverAddons) == "table" and type(serverAddons.models) == "table" then
         for i = 1, #serverAddons.models do addAddon(serverAddons.models[i]) end
-    elseif type(loaded) == "table" and #loaded > 0 then
+    end
+    local loaded = GetAllVehicleModels and GetAllVehicleModels() or nil
+    if type(loaded) == "table" and #loaded > 0 then
         for i = 1, #loaded do addAddon(loaded[i]) end
-    else
+    elseif not (type(serverAddons) == "table" and serverAddons.ok == true) then
         -- natif indisponible : on garde la carlist, mais seulement les modèles présents sur le serveur
         for model in pairs(carlistInfo) do addAddon(model) end
     end

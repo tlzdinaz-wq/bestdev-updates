@@ -32,6 +32,8 @@ files {
     -- Menu de garage
     "interface/garage/index.html",
     "interface/garage/**/*",
+    "interface/ltd/index.html",
+    "interface/ltd/**/*",
     "interface/documents/index.html",
     "interface/documents/**/*",
     -- Écran 3D des pompes à essence (DUI posé sur un scaleform)
