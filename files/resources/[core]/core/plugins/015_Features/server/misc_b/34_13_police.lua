@@ -1091,6 +1091,26 @@ end)
 local prisoners = {}
 local ethyloRequests = {}
 
+-- Le registre des détenus n'était jamais rempli : la liste du staff et le
+-- panneau police restaient vides même avec des joueurs en cellule. Il se
+-- remplit maintenant depuis le circuit d'incarcération (34_17_prison.lua), qui
+-- reste seul maître de la peine.
+AddEventHandler("vfw:prison:register", function(identifier, data)
+    if type(identifier) ~= "string" or type(data) ~= "table" then return end
+    prisoners[identifier] = {
+        name = data.name or "Inconnu",
+        minutes = tonumber(data.minutes) or 0,
+        reason = data.reason or "",
+        startedAt = tonumber(data.startedAt) or os.time(),
+        escaped = false,
+    }
+end)
+
+AddEventHandler("vfw:prison:unregister", function(identifier)
+    if type(identifier) ~= "string" then return end
+    prisoners[identifier] = nil
+end)
+
 MiscB.Cb("police:getPrisoners", function(source)
     local xPlayer = officerOrJustice(source)
     if not xPlayer then return {} end
@@ -1120,9 +1140,15 @@ RegisterNetEvent("police:releasePrisoner", function(targetId)
     local xTarget = VFW.GetPlayerFromId(target)
     if not xPlayer or not xTarget then return end
 
-    prisoners[xTarget.identifier] = nil
-    xTarget.setMeta("jail", 0)
-    TriggerClientEvent("police:prison:release", target)
+    -- Passer par le circuit prison : il ramène aussi le joueur au point de
+    -- sortie. Avant, il était libéré sur place, donc à l'intérieur des murs.
+    if VFW.Prison and VFW.Prison.Release then
+        VFW.Prison.Release(xTarget, false)
+    else
+        prisoners[xTarget.identifier] = nil
+        xTarget.setMeta("jail", 0)
+        TriggerClientEvent("police:prison:release", target)
+    end
 end)
 
 RegisterNetEvent("police:reduceSentence", function(targetId, minutes)
@@ -1142,8 +1168,12 @@ RegisterNetEvent("police:reduceSentence", function(targetId, minutes)
     xTarget.setMeta("jail", data.minutes)
 
     if data.minutes <= 0 then
-        prisoners[xTarget.identifier] = nil
-        TriggerClientEvent("police:prison:release", target)
+        if VFW.Prison and VFW.Prison.Release then
+            VFW.Prison.Release(xTarget, false)
+        else
+            prisoners[xTarget.identifier] = nil
+            TriggerClientEvent("police:prison:release", target)
+        end
         return
     end
 

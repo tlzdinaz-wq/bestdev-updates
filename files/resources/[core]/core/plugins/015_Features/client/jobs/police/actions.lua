@@ -126,8 +126,19 @@ local hasEscaped = false
 -- Release NPC state
 local pendingSavedSkin = nil
 local releaseNPC = nil
-local RELEASE_NPC_COORDS = vector4(1845.96, 2585.85, 44.67, 270.0)
 local RELEASE_NPC_MODEL = "s_m_m_prisguard_01"
+
+-- Positions de la prison, réglées dans Gestion > Builders > POSITIONS PRISON et
+-- envoyées par le serveur. Les valeurs ci-dessous sont celles qui étaient
+-- écrites en dur ici : tant que le serveur n'a rien dit, rien ne change.
+local prisonPoints = {
+    cell    = { x = 1679.04, y = 2513.07, z = 45.56, h = 0.0 },
+    release = { x = 1845.96, y = 2585.85, z = 44.67, h = 90.0 },
+    guard   = { x = 1845.96, y = 2585.85, z = 44.67, h = 270.0 },
+    zone    = { x = 1747.58, y = 2537.37, z = 44.57, radius = 500.0 },
+}
+
+local RELEASE_NPC_COORDS = vector4(prisonPoints.guard.x, prisonPoints.guard.y, prisonPoints.guard.z, prisonPoints.guard.h)
 
 -- Apply prisoner outfit (received by the TARGET)
 -- saveSkin: true on first imprisonment, false on reconnect (skin already saved server-side)
@@ -207,16 +218,14 @@ end)
 -- ============================================================
 -- PRISON ESCAPE: Detect when prisoner leaves the prison zone
 -- ============================================================
-local PRISON_CENTER = vector3(1747.58, 2537.37, 44.57)
-local PRISON_RADIUS = 500.0
-
 CreateThread(function()
     while true do
         if prisonEndTime and not hasEscaped then
+            local zone = prisonPoints.zone
             local playerCoords = GetEntityCoords(PlayerPedId())
-            local dist = #(playerCoords - PRISON_CENTER)
+            local dist = #(playerCoords - vector3(zone.x, zone.y, zone.z))
 
-            if dist > PRISON_RADIUS then
+            if dist > (zone.radius or 500.0) then
                 hasEscaped = true
                 prisonEndTime = nil
                 TriggerServerEvent("police:prison:escaped")
@@ -242,8 +251,9 @@ end)
 local function spawnReleaseNPC()
     if releaseNPC and DoesEntityExist(releaseNPC) then return end
 
+    local guard = prisonPoints.guard or RELEASE_NPC_COORDS
     releaseNPC = VFW.CreatePed(
-        vector4(RELEASE_NPC_COORDS.x, RELEASE_NPC_COORDS.y, RELEASE_NPC_COORDS.z - 1.0, RELEASE_NPC_COORDS.w),
+        vector4(guard.x, guard.y, guard.z - 1.0, guard.h or 0.0),
         RELEASE_NPC_MODEL
     )
 
@@ -259,6 +269,33 @@ end
 CreateThread(function()
     Wait(2000)
     spawnReleaseNPC()
+end)
+
+--- Positions envoyées par le serveur (réglage de Gestion > Builders).
+RegisterNetEvent("prison:positions", function(points)
+    if type(points) ~= "table" then return end
+
+    for key, value in pairs(points) do
+        if type(value) == "table" and prisonPoints[key] then
+            prisonPoints[key] = value
+        end
+    end
+
+    -- Le gardien a pu changer de place : on le refait apparaître au bon endroit.
+    if releaseNPC and DoesEntityExist(releaseNPC) then
+        DeleteEntity(releaseNPC)
+        releaseNPC = nil
+    end
+    spawnReleaseNPC()
+end)
+
+--- Téléportation demandée par le serveur (mise en cellule, libération).
+RegisterNetEvent("prison:teleport", function(point)
+    if type(point) ~= "table" or not point.x then return end
+
+    local ped = PlayerPedId()
+    SetEntityCoords(ped, point.x + 0.0, point.y + 0.0, point.z + 0.0, false, false, false, false)
+    if point.h then SetEntityHeading(ped, point.h + 0.0) end
 end)
 
 -- Interaction thread: E key near release NPC

@@ -1464,3 +1464,94 @@ end)
 AddEventHandler("gestion:hub:closed", function()
     for _, fn in pairs(CLOSE) do pcall(fn) end
 end)
+
+-- ═══════════════════════════════════════════════════════════════
+-- Positions prison (server/misc_b/34_17_prison.lua)
+--
+-- Les quatre points de la prison étaient écrits en dur dans le code du métier
+-- police : aucun serveur ne pouvait déplacer sa prison. On les prend ici là où
+-- le staff se tient — la tablette se réduit pour aller se placer.
+-- ═══════════════════════════════════════════════════════════════
+
+local PRISON_POINTS <const> = { cell = true, release = true, guard = true, zone = true }
+
+local function prisonPositions()
+    return TriggerServerCallback("prison:getPositions") or {}
+end
+
+--- La position du staff, cap compris.
+local function prisonHere()
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+    return { x = coords.x, y = coords.y, z = coords.z, h = GetEntityHeading(ped) }
+end
+
+OPEN.prison = function()
+    if not Has("manage_police_zones", "server_management", "dev") then
+        return Fail("Permission zones police requise.")
+    end
+    return Ok({ positions = prisonPositions() })
+end
+
+CALL.prison = function(action, a)
+    a = a or {}
+
+    if action == "setPoint" then
+        local key = a.key
+        if not PRISON_POINTS[key] then return Fail("Position inconnue.") end
+
+        local current = prisonPositions()
+        local point = prisonHere()
+
+        if key == "zone" then
+            -- Le rayon n'est pas une position : on le garde tel qu'il est réglé.
+            local zone = type(current.zone) == "table" and current.zone or {}
+            current.zone = { x = point.x, y = point.y, z = point.z, radius = zone.radius or 500.0 }
+        else
+            current[key] = point
+        end
+
+        local res = TriggerServerCallback("prison:savePositions", current)
+        if type(res) ~= "table" or not res.ok then
+            return Fail(type(res) == "table" and res.error or "Enregistrement impossible.")
+        end
+        return Ok({ positions = res.positions })
+
+    elseif action == "setRadius" then
+        local radius = tonumber(a.radius)
+        if not radius or radius < 20 or radius > 2000 then
+            return Fail("Le rayon doit etre compris entre 20 et 2000 metres.")
+        end
+
+        local current = prisonPositions()
+        local zone = type(current.zone) == "table" and current.zone or {}
+        current.zone = { x = zone.x, y = zone.y, z = zone.z, radius = radius }
+
+        local res = TriggerServerCallback("prison:savePositions", current)
+        if type(res) ~= "table" or not res.ok then
+            return Fail(type(res) == "table" and res.error or "Enregistrement impossible.")
+        end
+        return Ok({ positions = res.positions })
+
+    elseif action == "teleport" then
+        local key = a.key
+        if not PRISON_POINTS[key] then return Fail("Position inconnue.") end
+
+        local point = prisonPositions()[key]
+        if type(point) ~= "table" or not tonumber(point.x) then return Fail("Position non definie.") end
+
+        local ped = PlayerPedId()
+        SetEntityCoords(ped, point.x + 0.0, point.y + 0.0, point.z + 0.0, false, false, false, false)
+        if tonumber(point.h) then SetEntityHeading(ped, point.h + 0.0) end
+        return Ok()
+
+    elseif action == "reset" then
+        local res = TriggerServerCallback("prison:resetPositions")
+        if type(res) ~= "table" or not res.ok then
+            return Fail(type(res) == "table" and res.error or "Action impossible.")
+        end
+        return Ok({ positions = res.positions })
+    end
+
+    return Fail("Action inconnue.")
+end

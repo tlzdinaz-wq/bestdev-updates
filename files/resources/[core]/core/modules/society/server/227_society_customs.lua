@@ -64,6 +64,16 @@ end
 
 VFW.Society.SyncCustomPrices = syncPrices
 
+--- Relit les prix et les renvoie à tout le monde.
+---
+--- Le builder (228) écrit dans les tables ; sans relecture, le cache garderait
+--- l'ancien tarif jusqu'au prochain démarrage et le mécano facturerait encore
+--- le prix d'avant.
+function VFW.Society.ReloadCustomPrices()
+    loadPrices()
+    syncPrices()
+end
+
 local function maxPriceFor(modType)
     local cfg = priceCache.basePrices[modType]
     local base = 1000

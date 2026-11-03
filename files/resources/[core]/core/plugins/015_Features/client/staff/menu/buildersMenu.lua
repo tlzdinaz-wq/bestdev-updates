@@ -120,6 +120,7 @@ local builderEntries = {
     { separator = ":siren: POLICE & JUSTICE" },
     { label = ":scales: DOJ PERMISSIONS", desc = "Gérer les permissions du Department of Justice", submenu = "builderDOJ", perm = "manage_doj", opens = "doj" },
     { label = ":money: AMENDES POLICE", desc = "Gérer les types d'amendes et tarifs", submenu = "builderFines", perm = "builder_fines", opens = "fines" },
+    { label = ":lock: POSITIONS PRISON", desc = "Cellule, liberation, gardien et zone de detention", submenu = "builderPrison", perm = "manage_police_zones" },
     { label = ":map: ZONES ALERTES POLICE", desc = "Configurer les zones d'alertes par job police", perm = "manage_police_zones", opens = "policeAlerts" },
     { label = ":music: RADIO 911", desc = "Gérer les jobs autorisés à utiliser la radio 911", submenu = "builderRadio911", perm = "builder_radio911", opens = "radio911" },
     { label = ":film: CAMÉRAS POLICE", desc = "Gérer les caméras de vidéosurveillance", submenu = "builderCameras", perm = "builder_cameras" },

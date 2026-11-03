@@ -323,7 +323,15 @@ RegisterNetEvent("vfw:job:dynasty:createProperty", function(data)
     if type(data) ~= "table" then return end
 
     local xPlayer = dynastyAgent(source)
-    if not xPlayer then return end
+    if not xPlayer then
+        -- Refuser sans un mot laissait l'agent devant un bouton qui ne fait rien,
+        -- alors que c'est le nom de son metier qui n'est pas reconnu.
+        VFW.ShowNotification(source, {
+            type = "ROUGE",
+            content = "Vous n'etes pas agent immobilier.",
+        })
+        return
+    end
     if not MiscB.Rate(source, "dynastycreate", 2000) then return end
 
     local pos = MiscB.Plain(data.pos or data.coords)

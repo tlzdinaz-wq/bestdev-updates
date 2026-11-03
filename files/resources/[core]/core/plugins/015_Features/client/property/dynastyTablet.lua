@@ -781,15 +781,31 @@ end)
 -- plugins/**/client/ loads after modules/**/client/ so exports are available
 local JobMenuRegistry = exports.core:getJobMenuRegistry()
 if JobMenuRegistry then
-    JobMenuRegistry.registerByType("dynasty", function(menu, subMenus)
+    -- L'entrée du menu métier se cherche par TYPE de société. Un serveur dont
+    -- l'agence est rangée sous un autre type — et ils sont nombreux à l'appeler
+    -- « immobilier » — n'avait aucune entrée : ses agents voyaient le catalogue
+    -- public et jamais le formulaire de création. La commande /immobilier
+    -- (serveur, property/2812) reste la porte d'entrée qui ne dépend de rien.
+    local function registerAgentMenu(menu)
         menu.Separator("Dynasty 8")
 
         menu.Button("Catalogue immobilier", "Consulter et créer des propriétés", nil, "chevron", false, function()
             menu.close()
             VFW.OpenDynastyTablet(nil, true)
         end)
-    end, 30)
+    end
+
+    local AGENT_TYPES <const> = { "dynasty", "dynasty8", "dynasty_8", "immobilier", "realestate" }
+    for i = 1, #AGENT_TYPES do
+        JobMenuRegistry.registerByType(AGENT_TYPES[i], registerAgentMenu, 30)
+    end
 end
+
+--- Ouverture demandée par le serveur (commande /immobilier) : lui seul connaît
+--- le métier du joueur et son service.
+RegisterNetEvent("dynasty:openAgentTablet", function(staffMode)
+    VFW.OpenDynastyTablet(nil, true, staffMode == true)
+end)
 
 --- Event to force close the tablet
 RegisterNetEvent("vfw:dynastyTablet:close", function()

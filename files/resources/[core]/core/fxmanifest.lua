@@ -34,6 +34,9 @@ files {
     "interface/garage/**/*",
     "interface/ltd/index.html",
     "interface/ltd/**/*",
+    -- Armurerie Ammu-Nation (page dediee, iframe de l'interface)
+    "interface/ammunation/index.html",
+    "interface/ammunation/**/*",
     "interface/documents/index.html",
     "interface/documents/**/*",
     -- Écran 3D des pompes à essence (DUI posé sur un scaleform)

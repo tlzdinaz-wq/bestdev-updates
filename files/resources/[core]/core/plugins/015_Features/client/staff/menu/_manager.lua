@@ -543,6 +543,7 @@ StaffMenu.builderJewelry = VUI:CreateSubMenu(StaffMenu.builders, "BIJOUTERIE", a
 
 StaffMenu.builderDOJ = VUI:CreateSubMenu(StaffMenu.builders, "DOJ PERMISSIONS", adminBanner, true)
 StaffMenu.builderDOJPerms = VUI:CreateSubMenu(StaffMenu.builderDOJ, "PERMISSIONS GRADE", adminBanner, true)
+StaffMenu.builderPrison = VUI:CreateSubMenu(StaffMenu.builders, "POSITIONS PRISON", adminBanner, true)
 StaffMenu.builderFines = VUI:CreateSubMenu(StaffMenu.builders, "AMENDES POLICE", adminBanner, true)
 StaffMenu.builderFinesAdd = VUI:CreateSubMenu(StaffMenu.builderFines, "AJOUTER UNE AMENDE", adminBanner, true)
 StaffMenu.builderFinesEdit = VUI:CreateSubMenu(StaffMenu.builderFines, "MODIFIER AMENDE", adminBanner, true)

@@ -43,8 +43,17 @@ local CustomPricesCache = {
     modelOverrides = {}
 }
 
+-- Classes du jeu dans l'ordre de GetVehicleClass. Les memes noms que ceux listes
+-- par le builder des prix (society/server/228) : c'est la cle du pourcentage
+-- applique a toute une classe de vehicules.
+local VEHICLE_CLASS_NAMES <const> = {
+    [0] = "Compacts", "Sedans", "SUVs", "Coupes", "Muscle", "SportsClassics", "Sports", "Super",
+    "Motorcycles", "OffRoad", "Industrial", "Utility", "Vans", "Cycles", "Boats", "Helicopters",
+    "Planes", "Service", "Emergency", "Military", "Commercial", "Trains", "OpenWheel",
+}
+
 local currentVehicleModel = ""
-local currentVehicleCategory = "" -- concess category name
+local currentVehicleCategory = "" -- nom de la classe du vehicule (voir VEHICLE_CLASS_NAMES)
 local pendingModifications = {} -- Track modifications made during session
 local totalModificationCost = 0
 
@@ -593,7 +602,12 @@ local function OpenCustomsNUI()
     -- Get vehicle info for price calculation
     local vehicleModel = GetEntityModel(vehicle)
     currentVehicleModel = GetDisplayNameFromVehicleModel(vehicleModel)
-    currentVehicleCategory = TriggerServerCallback('customPrices:getVehicleCategory', currentVehicleModel) or ""
+    -- La classe se lit ici : GetVehicleClass est une native client, et le serveur
+    -- n'a aucun moyen de la connaitre a partir du nom du modele. L'appel serveur
+    -- qui etait fait ici n'avait pas de reponse : le menu attendait quinze
+    -- secondes a chaque ouverture, puis repartait sans classe, donc sans
+    -- pourcentage par classe applique.
+    currentVehicleCategory = VEHICLE_CLASS_NAMES[GetVehicleClass(vehicle)] or ""
 
     -- Get current vehicle state
     neon = {

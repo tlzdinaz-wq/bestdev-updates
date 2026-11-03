@@ -91,6 +91,7 @@ local directCategories = {
             { label = "Nettoyer la zone", desc = "Supprimer véhicules, peds et objets autour de vous", icon = "trash", perm = "clean_zone", action = "clear_zone" },
             { label = "Densité du monde", desc = "PNJ, trafic et véhicules garés — appliqué en direct à tous", icon = "globe", perm = "server_management", opens = "dev", dev = "density" },
             { label = "Zones de circulation", desc = "Limites de vitesse par zone : voir, créer, modifier, supprimer", icon = "car", perm = "server_management", opens = "dev", dev = "traffic" },
+            { label = "Positions prison", desc = "Cellule, point de liberation, gardien et zone de detention", icon = "lock", perm = { "manage_police_zones", "server_management" }, opens = "dev", dev = "prison" },
             { label = "Gérer les images", desc = "Logo, bannière, pause, items, sociétés, mugshots", icon = "image", opens = "images" },
             { label = "Notifications périodiques", desc = "Notifications automatiques", icon = "megaphone", opens = "notifs" },
             { label = "Starter pack", desc = "Argent et items de départ des nouveaux joueurs", icon = "gift", opens = "dev", dev = "starterpack" },

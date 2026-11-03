@@ -288,7 +288,10 @@ RegisterServerCallback("dynasty:proposeContract", function(source, contractData)
     if not xPlayer then return false, "Joueur introuvable." end
     if type(contractData) ~= "table" then return false, "Les informations envoyees ne sont pas valides." end
 
-    if not xPlayer.job or not xPlayer.job.onDuty then
+    -- Le staff passe par la meme tablette depuis Gestion, sans prendre le metier
+    -- d'agent : lui demander d'etre en service revenait a lui interdire de creer
+    -- quoi que ce soit depuis le menu de gestion.
+    if not PS.IsStaff(xPlayer) and (not xPlayer.job or not xPlayer.job.onDuty) then
         return false, "Vous devez etre en service."
     end
 
@@ -314,7 +317,11 @@ RegisterServerCallback("dynasty:proposeContract", function(source, contractData)
     if not config then return false, "Bien immobilier introuvable." end
 
     local prices = PS.GetPrice(category, config.id)
-    if not prices then return false, "Ce bien n'est pas au catalogue." end
+    if not prices then
+        -- Dire ou se trouve le reglage : sans prix, aucun contrat n'est possible,
+        -- et le message precedent laissait croire a un bien inexistant.
+        return false, "Ce bien n'a pas de prix. A regler dans Gestion > Gestion Dynasty."
+    end
 
     local contractType = contractData.contractType
     if contractType ~= "sale" and contractType ~= "rent" then
