@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="fr">
+	<head>
+		<title>pmms</title>
+		<meta charset="utf-8">
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+		<link rel="stylesheet" href="style.css?v=9">
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+		<script src="mediaelement.min.js"></script>
+		<script src="wave.js"></script>
+		<script src="script.js?v=9"></script>
+	</head>
+	<body>
+		<div class="notifications"></div>
+		<div id="ui">
+			<div class="pmms-shell" aria-hidden="true">
+				<div class="pmms-shell-bevel"></div>
+				<div class="pmms-shell-grain"></div>
+				<div class="pmms-shell-accent"></div>
+			</div>
+
+			<header class="pmms-chrome">
+				<div id="drag-top" class="pmms-drag pmms-drag-top" title="Déplacer"></div>
+				<div class="pmms-brand">
+					<span class="pmms-brand-mark" aria-hidden="true"></span>
+					<span class="pmms-brand-name">MEDIA</span>
+					<span class="pmms-brand-sub">console</span>
+				</div>
+				<button type="button" id="close-ui" class="pmms-close">
+					<span>Fermer</span>
+					<i class="fas fa-times" aria-hidden="true"></i>
+				</button>
+			</header>
+
+			<div class="pmms-body">
+			<div id="loading">
+				<img src="loading.svg" alt="Chargement">
+				<span class="pmms-loading-label">Initialisation…</span>
+			</div>
+
+			<section class="pmms-section pmms-now-playing" aria-label="Lecteurs actifs">
+				<div class="pmms-section-head">
+					<h2 class="pmms-section-title">En lecture</h2>
+				</div>
+				<div id="active-media-players-container">
+					<div class="tooltip">
+						<div class="tooltip-title">Lecteurs actifs</div>
+						<div class="tooltip-para">Liste des lecteurs médias actifs à proximité.</div>
+						<div class="icon-descriptions">
+							<div class="icon">&#xf0c1;</div>
+							<div>Copier l’URL du média dans le presse-papiers.</div>
+							<div class="icon">&#xf04a; / &#xf04e;</div>
+							<div>Reculer / avancer de 10 secondes.</div>
+							<div class="icon">&#xf051;</div>
+							<div>Lire l’élément suivant de la file.</div>
+							<div class="icon">&#xf023; / &#xf09c;</div>
+							<div>Lecteur verrouillé / déverrouillé. Cliquer pour basculer.</div>
+							<div class="icon">&#xf24d;</div>
+							<div>Copier la lecture en cours vers un autre lecteur.</div>
+							<div class="icon">&#xf079; / &#xf061;</div>
+							<div>Boucle activée / désactivée. Cliquer pour basculer.</div>
+							<div class="icon">&#xf03d; / &#xf4e2;</div>
+							<div>Vidéo activée / désactivée (RedM uniquement).</div>
+							<div class="icon">&#xf028; / &#xf6a9;</div>
+							<div>Son activé / coupé.</div>
+							<div class="icon">&#xf04c; / &#xf04b;</div>
+							<div>Pause / reprise.</div>
+							<div class="icon">&#xf04d;</div>
+							<div>Arrêter le lecteur.</div>
+						</div>
+					</div>
+					<div id="active-media-players"></div>
+				</div>
+			</section>
+
+			<section class="pmms-section pmms-launch" aria-label="Lancer un média">
+				<div class="pmms-section-head">
+					<h2 class="pmms-section-title">Lancer</h2>
+				</div>
+				<div id="start-media-player" class="start-on-enter">
+					<div id="usable-media-players-container" class="pmms-field">
+						<div class="tooltip">
+							<div class="tooltip-title">Choisir un lecteur</div>
+							<div class="tooltip-para">Liste des lecteurs à proximité sur lesquels vous pouvez diffuser.</div>
+						</div>
+						<label class="pmms-field-label" for="usable-media-players-btn">Lecteur</label>
+						<!-- Le <select> natif ne s'ouvre pas dans le CEF FiveM dès qu'un parent
+						     a un transform (centrage de #ui). On le garde pour la valeur, le
+						     bouton custom ouvre la liste. -->
+						<div class="pmms-dropdown" id="usable-media-players-dropdown">
+							<select id="usable-media-players" aria-hidden="true" tabindex="-1"></select>
+							<button type="button" id="usable-media-players-btn" class="pmms-dropdown-btn" aria-haspopup="listbox" aria-expanded="false">
+								<span class="pmms-dropdown-label"></span>
+								<span class="pmms-dropdown-caret">&#xf078;</span>
+							</button>
+							<div id="usable-media-players-menu" class="pmms-dropdown-menu" role="listbox" hidden></div>
+						</div>
+					</div>
+
+					<div id="presets-container" class="pmms-field">
+						<div class="tooltip">
+							<div class="tooltip-title">Preset</div>
+							<div class="tooltip-para">Liste de médias prédéfinis à lire.</div>
+						</div>
+						<label class="pmms-field-label" for="preset">Preset</label>
+						<select id="preset"></select>
+					</div>
+
+					<div id="url-container" class="pmms-field pmms-field-url">
+						<div class="tooltip">
+							<div class="tooltip-title">URL du média</div>
+							<div class="tooltip-para">L’adresse du média à lire.</div>
+						</div>
+						<label class="pmms-field-label" for="url">URL</label>
+						<input id="url" type="text" placeholder="Coller une URL…">
+					</div>
+
+					<div class="pmms-toggles" role="group" aria-label="Options de lecture">
+						<div id="loop-container" class="pmms-toggle">
+							<div class="tooltip">
+								<div class="tooltip-title">Boucle</div>
+								<div class="tooltip-para">Si coché, le média sera lu en boucle.</div>
+							</div>
+							<label class="pmms-toggle-face" for="loop">
+								<i class="fas fa-retweet" aria-hidden="true"></i>
+								<span>Boucle</span>
+							</label>
+							<input id="loop" type="checkbox">
+						</div>
+
+						<div id="filter-container" class="pmms-toggle" hidden>
+							<div class="tooltip">
+								<div class="tooltip-title">Filtre</div>
+								<div class="tooltip-para">Active un filtre immersif pour l’audio et la vidéo.</div>
+							</div>
+							<i class="fas fa-filter" aria-hidden="true"></i>
+							<input id="filter" type="checkbox" checked>
+						</div>
+
+						<div id="muted-container" class="pmms-toggle">
+							<div class="tooltip">
+								<div class="tooltip-title">Muet</div>
+								<div class="tooltip-para">Si coché, le son sera coupé.</div>
+							</div>
+							<label class="pmms-toggle-face" for="muted">
+								<i class="fas fa-volume-mute" aria-hidden="true"></i>
+								<span>Muet</span>
+							</label>
+							<input id="muted" type="checkbox">
+						</div>
+
+						<div id="video-container" class="pmms-toggle" hidden>
+							<div class="tooltip">
+								<div class="tooltip-title">Vidéo</div>
+								<div class="tooltip-para">Si coché, la vidéo sera activée (RedM uniquement).</div>
+							</div>
+							<i class="fas fa-video" aria-hidden="true"></i>
+							<input id="video" type="checkbox" disabled>
+							<input hidden id="video-size" type="number" min="10" max="100" step="10" value="30" disabled>
+						</div>
+
+						<div id="locked-container" class="pmms-toggle">
+							<div class="tooltip">
+								<div class="tooltip-title">Verrouiller</div>
+								<div class="tooltip-para">Si coché, ce lecteur sera verrouillé : seuls les managers pourront le contrôler.</div>
+							</div>
+							<label class="pmms-toggle-face" for="locked">
+								<i class="fas fa-lock" aria-hidden="true"></i>
+								<span>Verrouiller</span>
+							</label>
+							<input id="locked" type="checkbox">
+						</div>
+					</div>
+
+					<button type="button" id="advanced-settings-button" class="control-button pmms-icon-btn" aria-label="Réglages avancés">
+						<div class="tooltip">
+							<div class="tooltip-title">Réglages avancés</div>
+							<div class="tooltip-para">Affiche ou masque la section des réglages avancés.</div>
+						</div>
+						<i class="fas fa-sliders-h" aria-hidden="true"></i>
+					</button>
+
+					<div id="play-button-container">
+						<div class="tooltip">
+							<div class="tooltip-title">Lire</div>
+							<div class="tooltip-para">Démarre la lecture du média sélectionné.</div>
+							<div class="tooltip-para">Si quelque chose est déjà en cours sur ce lecteur, le média sera mis en file d’attente.</div>
+						</div>
+						<button type="button" id="play-button" class="control-button pmms-play-btn" aria-label="Lire">
+							<i class="fas fa-play" aria-hidden="true"></i>
+							<span>Lire</span>
+						</button>
+					</div>
+				</div>
+			</section>
+
+			<section id="advanced-settings" class="pmms-section pmms-advanced start-on-enter" style="display: none;" aria-label="Réglages avancés">
+				<div class="pmms-section-head">
+					<h2 class="pmms-section-title">Réglages</h2>
+				</div>
+				<div id="main-advanced-settings">
+					<div id="offset-container" class="pmms-adv-cell">
+						<div class="tooltip">
+							<div class="tooltip-title">Temps de départ</div>
+							<div class="tooltip-para">Décalage de départ pour la lecture.</div>
+							<div class="tooltip-para">Détecté automatiquement depuis l’URL YouTube/Twitch (<span class="literal">?t=</span>, <span class="literal">&amp;start=</span>, <span class="literal">#t=</span>).</div>
+							<div class="tooltip-para">Sinon : secondes (ex. <span class="literal">120</span>) ou timecode hh:mm:ss.</div>
+						</div>
+						<span class="pmms-adv-label"><i class="fas fa-clock" aria-hidden="true"></i> Départ</span>
+						<input id="offset" type="text" size="8" value="00:00:00" title="Rempli auto depuis t= / start= dans l’URL">
+					</div>
+					<div id="attenuation-container" class="pmms-adv-cell pmms-adv-pair">
+						<div>
+							<div class="tooltip">
+								<div class="tooltip-title">Atténuation même pièce</div>
+								<div class="tooltip-para">Vitesse d’atténuation du son dans la même pièce que le lecteur.</div>
+								<div class="tooltip-para">Une valeur de <span class="literal">0</span> signifie aucune atténuation.</div>
+							</div>
+							<span class="pmms-adv-label"><i class="fas fa-door-closed" aria-hidden="true"></i> Même pièce</span>
+							<input id="same-room-attenuation" class="set-attenuation" type="number" min="0" max="10" step="0.1" value="4">
+						</div>
+						<div>
+							<div class="tooltip">
+								<div class="tooltip-title">Atténuation autre pièce</div>
+								<div class="tooltip-para">Vitesse d’atténuation du son dans une autre pièce que le lecteur.</div>
+								<div class="tooltip-para">Une valeur de <span class="literal">0</span> signifie aucune atténuation.</div>
+							</div>
+							<span class="pmms-adv-label"><i class="fas fa-door-open" aria-hidden="true"></i> Autre pièce</span>
+							<input id="diff-room-attenuation" class="set-attenuation" type="number" min="0" max="10" step="0.1" value="6">
+						</div>
+					</div>
+					<div id="range-container" class="pmms-adv-cell">
+						<div class="tooltip">
+							<div class="tooltip-title">Portée</div>
+							<div class="tooltip-para">Distance à laquelle le lecteur est visible / audible.</div>
+						</div>
+						<span class="pmms-adv-label"><i class="fas fa-walking" aria-hidden="true"></i> Portée</span>
+						<input id="range" type="number" min="5" max="200" step="5" value="50"/>
+					</div>
+					<div id="volume-container" class="pmms-adv-cell">
+						<div class="tooltip">
+							<div class="tooltip-title">Volume</div>
+							<div class="tooltip-para">Volume de base du lecteur.</div>
+						</div>
+						<span class="pmms-adv-label"><i class="fas fa-volume-up" aria-hidden="true"></i> Volume</span>
+						<input id="volume" type="number" min="0" max="100" step="5" value="100">
+					</div>
+					<div id="diff-room-volume-container" class="pmms-adv-cell">
+						<div class="tooltip">
+							<div class="tooltip-title">Volume autre pièce</div>
+							<div class="tooltip-para">Ratio de réduction du volume de base en entrant dans une autre pièce.</div>
+							<div class="tooltip-para">Une valeur de <span class="literal">1</span> conserve le même volume.</div>
+						</div>
+						<span class="pmms-adv-label"><i class="fas fa-volume-down" aria-hidden="true"></i> Vol. pièce</span>
+						<input id="diff-room-volume" type="number" min="0" max="1" step="0.01" value="0.25">
+					</div>
+					<div id="is-vehicle-container" class="pmms-adv-cell pmms-adv-check">
+						<div class="tooltip">
+							<div class="tooltip-title">Mode véhicule</div>
+							<div class="tooltip-para">Si coché, l’entité est traitée comme un véhicule : l’intérieur = même pièce, l’extérieur = autre pièce.</div>
+							<div class="tooltip-para">Décochez pour diffuser le son à l’extérieur du véhicule.</div>
+						</div>
+						<span class="pmms-adv-label"><i class="fas fa-car" aria-hidden="true"></i> Véhicule</span>
+						<input id="is-vehicle" type="checkbox">
+					</div>
+					<div id="scaleform-container" class="pmms-adv-cell pmms-adv-check">
+						<div class="tooltip">
+							<div class="tooltip-title">Utiliser scaleform</div>
+							<div class="tooltip-para">Lire le média sur un scaleform plutôt que sur la render target d’un objet.</div>
+						</div>
+						<span class="pmms-adv-label"><i class="fas fa-tv" aria-hidden="true"></i> Scaleform</span>
+						<input id="scaleform" type="checkbox">
+					</div>
+					<div id="visualization-container" class="pmms-adv-cell">
+						<div class="tooltip">
+							<div class="tooltip-title">Visualisation audio</div>
+							<div class="tooltip-para">Afficher une visualisation audio à la place de la vidéo.</div>
+						</div>
+						<span class="pmms-adv-label"><i class="fas fa-signal" aria-hidden="true"></i> Visuel</span>
+						<select id="visualization">
+							<option></option>
+						</select>
+					</div>
+					<button type="button" id="save" class="control-button" aria-label="Enregistrer">
+						<div class="tooltip">
+							<div class="tooltip-title">Enregistrer les réglages</div>
+							<div class="tooltip-para">Ajouter un nouveau modèle, ou enregistrer les réglages pour un modèle / une entité.</div>
+						</div>
+						<i class="fas fa-save" aria-hidden="true"></i>
+					</button>
+					<button type="button" id="delete" class="control-button" aria-label="Supprimer">
+						<div class="tooltip">
+							<div class="tooltip-title">Supprimer les réglages</div>
+							<div class="tooltip-para">Supprimer les réglages enregistrés pour un modèle ou une entité.</div>
+						</div>
+						<i class="fas fa-trash-alt" aria-hidden="true"></i>
+					</button>
+					<button type="button" id="revert-settings" class="control-button" aria-label="Réinitialiser les réglages">
+						<div class="tooltip">
+							<div class="tooltip-title">Réinitialiser les réglages</div>
+							<div class="tooltip-para">Rétablir les réglages enregistrés pour le modèle ou l’entité sélectionné.</div>
+						</div>
+						<i class="fas fa-undo" aria-hidden="true"></i>
+					</button>
+					<button type="button" id="restore-ui-position" class="control-button" aria-label="Recentrer l’interface">
+						<div class="tooltip">
+							<div class="tooltip-title">Recentrer l’interface</div>
+							<div class="tooltip-para">Remet l’interface au centre de l’écran.</div>
+						</div>
+						<i class="fas fa-window-restore" aria-hidden="true"></i>
+					</button>
+					<button type="button" id="reset-players" class="control-button" aria-label="Réinitialiser les lecteurs">
+						<div class="tooltip">
+							<div class="tooltip-title">Réinitialiser les lecteurs</div>
+							<div class="tooltip-para">Réinitialise tous les lecteurs, ce qui peut corriger certains problèmes.</div>
+						</div>
+						<i class="fas fa-sync" aria-hidden="true"></i>
+					</button>
+					<div id="toggle-tips-container" class="pmms-adv-cell pmms-adv-check">
+						<div class="tooltip">
+							<div class="tooltip-title">Info-bulles</div>
+							<div class="tooltip-para">Activer ou désactiver ces info-bulles.</div>
+						</div>
+						<span class="pmms-adv-label"><i class="fas fa-question-circle" aria-hidden="true"></i> Astuces</span>
+						<input id="toggle-tips" type="checkbox">
+					</div>
+				</div>
+
+				<div id="scaleform-settings" style="display: none;">
+					<div id="scaleform-title">Réglages Scaleform</div>
+					<div id="scaleform-name-container">
+						<div class="tooltip">
+							<div class="tooltip-title">Nom du scaleform</div>
+							<div class="tooltip-para">Nom du scaleform (fichier .gfx sans extension).</div>
+						</div>
+						<input id="scaleform-name" type="text" placeholder="Nom">
+					</div>
+					<div id="scaleform-position">
+						<div class="tooltip">
+							<div class="tooltip-title">Position du scaleform</div>
+							<div class="tooltip-para">Coordonnées XYZ où le scaleform sera dessiné.</div>
+						</div>
+						<i class="fas fa-map-marker-alt" aria-hidden="true"></i>
+						<input id="scaleform-position-x" type="number" placeholder="x" class="scaleform-setting" min="-16000" max="16000" step="0.01">
+						<input id="scaleform-position-y" type="number" placeholder="y" class="scaleform-setting" min="-16000" max="16000" step="0.01">
+						<input id="scaleform-position-z" type="number" placeholder="z" class="scaleform-setting" min="-16000" max="16000" step="0.01">
+					</div>
+					<div id="scaleform-rotation">
+						<div class="tooltip">
+							<div class="tooltip-title">Rotation du scaleform</div>
+							<div class="tooltip-para">Rotation XYZ du scaleform.</div>
+						</div>
+						<i class="fas fa-compass" aria-hidden="true"></i>
+						<input id="scaleform-rotation-x" type="number" placeholder="x" class="scaleform-setting" min="-360" max="360" step="0.1">
+						<input id="scaleform-rotation-y" type="number" placeholder="y" class="scaleform-setting" min="-360" max="360" step="0.1">
+						<input id="scaleform-rotation-z" type="number" placeholder="z" class="scaleform-setting" min="-360" max="360" step="0.1">
+					</div>
+					<div id="scaleform-scale">
+						<div class="tooltip">
+							<div class="tooltip-title">Échelle du scaleform</div>
+							<div class="tooltip-para">Échelle XYZ du scaleform.</div>
+						</div>
+						<i class="fas fa-arrows-alt" aria-hidden="true"></i>
+						<input id="scaleform-scale-x" type="number" placeholder="x" class="scaleform-setting" min="0" max="1" step="0.01" value="0.1">
+						<input id="scaleform-scale-y" type="number" placeholder="y" class="scaleform-setting" min="0" max="1" step="0.01" value="0.05">
+						<input id="scaleform-scale-z" type="number" placeholder="z" class="scaleform-setting" min="0" max="1" step="0.01" value="0">
+					</div>
+					<div id="scaleform-auto">
+						<button type="button" id="scaleform-auto-my-position">
+							<div class="tooltip">
+								<div class="tooltip-title">Ma position</div>
+								<div class="tooltip-para">Définir la position et la rotation du scaleform sur votre position actuelle.</div>
+							</div>
+							<i class="fas fa-street-view" aria-hidden="true"></i>
+						</button>
+						<button type="button" id="scaleform-auto-entity">
+							<div class="tooltip">
+								<div class="tooltip-title">Position de l’entité</div>
+								<div class="tooltip-para">Définir la position et la rotation du scaleform sur celles de l’entité lecteure sélectionnée.</div>
+							</div>
+							<i class="fas fa-cube" aria-hidden="true"></i>
+						</button>
+						<div id="scaleform-attached-container">
+							<div class="tooltip">
+								<div class="tooltip-title">Attacher à l’entité</div>
+								<div class="tooltip-para">Attacher le scaleform à l’entité sélectionnée.</div>
+							</div>
+							<i class="fas fa-magnet" aria-hidden="true"></i>
+							<input id="scaleform-attached" class="scaleform-setting" type="checkbox">
+						</div>
+					</div>
+				</div>
+
+				<div id="save-settings" style="display: none;">
+					<div class="pmms-panel-label">Enregistrer :</div>
+					<div id="save-model-container">
+						<div class="save-input-label">Modèle</div>
+						<input id="save-model" type="text">
+					</div>
+					<div id="save-render-target-container">
+						<div class="save-input-label">Render Target</div>
+						<input id="save-render-target" type="text">
+					</div>
+					<div>
+						<div class="save-input-label">Libellé</div>
+						<input id="save-label" type="text">
+					</div>
+					<div>
+						<button type="button" id="save-server-model" class="save-method" data-save-method="server-model" style="display: none;">
+							<i class="fas fa-cubes" aria-hidden="true"></i>
+							<span>Modèle</span>
+						</button>
+						<button type="button" id="save-server-entity" class="save-method" data-save-method="server-entity" style="display: none;">
+							<i class="fas fa-cube" aria-hidden="true"></i>
+							<span>Entité</span>
+						</button>
+						<button type="button" id="save-new-model" class="save-method" data-save-method="new-model">
+							<i class="fas fa-plus" aria-hidden="true"></i>
+							<span>Ajouter</span>
+						</button>
+						<button type="button" id="save-cancel">
+							<i class="fas fa-times" aria-hidden="true"></i>
+							<span>Annuler</span>
+						</button>
+					</div>
+				</div>
+
+				<div id="delete-settings" style="display: none;">
+					<div class="pmms-panel-label">Supprimer :</div>
+					<button type="button" id="delete-server-model" class="delete-method" data-delete-method="server-model">
+						<i class="fas fa-cubes" aria-hidden="true"></i>
+						<span>Modèle</span>
+					</button>
+					<button type="button" id="delete-server-entity" class="delete-method" data-delete-method="server-entity">
+						<i class="fas fa-cube" aria-hidden="true"></i>
+						<span>Entité</span>
+					</button>
+					<button type="button" id="delete-cancel">
+						<i class="fas fa-times" aria-hidden="true"></i>
+						<span>Annuler</span>
+					</button>
+				</div>
+			</section>
+			</div><!-- /.pmms-body -->
+
+			<footer class="pmms-footer">
+				<div id="base-volume-container">
+					<div class="tooltip">
+						<div class="tooltip-title">Volume personnel</div>
+						<div class="tooltip-para">Définit votre volume de base personnel pour tous les lecteurs.</div>
+					</div>
+					<i class="fas fa-volume-off" aria-hidden="true"></i>
+					<span class="pmms-footer-label">Volume</span>
+					<div id="base-volume">100</div>
+					<input id="set-base-volume" type="range" min="0" max="100" step="1" value="100">
+				</div>
+				<div id="drag-bottom" class="pmms-drag pmms-drag-bottom" title="Déplacer"></div>
+			</footer>
+		</div>
+		<div id="status" style="display: none;"></div>
+	</body>
+</html>

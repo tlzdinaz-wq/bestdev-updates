@@ -405,9 +405,9 @@ VFW.ContextAddButton("vehicle", ":music: Mettre de la musique", function(veh)
     local ped = VFW.PlayerData.ped
     return IsPedInVehicle(ped, veh, false)
 end, function(veh)
-    VFW.CloseContextMenu()
-    Wait(150)
-    OpenVehicleMusicRadioUI(veh)
+    -- Meme lecteur que les platines : PMMS vise le vehicule le plus proche,
+    -- donc celui dans lequel on est assis (voir client/media_player.lua).
+    VFW.OpenMediaPlayer("vehicule")
 end)
 
 -- Verrouiller/Déverrouiller (avec clés) : le serveur vérifie les clés (objet, propriétaire,

@@ -3,7 +3,40 @@ VFW.Inventory = VFW.Inventory or {}
 local Inv = VFW.Inventory
 
 Inv.PlayerMaxSlots = 100
-Inv.DefaultChestMaxWeight = 200
+
+-- ── L'échelle des poids ─────────────────────────────────────────
+--
+-- L'inventaire compte en unités de 5 grammes (voir config/item_weights.lua) :
+-- une bouteille d'eau pèse 100, un pistolet 200, et la capacité d'un joueur vaut
+-- 5000, soit 25 kg. **1 kg = 200 unités.**
+--
+-- Les coffres, eux, étaient restés sur l'ancienne échelle où 1 valait 1 kg :
+-- leurs capacités — celles d'origine comme celles saisies dans les builders, qui
+-- demandent pourtant des kilos — se retrouvaient divisées par deux cents. D'où
+-- « je mets 1000 kg et j'ai 5 kg ». Tout ce qui est exprimé en kilos passe
+-- maintenant par ces deux fonctions avant d'entrer dans l'inventaire.
+
+Inv.UnitsPerKg = 200
+
+--- Des kilos vers les unités de l'inventaire.
+---@param kg any
+---@param fallbackKg? number
+---@return integer
+function Inv.KgToUnits(kg, fallbackKg)
+    local value = tonumber(kg)
+    if not value or value ~= value or value <= 0 then value = fallbackKg or 0 end
+    return math.floor(value * Inv.UnitsPerKg)
+end
+
+--- Des unités de l'inventaire vers les kilos (affichage, builders).
+---@param units any
+---@return number
+function Inv.UnitsToKg(units)
+    local value = tonumber(units) or 0
+    return value / Inv.UnitsPerKg
+end
+
+Inv.DefaultChestMaxWeight = 200 * 200 -- 200 kg
 Inv.DefaultChestMaxSlots = 50
 Inv.PickupModel = joaat("prop_paper_bag_01")
 Inv.PickupRadius = 12.0

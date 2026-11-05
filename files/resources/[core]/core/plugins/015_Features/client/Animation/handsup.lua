@@ -3,47 +3,85 @@
 
 local isHandsup = false
 
+local handsupDict = "random@mugging3"
+local handsupAnim = "handsup_standing_base"
+
+-- Le raccourci et le menu d'emotes ne jouent pas la même animation.
+-- On les reconnaît toutes pour pouvoir les baisser.
+local HANDS_ANIMS = {
+    { handsupDict, handsupAnim },
+    { "missminuteman_1ig_2", "handsup_base" },
+    { "anim@mp_player_intuppersurrender", "idle_a_fp" },
+    { "anim@mp_rollarcoaster", "hands_up_idle_a_player_one" },
+}
+
+local function playingHands(ped)
+    for i = 1, #HANDS_ANIMS do
+        local entry = HANDS_ANIMS[i]
+        if IsEntityPlayingAnim(ped, entry[1], entry[2], 3) then
+            return true
+        end
+    end
+    return false
+end
+
+local function lowerHands(ped)
+    isHandsup = false
+    for i = 1, #HANDS_ANIMS do
+        local entry = HANDS_ANIMS[i]
+        StopAnimTask(ped, entry[1], entry[2], 2.0)
+    end
+    -- Flag 49/51 : l'animation tourne en tâche secondaire. StopAnimTask la
+    -- laisse souvent en place, donc les mains restent levées.
+    ClearPedSecondaryTask(ped)
+    if playingHands(ped) and not IsPedInAnyVehicle(ped, false) then
+        ClearPedTasks(ped)
+    end
+end
+
 function VFW.IsPlayerHandsUp(ped)
     if not ped then
         ped = VFW.PlayerData.ped
+    end
+
+    if playingHands(ped) then
+        return true
     end
 
     if ped == VFW.PlayerData.ped then
         return isHandsup
     end
 
-    return IsEntityPlayingAnim(ped, "random@mugging3", "handsup_standing_base", 3)
+    return false
 end
-
-local handsupDict = "random@mugging3"
-local handsupAnim = "handsup_standing_base"
 
 RegisterCommand('+handsup', function()
     if SN_SAMS and SN_SAMS.cprActive then return end
     if IsPlayerInMugshot() then return end
     if VFW.isEscorting then return end
-    if not IsPedOnFoot(VFW.PlayerData.ped) then
+
+    local ped = VFW.PlayerData.ped or PlayerPedId()
+    if not ped or ped == 0 or not IsPedOnFoot(ped) then
         return
     end
 
-    isHandsup = not isHandsup
-
-    if isHandsup then
-        RequestAnimDict(handsupDict)
-        while not HasAnimDictLoaded(handsupDict) do
-            Wait(0)
+    if isHandsup or playingHands(ped) then
+        lowerHands(ped)
+        if HasActiveEmote and HasActiveEmote(ped) then
+            VFW.CancelEmote()
         end
-
-        TaskPlayAnim(VFW.PlayerData.ped, handsupDict, handsupAnim, 2.0, 2.0, -1, 49, 0, false, false, false)
-    else
-        if IsEntityPlayingAnim(VFW.PlayerData.ped, handsupDict, handsupAnim, 3) then
-            StopAnimTask(VFW.PlayerData.ped, handsupDict, handsupAnim, -2.0)
-        else
-            ClearPedTasks(VFW.PlayerData.ped)
-        end
+        return
     end
 
+    isHandsup = true
+    RequestAnimDict(handsupDict)
+    while not HasAnimDictLoaded(handsupDict) do
+        Wait(0)
+    end
+
+    TaskPlayAnim(ped, handsupDict, handsupAnim, 2.0, 2.0, -1, 49, 0, false, false, false)
 end, false)
+RegisterCommand('-handsup', function() end, false)
 RegisterKeyMapping('+handsup', "Mains en l'air", 'keyboard', 'GRAVE')
 
 -- Commande pour arreter toute animation (emotes + handsup) avec X
@@ -51,32 +89,24 @@ RegisterCommand('+cancelanim', function()
     if SN_SAMS and SN_SAMS.cprActive then return end
     if IsPlayerInMugshot() then return end
     if VFW.isEscorting then return end
-    local ped = VFW.PlayerData.ped
+    local ped = VFW.PlayerData.ped or PlayerPedId()
+    if not ped or ped == 0 then return end
 
     if IsEntityDead(ped) or (Death and Death.isDead) or isKnockedOut then
         return
     end
 
-    -- Vérifier si le joueur a une emote active ou handsup
     local hasEmote = HasActiveEmote and HasActiveEmote(ped)
+    local hands = isHandsup or playingHands(ped)
 
-    if not isHandsup and not hasEmote then
+    if not hands and not hasEmote then
         return
     end
 
-    -- Arreter handsup si actif avec blend-out fluide
-    if isHandsup then
-        isHandsup = false
-        if not IsPedInAnyVehicle(ped, false) then
-            if IsEntityPlayingAnim(ped, handsupDict, handsupAnim, 3) then
-                StopAnimTask(ped, handsupDict, handsupAnim, -2.0)
-            else
-                ClearPedTasks(ped)
-            end
-        end
+    if hands then
+        lowerHands(ped)
     end
 
-    -- Arreter toute autre animation (emotes, scenarios, etc.)
     if hasEmote then
         VFW.CancelEmote()
     end

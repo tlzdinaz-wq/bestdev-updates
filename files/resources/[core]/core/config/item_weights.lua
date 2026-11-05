@@ -559,6 +559,7 @@ VFW.ItemWeights = {
     -- CLÉS ET ACCÈS
     ["keys"] = 4,
     ["key_motel"] = 4,
+    ["carte_identite"] = 2,
 
     -- ARGENT
     ["money"] = 0,

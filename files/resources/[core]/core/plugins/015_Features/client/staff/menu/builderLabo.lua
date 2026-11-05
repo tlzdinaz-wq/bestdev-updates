@@ -2,7 +2,7 @@ local laboData = {
     name = nil, label = nil,
     templateId = nil,
     doorCoords = nil, interiorCoords = nil, chestCoords = nil,
-    managementCoords = nil,
+    managementCoords = nil, exitCoords = nil,
     ownerFaction = nil, ownerPlayerName = nil,
     attackSlots = {},
     chestMaxWeight = 50000, chestMaxSlots = 20,
@@ -43,14 +43,14 @@ end)
 
 local templateEditData = {
     id = nil, name = nil, label = nil,
-    interiorCoords = nil, chestCoords = nil, managementCoords = nil,
+    interiorCoords = nil, chestCoords = nil, managementCoords = nil, exitCoords = nil,
     blipSprite = 499, blipColor = 1, blipScale = 0.8
 }
 
 local function ResetTemplateEditData()
     templateEditData = {
         id = nil, name = nil, label = nil,
-        interiorCoords = nil, chestCoords = nil, managementCoords = nil,
+        interiorCoords = nil, chestCoords = nil, managementCoords = nil, exitCoords = nil,
         blipSprite = 499, blipColor = 1, blipScale = 0.8
     }
 end
@@ -60,7 +60,7 @@ local function ResetLaboData()
         name = nil, label = nil,
         templateId = nil,
         doorCoords = nil, interiorCoords = nil, chestCoords = nil,
-        managementCoords = nil,
+        managementCoords = nil, exitCoords = nil,
         ownerFaction = nil, ownerPlayerName = nil,
         attackSlots = {},
         chestMaxWeight = 50000, chestMaxSlots = 20,
@@ -166,6 +166,38 @@ local function FormatCoords(c)
     return string.format("%.1f, %.1f, %.1f", c.x, c.y, c.z)
 end
 
+--- Le hub de gestion a le focus NUI : GetEntityCoords sur place ne laisse pas marcher
+--- jusqu'à la porte. On cache le hub, le joueur se place, E confirme.
+local function PlaceLaboPoint(menu, onPlaced, successMessage)
+    CreateThread(function()
+        local point = StaffMenu.PlaceInWorld(menu, function()
+            Wait(250)
+            while true do
+                Wait(0)
+                local ped = PlayerPedId()
+                local pos = GetEntityCoords(ped)
+                DrawMarker(28, pos.x, pos.y, pos.z + 0.15, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.32, 0.32, 0.32, 114, 99, 238, 210, false, true, 2, false, nil, nil, false)
+                VFW.ShowHelpNotification("~INPUT_CONTEXT~ Confirmer la porte de sortie | ~INPUT_CELLPHONE_CANCEL~ Annuler")
+                if (VFW.Interact and VFW.Interact.JustPressed(0, 38)) or IsControlJustPressed(0, 38) then
+                    return { x = pos.x, y = pos.y, z = pos.z, heading = GetEntityHeading(ped) }
+                end
+                if IsControlJustPressed(0, 177) or IsDisabledControlJustPressed(0, 177) then
+                    return nil
+                end
+            end
+        end)
+
+        if not point then
+            VFW.ShowNotification({ type = 'STAFF', variant = 'INFO', subtitle = 'Builder Labo', message = "Placement annulé." })
+            return
+        end
+
+        onPlaced(point)
+        VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder Labo', message = successMessage })
+        menu.refresh()
+    end)
+end
+
 local function GetItemLabel(itemName)
     if not itemName then return "Inconnu" end
     if not cachedItems then
@@ -252,6 +284,9 @@ StaffMenu.builderLabo.OnOpen(function()
                     end
                     if labo.management_x then
                         laboData.managementCoords = { x = labo.management_x, y = labo.management_y, z = labo.management_z }
+                    end
+                    if labo.exit_x then
+                        laboData.exitCoords = { x = labo.exit_x, y = labo.exit_y, z = labo.exit_z, heading = labo.exit_heading }
                     end
                     laboData.ownerFaction = labo.owner_faction
                     laboData.ownerPlayerName = labo.owner_player_name
@@ -407,6 +442,13 @@ StaffMenu.builderLaboManage.OnOpen(function()
         end
     end)
 
+    StaffMenu.builderLaboManage.Button(":door: TP PORTE DE SORTIE", "Se téléporter sur la porte de sortie", FormatCoords(laboData.exitCoords), nil, not laboData.exitCoords, function()
+        if not laboData.exitCoords then return end
+        SetEntityCoords(PlayerPedId(), laboData.exitCoords.x, laboData.exitCoords.y, laboData.exitCoords.z, false, false, false, true)
+        SetEntityHeading(PlayerPedId(), laboData.exitCoords.heading or 0)
+        VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder Labo', message = "Téléporté à la porte de sortie." })
+    end)
+
     StaffMenu.builderLaboManage.Separator("DANGER")
 
     StaffMenu.builderLaboManage.Button(":trash: SUPPRIMER", "Supprime le labo et tous ses accès", nil, "trash", false, function()
@@ -458,6 +500,21 @@ StaffMenu.builderLaboCreate.OnOpen(function()
         VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder Labo', message = "Position porte définie." })
         StaffMenu.builderLaboCreate.refresh()
     end)
+
+    StaffMenu.builderLaboCreate.Separator("PORTE DE SORTIE")
+
+    StaffMenu.builderLaboCreate.Button(":door: PORTE DE SORTIE", "Point à l'intérieur où les joueurs quittent le labo. Sans ce point, la sortie reste sur le spawn.", FormatCoords(laboData.exitCoords), "chevron", false, function()
+        PlaceLaboPoint(StaffMenu.builderLaboCreate, function(point)
+            laboData.exitCoords = point
+        end, "Porte de sortie définie.")
+    end)
+
+    if laboData.exitCoords then
+        StaffMenu.builderLaboCreate.Button(":x: RETIRER LA PORTE DE SORTIE", "La sortie reviendra sur le spawn intérieur", nil, "trash", false, function()
+            laboData.exitCoords = nil
+            StaffMenu.builderLaboCreate.refresh()
+        end)
+    end
 
     StaffMenu.builderLaboCreate.Separator("FACTION PROPRIÉTAIRE")
 
@@ -542,6 +599,7 @@ StaffMenu.builderLaboCreate.OnOpen(function()
             interiorCoords = laboData.interiorCoords,
             chestCoords = laboData.chestCoords,
             managementCoords = laboData.managementCoords,
+            exitCoords = laboData.exitCoords,
             ownerFaction = laboData.ownerFaction,
             ownerPlayerName = laboData.ownerPlayerName,
             chestMaxWeight = laboData.chestMaxWeight,
@@ -1428,6 +1486,9 @@ StaffMenu.builderLaboTemplateList.OnOpen(function()
                     if t.management_x then
                         templateEditData.managementCoords = { x = t.management_x, y = t.management_y, z = t.management_z }
                     end
+                    if t.exit_x then
+                        templateEditData.exitCoords = { x = t.exit_x, y = t.exit_y, z = t.exit_z, heading = t.exit_heading }
+                    end
                     templateEditData.blipSprite = t.blip_sprite or 499
                     templateEditData.blipColor = t.blip_color or 1
                     templateEditData.blipScale = t.blip_scale or 0.8
@@ -1490,6 +1551,19 @@ StaffMenu.builderLaboTemplateManage.OnOpen(function()
         StaffMenu.builderLaboTemplateManage.refresh()
     end)
 
+    StaffMenu.builderLaboTemplateManage.Button(":door: PORTE DE SORTIE", "Point intérieur où les joueurs quittent le labo. Appliqué à tous les labos de ce template.", FormatCoords(templateEditData.exitCoords), "chevron", false, function()
+        PlaceLaboPoint(StaffMenu.builderLaboTemplateManage, function(point)
+            templateEditData.exitCoords = point
+        end, "Porte de sortie du template définie.")
+    end)
+
+    if templateEditData.exitCoords then
+        StaffMenu.builderLaboTemplateManage.Button(":x: RETIRER LA PORTE DE SORTIE", "Les labos de ce template sortiront sur le spawn intérieur", nil, "trash", false, function()
+            templateEditData.exitCoords = nil
+            StaffMenu.builderLaboTemplateManage.refresh()
+        end)
+    end
+
     StaffMenu.builderLaboTemplateManage.Separator(isNew
         and "POINTS (enregistrez la template d'abord)"
         or "POINTS")
@@ -1508,13 +1582,14 @@ StaffMenu.builderLaboTemplateManage.OnOpen(function()
 
     StaffMenu.builderLaboTemplateManage.Separator("")
 
-    StaffMenu.builderLaboTemplateManage.Button(":save: SAUVEGARDER", "Appliquer les points intérieur, coffre et gestion à tous les labos utilisant ce template", nil, "check", false, function()
+    StaffMenu.builderLaboTemplateManage.Button(":save: SAUVEGARDER", "Appliquer intérieur, coffre, gestion et porte de sortie à tous les labos de ce template", nil, "check", false, function()
         local result = TriggerServerCallback("laboBuilder:updateTemplate", templateEditData.id, {
             name = templateEditData.name,
             label = templateEditData.label,
             interiorCoords = templateEditData.interiorCoords,
             chestCoords = templateEditData.chestCoords,
             managementCoords = templateEditData.managementCoords,
+            exitCoords = templateEditData.exitCoords,
             blipSprite = templateEditData.blipSprite,
             blipColor = templateEditData.blipColor,
             blipScale = templateEditData.blipScale

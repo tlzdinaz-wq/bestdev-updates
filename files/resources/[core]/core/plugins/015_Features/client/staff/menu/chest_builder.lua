@@ -161,7 +161,7 @@ function StaffMenu.BuildCreateChestMenu()
         StaffMenu.CreateChest.refresh()
     end)
 
-    StaffMenu.CreateChest.Button("POIDS DU COFFRE", nil, chestData.maxWeight, "chevron", false, function()
+    StaffMenu.CreateChest.Button("POIDS DU COFFRE", "Capacite du coffre, en kilos", tostring(chestData.maxWeight) .. " kg", "chevron", false, function()
         local weight <const> = tonumber(VFW.Nui.KeyboardInput(true, "Entrer le poids du coffre (en kg)"))
 
         if not weight or weight <= 0 then

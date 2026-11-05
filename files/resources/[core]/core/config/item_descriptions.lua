@@ -703,6 +703,7 @@ VFW.ItemDescriptions = {
     -- =====================================================
     ["employment_contract"] = "Contrat de travail officiel pour embaucher un employé.",
     ["dynasty_contract"] = "Contrat de bail Dynasty 8 pour la location d'un logement.",
+    ["carte_identite"] = "Carte d'identité - Document officiel remis à la mairie.",
 
     -- =====================================================
     -- DIVERS

@@ -440,12 +440,20 @@ JC.DefaultGrades = DEFAULT_GRADES
 
 CreateThread(function()
     while not VFW.Ready do Wait(250) end
-    Wait(1500)
+    local waited = 0
+    while not (VFW.Society and VFW.Society.IsJobRemoved) and waited < 10000 do
+        Wait(250)
+        waited = waited + 250
+    end
+    if VFW.Society and VFW.Society.LoadRemovedJobs then
+        VFW.Society.LoadRemovedJobs()
+    end
 
     local created = 0
     for i = 1, #pendingJobs do
         local job = pendingJobs[i]
-        if not VFW.Jobs[job.name] then
+        local removed = VFW.Society and VFW.Society.IsJobRemoved and VFW.Society.IsJobRemoved(job.name)
+        if not removed and not VFW.Jobs[job.name] then
             JC.Exec("INSERT IGNORE INTO jobs (name, label, type, whitelisted) VALUES (?, ?, ?, 1)",
                 { job.name, job.label, job.type })
 

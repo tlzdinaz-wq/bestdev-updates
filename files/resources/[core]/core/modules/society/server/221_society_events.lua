@@ -112,6 +112,10 @@ local function createSocietyFromBuilder(source, name, data)
         return builderResult(false, "Ce métier existe déjà.")
     end
 
+    if VFW.Society.UnmarkJobRemoved then
+        VFW.Society.UnmarkJobRemoved(name)
+    end
+
     local label = cleanString(data.label, 120, name)
     local societyType = cleanString(data.type, 60, "job")
     local image = cleanString(data.image, 255, "")
@@ -230,12 +234,18 @@ RegisterNetEvent("core:modify:society", function(name, data)
 
     local previousCatalog = previous and previous.custom and previous.custom.catalog or nil
 
-    VFW.Society.Update([[
+    -- Un renommage ne doit pas effacer le point de gestion déjà en base
+    -- quand le menu n'en a pas renvoyé.
+    if not management.x and previous and type(previous.management) == "table" and previous.management.x then
+        management = previous.management
+    end
+
+    local jobSaved = VFW.Society.Update([[
         INSERT INTO jobs (name, label, type, whitelisted) VALUES (?, ?, ?, 1)
         ON DUPLICATE KEY UPDATE label = VALUES(label), type = VALUES(type)
     ]], { name, label, societyType })
 
-    VFW.Society.Update([[
+    local societySaved = VFW.Society.Update([[
         INSERT INTO societies (name, label, type, image, banner, address, blip, management, custom)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE label = VALUES(label), type = VALUES(type), image = VALUES(image),
@@ -245,6 +255,14 @@ RegisterNetEvent("core:modify:society", function(name, data)
         name, label, societyType, image, banner, address,
         VFW.DB.Encode(blip), VFW.DB.Encode(management), VFW.DB.Encode(custom),
     })
+
+    if jobSaved == nil or societySaved == nil then
+        xPlayer.showNotification({
+            type = "STAFF", variant = "ERROR", subtitle = "Builder",
+            message = "La modification n'a pas été enregistrée. Consultez la console serveur.",
+        })
+        return
+    end
 
     VFW.Society.RefreshJobs()
     VFW.Society.Reload(name)
@@ -269,6 +287,16 @@ RegisterNetEvent("core:delete:society", function(name)
     if not xPlayer then return end
     if not jobNameIsValid(name) then return end
     if name == "unemployed" then return end
+
+    -- Sans cette marque, le démarrage recrée les métiers livrés avec la base
+    -- (police, EMS, fermes...) et la suppression disparaît au reboot.
+    if not VFW.Society.MarkJobRemoved(name) then
+        xPlayer.showNotification({
+            type = "STAFF", variant = "ERROR", subtitle = "Builder",
+            message = "La suppression n'a pas pu être mémorisée. Le métier reviendrait au reboot.",
+        })
+        return
+    end
 
     VFW.Society.Update("DELETE FROM societies WHERE name = ?", { name })
     VFW.Society.Update("DELETE FROM job_grades WHERE job_name = ?", { name })

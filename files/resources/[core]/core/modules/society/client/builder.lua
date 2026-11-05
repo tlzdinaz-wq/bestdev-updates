@@ -243,6 +243,39 @@ modifyJob.OnOpen(function()
     end
 end)
 
+local function saveJobModification(requireBlip)
+    if type(jobInModification) ~= "table" or type(jobInModification.name) ~= "string" or jobInModification.name == "" then
+        return
+    end
+    if type(jobInModification.label) ~= "string" or jobInModification.label == "" then
+        VFW.ShowNotification({
+            type = 'STAFF',
+            variant = 'ERROR',
+            subtitle = 'Builder',
+            message = "Indique un nom de métier avant d'enregistrer."
+        })
+        return
+    end
+
+    if type(jobInModification.management) ~= "table" then jobInModification.management = {} end
+    if type(jobInModification.blip) ~= "table" then jobInModification.blip = {} end
+    if type(jobInModification.custom) ~= "table" then jobInModification.custom = {} end
+
+    if requireBlip and jobInModification.blip.enabled then
+        if not jobInModification.blip.name or not jobInModification.blip.sprite or jobInModification.blip.color == nil or not jobInModification.blip.scale then
+            VFW.ShowNotification({
+                type = 'STAFF',
+                variant = 'ERROR',
+                subtitle = 'Builder',
+                message = "Le blip est activé, mais il lui manque un nom, un sprite, une couleur ou une taille."
+            })
+            return
+        end
+    end
+
+    TriggerServerEvent("core:modify:society", jobInModification.name, jobInModification)
+end
+
 modifyJobData.OnOpen(function()
     modifyJobData.Button("Label du métier", "", jobInModification.label or "Non défini", nil, false, function()
         local label <const> = VFW.Nui.KeyboardInput(true, "Entrez le label du métier", "")
@@ -252,6 +285,7 @@ modifyJobData.OnOpen(function()
 
         jobInModification.label = label
         modifyJobData.refresh()
+        saveJobModification()
     end)
 
     modifyJobData.Button("Gestion Grades", "", nil, "chevron", false, function()
@@ -348,30 +382,8 @@ modifyJobData.OnOpen(function()
     modifyJobData.Button("Sonnettes", ("(%d configurée%s)"):format(doorbellCount, doorbellCount > 1 and "s" or ""),
         nil, "chevron", false, function() end, modifyJobDoorbells)
 
-    modifyJobData.Button("Modifier le métier", "", nil, "chevron", false, function()
-        if not jobInModification.name or not jobInModification.label or not jobInModification.management.x then
-            VFW.ShowNotification({
-                type = 'STAFF',
-                variant = 'ERROR',
-                subtitle = 'Builder',
-                message = "Veuillez définir toutes les informations du métier avant de le modifier."
-            })
-            return
-        end
-
-        if jobInModification.blip.enabled then
-            if not jobInModification.blip.name or not jobInModification.blip.sprite or not jobInModification.blip.color or not jobInModification.blip.scale then
-                VFW.ShowNotification({
-                    type = 'STAFF',
-                    variant = 'ERROR',
-                    subtitle = 'Builder',
-                    message = "Veuillez définir toutes les informations du blip avant de le modifier."
-                })
-                return
-            end
-        end
-
-        TriggerServerEvent("core:modify:society", jobInModification.name, jobInModification)
+    modifyJobData.Button("Modifier le métier", "Enregistre le nom et les réglages. Le point de gestion n'est pas obligatoire.", nil, "chevron", false, function()
+        saveJobModification(true)
     end)
 
     modifyJobData.Button("Supprimer le métier", "", nil, "trash", false, function()

@@ -229,49 +229,9 @@ local function BuildTvModelForm(menu, data, isEdit)
         end
     )
 
-    menu.Separator(":ruler: OFFSET")
-
-    -- Offset X
-    menu.Button(
-        "Offset X: " .. tostring(data.offset_x or tvDefaults.offset_x),
-        nil, nil, "arrow", false,
-        function()
-            local input <const> = VFW.Nui.KeyboardInput(true, "Offset X", tostring(data.offset_x or tvDefaults.offset_x))
-            local num <const> = tonumber(input)
-            if num then
-                data.offset_x = num
-                if menu.opened then menu.refresh() end
-            end
-        end
-    )
-
-    -- Offset Y
-    menu.Button(
-        "Offset Y: " .. tostring(data.offset_y or tvDefaults.offset_y),
-        nil, nil, "arrow", false,
-        function()
-            local input <const> = VFW.Nui.KeyboardInput(true, "Offset Y", tostring(data.offset_y or tvDefaults.offset_y))
-            local num <const> = tonumber(input)
-            if num then
-                data.offset_y = num
-                if menu.opened then menu.refresh() end
-            end
-        end
-    )
-
-    -- Offset Z
-    menu.Button(
-        "Offset Z: " .. tostring(data.offset_z or tvDefaults.offset_z),
-        nil, nil, "arrow", false,
-        function()
-            local input <const> = VFW.Nui.KeyboardInput(true, "Offset Z", tostring(data.offset_z or tvDefaults.offset_z))
-            local num <const> = tonumber(input)
-            if num then
-                data.offset_z = num
-                if menu.opened then menu.refresh() end
-            end
-        end
-    )
+    -- Les offsets X/Y/Z venaient de ptelevision (plan 3D manuel). PMMS dessine
+    -- directement sur le render target de l'écran : plus rien à saisir ici.
+    -- Le target est détecté automatiquement à l'ajout du modèle.
 
     menu.Separator(":megaphone: AUDIO & PORTÉE")
 
@@ -420,9 +380,10 @@ StaffMenu.builderTelevision.OnOpen(function()
             -- Auto-detect render target
             local detectedTarget = DetectRenderTarget(modelHash) or "tvscreen"
 
-          selectedTvModel = {
+            selectedTvModel = {
                 model = modelName,
                 target = detectedTarget,
+                -- Plus d'offsets manuels : PMMS utilise le render target détecté.
             }
 
             StaffMenu.builderTelevisionAdd.open()

@@ -526,8 +526,48 @@ function VFW.Society.RefreshJobs()
     TriggerEvent("vfw:society:changed")
 end
 
+-- Métiers retirés depuis le menu. Le démarrage recrée sinon police, EMS, fermes, etc.
+local removedJobs = {}
+
+function VFW.Society.LoadRemovedJobs()
+    sqlUpdate([[
+        CREATE TABLE IF NOT EXISTS job_staff_removed (
+            name VARCHAR(60) NOT NULL,
+            PRIMARY KEY (name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ]])
+
+    local rows = sqlQuery("SELECT name FROM job_staff_removed") or {}
+    removedJobs = {}
+    for i = 1, #rows do
+        local name = rows[i].name
+        if type(name) == "string" and name ~= "" then
+            removedJobs[name] = true
+        end
+    end
+end
+
+function VFW.Society.IsJobRemoved(name)
+    return type(name) == "string" and removedJobs[name] == true
+end
+
+function VFW.Society.MarkJobRemoved(name)
+    if type(name) ~= "string" or name == "" then return false end
+    local saved = sqlUpdate("INSERT IGNORE INTO job_staff_removed (name) VALUES (?)", { name })
+    if saved == nil then return false end
+    removedJobs[name] = true
+    return true
+end
+
+function VFW.Society.UnmarkJobRemoved(name)
+    if type(name) ~= "string" or name == "" then return end
+    removedJobs[name] = nil
+    sqlUpdate("DELETE FROM job_staff_removed WHERE name = ?", { name })
+end
+
 MySQL.ready(function()
     VFW.Society.LoadRecipes()
     VFW.Society.LoadDoorbells()
     VFW.Society.LoadSocieties()
+    VFW.Society.LoadRemovedJobs()
 end)

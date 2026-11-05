@@ -2,18 +2,23 @@ local Inv = VFW.Inventory
 
 local dirty = {}
 
+-- Capacités d'origine, **en kilos** : elles étaient écrites telles quelles dans
+-- l'inventaire, qui compte en unités de 5 g — un coffre de propriété annoncé à
+-- 600 kg en offrait trois (voir Inv.KgToUnits dans 25_01_core.lua).
+local KG <const> = Inv.UnitsPerKg
+
 local prefixDefaults = {
-    ["veh:"] = { label = "Coffre du vehicule", maxWeight = 120, maxSlots = 40 },
-    ["trunk:"] = { label = "Coffre du vehicule", maxWeight = 120, maxSlots = 40 },
-    ["glovebox:"] = { label = "Boite a gants", maxWeight = 15, maxSlots = 6 },
-    ["property:"] = { label = "Propriete", maxWeight = 600, maxSlots = 100 },
-    ["motel:"] = { label = "Motel", maxWeight = 200, maxSlots = 50 },
-    ["labo:"] = { label = "Laboratoire", maxWeight = 400, maxSlots = 60 },
-    ["society:"] = { label = "Coffre de societe", maxWeight = 600, maxSlots = 100 },
-    ["locker:"] = { label = "Casier", maxWeight = 120, maxSlots = 40 },
-    ["chestbuilder:"] = { label = "Coffre", maxWeight = 400, maxSlots = 50 },
-    ["deposit:"] = { label = "Depot", maxWeight = 1000, maxSlots = 100 },
-    ["test:"] = { label = "Coffre de test", maxWeight = 200, maxSlots = 50 },
+    ["veh:"] = { label = "Coffre du vehicule", maxWeight = 120 * KG, maxSlots = 40 },
+    ["trunk:"] = { label = "Coffre du vehicule", maxWeight = 120 * KG, maxSlots = 40 },
+    ["glovebox:"] = { label = "Boite a gants", maxWeight = 15 * KG, maxSlots = 6 },
+    ["property:"] = { label = "Propriete", maxWeight = 600 * KG, maxSlots = 100 },
+    ["motel:"] = { label = "Motel", maxWeight = 200 * KG, maxSlots = 50 },
+    ["labo:"] = { label = "Laboratoire", maxWeight = 400 * KG, maxSlots = 60 },
+    ["society:"] = { label = "Coffre de societe", maxWeight = 600 * KG, maxSlots = 100 },
+    ["locker:"] = { label = "Casier", maxWeight = 120 * KG, maxSlots = 40 },
+    ["chestbuilder:"] = { label = "Coffre", maxWeight = 400 * KG, maxSlots = 50 },
+    ["deposit:"] = { label = "Depot", maxWeight = 1000 * KG, maxSlots = 100 },
+    ["test:"] = { label = "Coffre de test", maxWeight = 200 * KG, maxSlots = 50 },
 }
 
 Inv.ChestOverrides = Inv.ChestOverrides or {}
@@ -73,13 +78,19 @@ function Inv.GetChest(chestId)
     local raced = Inv.Chests[chestId]
     if raced then return raced end
 
+    -- La capacité réglée dans un builder l'emporte sur celle enregistrée avec le
+    -- contenu : sinon un coffre déjà créé garderait pour toujours la capacité
+    -- qu'il avait à sa première ouverture, et corriger un réglage ne changerait
+    -- rien tant que le coffre existe.
+    local override = Inv.ChestOverrides[chestId]
+
     local chest
     if row then
         chest = {
             id = chestId,
             label = row.label ~= "" and row.label or label,
-            maxWeight = tonumber(row.max_weight) or maxWeight,
-            maxSlots = tonumber(row.max_slots) or maxSlots,
+            maxWeight = (override and tonumber(override.maxWeight)) or tonumber(row.max_weight) or maxWeight,
+            maxSlots = (override and tonumber(override.maxSlots)) or tonumber(row.max_slots) or maxSlots,
             accessName = row.access_name,
             items = Inv.Normalize(VFW.DB.Decode(row.items, {}), tonumber(row.max_slots) or maxSlots),
         }

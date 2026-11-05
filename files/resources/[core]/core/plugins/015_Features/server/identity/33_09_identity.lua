@@ -247,6 +247,17 @@ RegisterNetEvent("identity:givemycard", function()
         renamed = ("CNI %s %s"):format(xPlayer.firstName or "", xPlayer.lastName or ""),
     }
 
+    local Inv = VFW.Inventory
+    if not Inv or not Inv.Exists(CARD_ITEM) then
+        Cl.Notify(source, "La carte d'identite n'est pas disponible.")
+        return
+    end
+
+    if Inv.CanCarry and not Inv.CanCarry(xPlayer, CARD_ITEM, 1) then
+        Cl.Notify(source, "Inventaire plein.")
+        return
+    end
+
     if Cl.GiveItem(xPlayer, CARD_ITEM, 1, meta) then
         Cl.Notify(source, "Votre carte d'identite vous a ete remise.", "VERT")
     else

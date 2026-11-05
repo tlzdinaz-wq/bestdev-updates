@@ -75,7 +75,8 @@ function ChestBuilderServer.Load()
         ChestBuilderServer.cache[chest.id] = chest
         Inv.ConfigureChest(chestIdFor(chest.id), {
             label = chest.label,
-            maxWeight = chest.maxWeight,
+            -- le builder demande des kilos, l'inventaire compte en unites de 5 g
+            maxWeight = Inv.KgToUnits(chest.maxWeight, 400),
             maxSlots = chest.maxSlots,
         })
     end
@@ -169,7 +170,7 @@ Inv.RegisterNet("chestBuilder:server:openChest", function(id, pincode)
 
     Inv.ConfigureChest(chestIdFor(chest.id), {
         label = chest.label,
-        maxWeight = chest.maxWeight,
+        maxWeight = Inv.KgToUnits(chest.maxWeight, 400),
         maxSlots = chest.maxSlots,
     })
 
@@ -246,7 +247,7 @@ VFW.RegisterCommand("createchest", "chest_builder", function(source, xPlayer, ar
     }
 
     ChestBuilderServer.cache[id] = chest
-    Inv.ConfigureChest(chestIdFor(id), { label = chest.label, maxWeight = chest.maxWeight, maxSlots = chest.maxSlots })
+    Inv.ConfigureChest(chestIdFor(id), { label = chest.label, maxWeight = Inv.KgToUnits(chest.maxWeight, 400), maxSlots = chest.maxSlots })
 
     TriggerClientEvent("chestBuilder:client:syncNewChest", -1, clientView(chest))
     xPlayer.showNotification({ type = "VERT", content = ("Coffre #%s cree."):format(tostring(id)) })
@@ -375,8 +376,10 @@ local function chestFromPayload(payload)
     local label = cleanText(payload.label or payload.name, 100)
     if not label then return nil, "Le nom du coffre n'est pas valide." end
 
+    -- En kilos : converti en unites d'inventaire (x200) au moment d'ouvrir le coffre.
+    -- Le plafond tient compte de cette multiplication, qui sinon deborderait la colonne.
     local maxWeight = math.floor(tonumber(payload.maxWeight) or 0)
-    if maxWeight <= 0 or maxWeight > 10000000 then return nil, "Le poids du coffre n'est pas valide." end
+    if maxWeight <= 0 or maxWeight > 100000 then return nil, "Le poids du coffre n'est pas valide (1 a 100000 kg)." end
 
     local maxSlots = DEFAULT_MAX_SLOTS
     if payload.maxSlots ~= nil then
@@ -428,7 +431,7 @@ end
 local function applyChestConfig(chest)
     Inv.ConfigureChest(chestIdFor(chest.id), {
         label = chest.label,
-        maxWeight = chest.maxWeight,
+        maxWeight = Inv.KgToUnits(chest.maxWeight, 400),
         maxSlots = chest.maxSlots,
     })
 end

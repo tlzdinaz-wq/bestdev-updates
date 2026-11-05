@@ -168,6 +168,11 @@ local function ensureSchema()
     addColumn("labos", "template_id", "INT(11) DEFAULT NULL")
     addColumn("labos", "owner_player_name", "VARCHAR(100) DEFAULT NULL")
     addColumn("labos", "chest_max_weight", "INT(11) NOT NULL DEFAULT 100000")
+    -- Porte de sortie : point intérieur où l'on quitte le labo. NULL = le spawn intérieur.
+    addColumn("labos", "exit_x", "DOUBLE DEFAULT NULL")
+    addColumn("labos", "exit_y", "DOUBLE DEFAULT NULL")
+    addColumn("labos", "exit_z", "DOUBLE DEFAULT NULL")
+    addColumn("labos", "exit_heading", "DOUBLE DEFAULT NULL")
     addColumn("labo_harvest_points", "template_point_id", "INT(11) DEFAULT NULL")
     addColumn("labo_transform_points", "template_point_id", "INT(11) DEFAULT NULL")
 
@@ -186,6 +191,10 @@ local function ensureSchema()
             management_x     DOUBLE       DEFAULT NULL,
             management_y     DOUBLE       DEFAULT NULL,
             management_z     DOUBLE       DEFAULT NULL,
+            exit_x           DOUBLE       DEFAULT NULL,
+            exit_y           DOUBLE       DEFAULT NULL,
+            exit_z           DOUBLE       DEFAULT NULL,
+            exit_heading     DOUBLE       DEFAULT NULL,
             blip_sprite      INT(11)      NOT NULL DEFAULT 499,
             blip_color       INT(11)      NOT NULL DEFAULT 1,
             blip_scale       FLOAT        NOT NULL DEFAULT 0.8,
@@ -231,6 +240,12 @@ local function ensureSchema()
                          "labo_template_harvest_points", "labo_template_transform_points" }) do
         pointColumns(t)
     end
+
+    -- Les templates déjà créés n'ont pas ces colonnes : CREATE TABLE IF NOT EXISTS ne les ajoute pas.
+    addColumn("labo_templates", "exit_x", "DOUBLE DEFAULT NULL")
+    addColumn("labo_templates", "exit_y", "DOUBLE DEFAULT NULL")
+    addColumn("labo_templates", "exit_z", "DOUBLE DEFAULT NULL")
+    addColumn("labo_templates", "exit_heading", "DOUBLE DEFAULT NULL")
 end
 
 -- ── Lecture ─────────────────────────────────────────────────────────────────────────────
@@ -633,6 +648,7 @@ local function sanitizeLabo(data)
     local interior = type(data.interiorCoords) == "table" and data.interiorCoords or nil
     local chest = type(data.chestCoords) == "table" and data.chestCoords or nil
     local management = type(data.managementCoords) == "table" and data.managementCoords or nil
+    local exitDoor = type(data.exitCoords) == "table" and data.exitCoords or nil
 
     return {
         name = str(data.name, 100) or label:lower():gsub("[^%w]+", "_"),
@@ -652,13 +668,19 @@ local function sanitizeLabo(data)
         management_x = management and num(management.x, nil) or nil,
         management_y = management and num(management.y, nil) or nil,
         management_z = management and num(management.z, nil) or nil,
+        exit_x = exitDoor and num(exitDoor.x, nil) or nil,
+        exit_y = exitDoor and num(exitDoor.y, nil) or nil,
+        exit_z = exitDoor and num(exitDoor.z, nil) or nil,
+        exit_heading = exitDoor and num(exitDoor.heading, 0.0) or nil,
         chest_max_slots = math.max(1, int(data.chestMaxSlots, 40)),
         chest_max_weight = math.max(1, int(data.chestMaxWeight, 100000)),
     }
 end
 
 --- Un labo cree depuis un template herite de son interieur et de ses blips.
-local function applyTemplate(labo)
+--- La porte de sortie ne se recopie qu'a la creation : la retirer sur un labo
+--- deja enregistre doit rester retiree.
+local function applyTemplate(labo, inheritExit)
     if not labo.template_id then return labo end
 
     local template = single("SELECT * FROM labo_templates WHERE id = ?", { labo.template_id })
@@ -680,6 +702,13 @@ local function applyTemplate(labo)
             template.management_x, template.management_y, template.management_z
     end
 
+    if inheritExit and labo.exit_x == nil and template.exit_x ~= nil then
+        labo.exit_x = template.exit_x
+        labo.exit_y = template.exit_y
+        labo.exit_z = template.exit_z
+        labo.exit_heading = template.exit_heading
+    end
+
     labo.blip_sprite = template.blip_sprite
     labo.blip_color = template.blip_color
     labo.blip_scale = template.blip_scale
@@ -692,6 +721,7 @@ local LABO_COLUMNS <const> = {
     "door_x", "door_y", "door_z", "door_heading",
     "interior_x", "interior_y", "interior_z", "interior_heading",
     "chest_x", "chest_y", "chest_z", "management_x", "management_y", "management_z",
+    "exit_x", "exit_y", "exit_z", "exit_heading",
     "chest_max_slots", "chest_max_weight", "blip_sprite", "blip_color", "blip_scale",
 }
 
@@ -702,7 +732,7 @@ RegisterServerCallback("laboBuilder:createLabo", function(source, data)
     local labo = sanitizeLabo(data)
     if not labo then return { success = false, error = "Il faut un label, une porte et un interieur." } end
 
-    applyTemplate(labo)
+    applyTemplate(labo, true)
 
     local names, marks, params = {}, {}, {}
     for i = 1, #LABO_COLUMNS do
@@ -744,7 +774,7 @@ RegisterServerCallback("laboBuilder:updateLabo", function(source, laboId, data)
     for i = 1, #LABO_COLUMNS do
         local column = LABO_COLUMNS[i]
         if labo[column] ~= nil or column == "template_id" or column == "owner_player_name"
-            or column:find("^chest_") or column:find("^management_") then
+            or column:find("^chest_") or column:find("^management_") or column:find("^exit_") then
             if labo[column] == nil then
                 sets[#sets + 1] = ("`%s` = NULL"):format(column)
             else
@@ -792,6 +822,7 @@ RegisterServerCallback("laboBuilder:updateTemplate", function(source, templateId
     local interior = type(data.interiorCoords) == "table" and data.interiorCoords or {}
     local chest = type(data.chestCoords) == "table" and data.chestCoords or nil
     local management = type(data.managementCoords) == "table" and data.managementCoords or nil
+    local exitDoor = type(data.exitCoords) == "table" and data.exitCoords or nil
 
     local fields = {
         name = name,
@@ -806,6 +837,10 @@ RegisterServerCallback("laboBuilder:updateTemplate", function(source, templateId
         management_x = management and num(management.x, nil) or nil,
         management_y = management and num(management.y, nil) or nil,
         management_z = management and num(management.z, nil) or nil,
+        exit_x = exitDoor and num(exitDoor.x, nil) or nil,
+        exit_y = exitDoor and num(exitDoor.y, nil) or nil,
+        exit_z = exitDoor and num(exitDoor.z, nil) or nil,
+        exit_heading = exitDoor and num(exitDoor.heading, 0.0) or nil,
         blip_sprite = int(data.blipSprite, 499),
         blip_color = int(data.blipColor, 1),
         blip_scale = num(data.blipScale, 0.8),
@@ -813,6 +848,7 @@ RegisterServerCallback("laboBuilder:updateTemplate", function(source, templateId
 
     local columns = { "name", "label", "interior_x", "interior_y", "interior_z", "interior_heading",
                       "chest_x", "chest_y", "chest_z", "management_x", "management_y", "management_z",
+                      "exit_x", "exit_y", "exit_z", "exit_heading",
                       "blip_sprite", "blip_color", "blip_scale" }
 
     local id = int(templateId, nil)

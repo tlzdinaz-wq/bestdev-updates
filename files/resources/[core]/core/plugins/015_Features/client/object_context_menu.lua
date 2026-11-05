@@ -56,7 +56,9 @@ VFW.ContextAddButton("object", ":music: Utiliser la boombox", function(object)
     local distance = #(GetEntityCoords(VFW.PlayerData.ped) - GetEntityCoords(object))
     return distance < 2.75 and DoesEntityExist(object) and GetEntityModel(object) == 1729911864 and NetworkGetEntityIsNetworked(object)
 end, function(object)
-    OpenMusicRadioUI(object)
+    -- Meme lecteur que les platines et les vehicules : PMMS vise l'objet le plus
+    -- proche, donc la boombox devant laquelle on se tient.
+    VFW.OpenMediaPlayer("boombox")
 end, {})
 
 VFW.ContextAddButton("object", " Mettre sur son épaule", function(object)
@@ -130,92 +132,21 @@ local tvSubmenu = VFW.ContextAddSubmenu("object", ":monitor: Télévision", func
     return distance < 25.0 and DoesEntityExist(object) and IsTvModel(object)
 end, {}, nil)
 
+-- Les quatre boutons d'avant (lancer, volume, arrêter, gérer) pilotaient
+-- ptelevision, dont la lecture YouTube échouait régulièrement. La télévision
+-- passe par le même lecteur que les platines et les véhicules : PMMS sait
+-- dessiner sur l'écran des téléviseurs et gère lui-même lecture, pause, volume
+-- et arrêt, sans qu'on ait à doubler ses commandes ici.
+--
+-- Un modèle de téléviseur qui ne serait pas reconnu se déclare dans l'interface
+-- de PMMS (« Save model »), avec le nom de son écran.
 VFW.ContextAddButton("object", ":arrow: Mettre une vidéo", function(object)
     local distance = #(GetEntityCoords(VFW.PlayerData.ped) - GetEntityCoords(object))
     return distance < 25.0 and DoesEntityExist(object) and IsTvModel(object)
 end, function(object)
-    local coords = GetEntityCoords(object)
-    local model = GetEntityModel(object)
-
-    VFW.OpenContextMenu()
-    CreateThread(function()
-        Wait(250)
-        VFW.Nui.Focus(true)
-        local videoUrl = VFW.Nui.KeyboardInput(true, "Lien YouTube ou vidéo", "", 200)
-        VFW.Nui.Focus(false)
-
-        if videoUrl and videoUrl ~= "" and videoUrl ~= "KBD_CANCEL" then
-            TriggerServerEvent("ptelevision:event", {coords = coords, model = model, entity = object}, "ptv_status", {
-                type = "play",
-                url = videoUrl
-            })
-
-            VFW.ShowNotification({
-                type = 'VERT',
-                content = "Vidéo lancée sur la TV"
-           })
-        end
-    end)
-end, {}, tvSubmenu)
-
-VFW.ContextAddButton("object", ":megaphone: Gérer le volume", function(object)
-    local distance = #(GetEntityCoords(VFW.PlayerData.ped) - GetEntityCoords(object))
-    return distance < 25.0 and DoesEntityExist(object) and IsTvModel(object)
-end, function(object)
-    local coords = GetEntityCoords(object)
-
-    VFW.OpenContextMenu()
-    CreateThread(function()
-        Wait(250)
-        VFW.Nui.Focus(true)
-        local volume = VFW.Nui.KeyboardInput(true, "Volume (0-100)", "50", 3)
-        VFW.Nui.Focus(false)
-
-        if volume and volume ~= "" and volume ~= "KBD_CANCEL" and tonumber(volume) then
-            local vol = math.max(0, math.min(100, tonumber(volume)))
-            -- Trigger l'événement client de ptelevision pour changer le volume
-            TriggerEvent("ptelevision:clientSetVolume", coords, vol / 100)
-
-            VFW.ShowNotification({
-                type = 'VERT',
-                content = string.format("Volume réglé à %d%%", vol)
-            })
-        end
-    end)
-end, {}, tvSubmenu)
-
-VFW.ContextAddButton("object", "⏹ Arrêter la vidéo", function(object)
-    local distance = #(GetEntityCoords(VFW.PlayerData.ped) - GetEntityCoords(object))
-    return distance < 25.0 and DoesEntityExist(object) and IsTvModel(object)
-end, function(object)
-    local coords = GetEntityCoords(object)
-    local model = GetEntityModel(object)
-
-    -- Synchronisé server-side pour tous les joueurs
-    TriggerServerEvent("ptelevision:event", {coords = coords, model = model, entity = object}, "ptv_status", {
-        type = "stop"
-   })
-
-    VFW.ShowNotification({
-        type = 'ORANGE',
-        content = "Vidéo arrêtée"
-   })
-end, {}, tvSubmenu)
-
-VFW.ContextAddButton("object", ":film: Gérer la vidéo", function(object)
-    local distance = #(GetEntityCoords(VFW.PlayerData.ped) - GetEntityCoords(object))
-    if distance >= 25.0 or not DoesEntityExist(object) or not IsTvModel(object) then
-        return false
-    end
-    local coords = GetEntityCoords(object)
-    local ok, result = pcall(exports["ptelevision"].IsVideoPlayingAt, exports["ptelevision"], coords)
-    return ok and result
-end, function(object)
-    VFW.OpenContextMenu()
-    CreateThread(function()
-        Wait(300)
-        exports["ptelevision"]:OpenVideoController()
-    end)
+    -- On passe l'entité : PMMS la pré-sélectionne et utilise son render target
+    -- (plus besoin de saisir offset X/Y/Z à la main).
+    VFW.OpenMediaPlayer("television", object)
 end, {}, tvSubmenu)
 
 --region ------ Distributeurs

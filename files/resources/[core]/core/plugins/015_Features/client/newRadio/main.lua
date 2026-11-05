@@ -227,6 +227,16 @@ AddEventHandler("vfw:radio:notify", function(message)
     })
 end)
 
+local radioCloseAt = 0
+
+local function CloseRadio()
+    if not radioOpen then return end
+    local now = GetGameTimer()
+    if now - radioCloseAt < 400 then return end
+    radioCloseAt = now
+    ToggleRadio()
+end
+
 function ToggleRadio()
     radioOpen = not radioOpen
     dbgPrint('[Radio] ToggleRadio triggered. New state:', radioOpen and 'OUVERTE' or 'FERMÉE')
@@ -287,7 +297,7 @@ end
 
 
 RegisterNUICallback('closeRadio', function(_, cb)
-    ToggleRadio()
+    CloseRadio()
     cb('ok')
 end)
 
@@ -770,6 +780,14 @@ Citizen.CreateThread(function()
             DisableControlAction(0, 141, true)
             DisableControlAction(0, 142, true)
             DisableControlAction(0, 143, true)
+            -- Échap ouvre le menu pause (le focus NUI laisse passer la touche).
+            -- On le bloque et on ferme la radio à la place.
+            DisableControlAction(0, 199, true)
+            DisableControlAction(0, 200, true)
+            DisableControlAction(0, 322, true)
+            if IsDisabledControlJustReleased(0, 200) or IsDisabledControlJustReleased(0, 322) then
+                CloseRadio()
+            end
         else
             Wait(250) -- reduce carga cuando la radio está cerrada
         end

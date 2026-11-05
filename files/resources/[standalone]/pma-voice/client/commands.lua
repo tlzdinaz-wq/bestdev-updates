@@ -14,8 +14,14 @@ end)
 
 -- TODO: Better implementation of this?
 RegisterCommand('vol', function(_, args)
-	if not args[1] then return end
-	setVolume(tonumber(args[1]))
+	-- Un argument qui n'est pas un nombre (« /vol max », une faute de frappe)
+	-- arrivait jusqu'au controle de type et remplissait la console d'erreurs.
+	local volume = tonumber(args[1])
+	if not volume then
+		ShowNotification('Utilisation : /vol [0-100]')
+		return
+	end
+	setVolume(math.max(0, math.min(100, volume)))
 end)
 
 exports('setAllowProximityCycleState', function(state)

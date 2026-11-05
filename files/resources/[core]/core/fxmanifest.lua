@@ -37,6 +37,10 @@ files {
     -- Armurerie Ammu-Nation (page dediee, iframe de l'interface)
     "interface/ammunation/index.html",
     "interface/ammunation/**/*",
+    -- Lecteur de medias (page dediee, iframe de l'interface) : platines DJ,
+    -- autoradio, boombox et televisions passent par elle.
+    "interface/pmms/index.html",
+    "interface/pmms/**/*",
     "interface/documents/index.html",
     "interface/documents/**/*",
     -- Écran 3D des pompes à essence (DUI posé sur un scaleform)

@@ -170,7 +170,8 @@ local function ensureEntry(pointId, xPlayer)
     local point = DepositBuilderServer.Find(pointId)
     Inv.ConfigureChest(chestId, {
         label = point and (point.label .. " - depot") or "Depot",
-        maxWeight = point and point.maxWeight or 1000,
+        -- le builder des depots demande des kilos (1 kg = 200 unites d'inventaire)
+        maxWeight = Inv.KgToUnits(point and point.maxWeight, 1000),
         maxSlots = point and point.maxSlots or 100,
     })
 
@@ -322,7 +323,7 @@ Inv.RegisterNet("depositBuilder:server:openEntry", function(pointId, citizenid)
     local chestId = depositChestId(point.id, citizenid)
     Inv.ConfigureChest(chestId, {
         label = point.label .. " - depot",
-        maxWeight = point.maxWeight,
+        maxWeight = Inv.KgToUnits(point.maxWeight, 1000),
         maxSlots = point.maxSlots,
     })
 

@@ -160,7 +160,11 @@ CreateThread(function()
                         if VFW.Interact.JustReleased(0, 38) then
                             CurrentPlatineId = closestPlatine
                             HideDJFloating()
-                            OpenDJPlatineUI(closestPlatine)
+                            -- La platine ouvre desormais le lecteur PMMS (client/media_player.lua) :
+                            -- l'ancienne interface a deux platines reposait sur xsound, qui decalait
+                            -- le son d'un auditeur a l'autre. Le prop et son emplacement, eux, ne
+                            -- changent pas : le builder des platines reste celui de la base.
+                            VFW.OpenMediaPlayer("platine")
                         end
                     else
                         ShowDJFloating(closestPlatine, platineInfo.position, "PLATINE DJ", reason or "Accès refusé", {}, platineInfo.floatingZ)

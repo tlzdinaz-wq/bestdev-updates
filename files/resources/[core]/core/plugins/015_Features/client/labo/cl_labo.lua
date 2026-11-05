@@ -369,8 +369,17 @@ CreateThread(function()
             local closestDist = INTERACT_DIST + 1
             local closestPos = nil
 
-            local exitPos = vector3(currentLaboData.interior_x, currentLaboData.interior_y, currentLaboData.interior_z)
+            local hasExitDoor = currentLaboData.exit_x ~= nil and currentLaboData.exit_y ~= nil and currentLaboData.exit_z ~= nil
+            local exitPos = hasExitDoor
+                and vector3(currentLaboData.exit_x + 0.0, currentLaboData.exit_y + 0.0, currentLaboData.exit_z + 0.0)
+                or vector3(currentLaboData.interior_x, currentLaboData.interior_y, currentLaboData.interior_z)
             local exitDist = #(myPos - exitPos)
+            if hasExitDoor and exitDist < 15.0 then
+                sleep = 0
+                DrawMarker(25, exitPos.x, exitPos.y, exitPos.z - 0.98,
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.8, 0.8,
+                    114, 99, 238, 180, false, true, 2, false, nil, nil, false)
+            end
             if exitDist < closestDist then
                 closestDist = exitDist
                 closestType = "exit"
