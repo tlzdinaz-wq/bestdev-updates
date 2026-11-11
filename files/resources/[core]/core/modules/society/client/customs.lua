@@ -77,6 +77,12 @@ end)
 ---@return number price The calculated price
 local function GetModPrice(modType, level)
     level = level or 0
+
+    -- Niveau -1 = pièce d'origine. L'écran l'affiche à 0, mais le calcul rendait
+    -- « prix de base moins un niveau » : remettre une pièce de série était facturé presque
+    -- plein tarif, et le total ne correspondait plus aux lignes affichées.
+    if level < 0 then return 0 end
+
     local modelLower = currentVehicleModel and string.lower(currentVehicleModel) or ""
     local categoryName = currentVehicleCategory or ""
 

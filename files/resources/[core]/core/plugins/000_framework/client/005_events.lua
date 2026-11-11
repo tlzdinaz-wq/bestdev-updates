@@ -444,6 +444,8 @@ RegisterNetEvent("vfw:loadItems", function(items)
         return
     end
     VFW.Items = items
+    -- Même registre côté client : c'est lui que lit l'affichage de l'arme en main.
+    if VFW.RegisterWeaponItems then VFW.RegisterWeaponItems() end
 end)
 
 function VFW.EnsureItemCatalog(force)
@@ -456,6 +458,7 @@ function VFW.EnsureItemCatalog(force)
         return false, reason
     end
     VFW.Items = result.items
+    if VFW.RegisterWeaponItems then VFW.RegisterWeaponItems() end
     return true
 end
 

@@ -2428,3 +2428,31 @@ RegisterNetEvent("vfw:playerReady", function()
 end)
 
 --endregion
+
+--region ====== RECRUTER DANS SA FACTION ======
+
+-- Recruter quelqu'un n'était possible nulle part : la fonction existait
+-- (client/factions/functions.lua, InviteCrew) mais plus aucun menu ne l'appelait, et l'onglet
+-- « Recruter » de la tablette de gang demande un droit que le chef n'avait pas. Le serveur,
+-- lui, répondait déjà : core:faction:invitePlayer vérifie le droit, la distance et que la
+-- cible n'a pas de faction.
+
+VFW.ContextAddButton("ped", ":faction: Recruter dans ma faction", function(ped)
+    if Death.isDead or (VFW.PlayerData and VFW.PlayerData.dead) then return false end
+    if not IsOtherPlayer(ped) then return false end
+    if not hasJob2() then return false end
+
+    -- Le serveur refuse au-delà de six mètres : inutile de proposer le bouton plus loin.
+    local myCoords = GetEntityCoords(PlayerPedId())
+    if #(myCoords - GetEntityCoords(ped)) > 5.0 then return false end
+
+    if not VFW.GetMyCrewPermission then return false end
+    return VFW.GetMyCrewPermission("recruit") == true
+end, function(ped)
+    local targetServerId = GetPlayerServerIdFromPed(ped)
+    if not targetServerId then return end
+    TriggerServerEvent("core:faction:invitePlayer", targetServerId)
+    VFW.ShowNotification({ type = 'VERT', content = "Invitation envoyée." })
+end)
+
+--endregion

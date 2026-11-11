@@ -800,6 +800,42 @@ Staff29.Cb("vfw:staff:getRanksList", function(source)
     return out
 end)
 
+--- Réapplique un grade à ceux qui le portent déjà.
+---
+--- Modifier un grade ne changeait rien pour personne : les droits d'un joueur vivent sur son
+--- compte (`users.permissions`), recopiés depuis le grade au moment où on le lui donne. Décocher
+--- « Ban » sur un grade laissait donc tous ceux qui l'avaient déjà bannir comme avant, et il
+--- fallait leur réattribuer le grade un par un pour que ça prenne.
+---
+--- Le grade reste absolu : ce qu'il donne est posé, le reste est retiré. Un droit accordé à
+--- l'unité à quelqu'un de ce grade disparaît donc à la prochaine modification du grade.
+---@param roleId string
+---@param role table
+---@return number online, number offline
+local function reapplyRole(roleId, role)
+    local wanted = (roleId == DEV_ROLE) and allPermissionKeys() or copySet(role.permissions)
+    local encoded = Staff29.Encode(wanted)
+    local online = 0
+
+    for _, target in pairs(VFW.Players or {}) do
+        local data = target.getGlobalData and target.getGlobalData() or nil
+        if data and data.role == roleId then
+            target.permissions = copySet(wanted)
+            if target.globalData then target.globalData.permissions = target.permissions end
+            -- Une seule écriture : passer par setPermission ferait une requête par droit.
+            Staff29.Update("UPDATE users SET permissions = ? WHERE id = ?", { encoded, target.accountId })
+            pushGlobalData(target)
+            online = online + 1
+        end
+    end
+
+    -- Les comptes hors ligne : même remise à plat, pour qu'ils ne reviennent pas avec les anciens
+    -- droits à la prochaine connexion.
+    local offline = Staff29.Update("UPDATE users SET permissions = ? WHERE role = ?", { encoded, roleId }) or 0
+
+    return online, offline
+end
+
 local function writeRank(source, xPlayer, payload, create)
     if type(payload) ~= "table" then return end
 
@@ -858,9 +894,21 @@ local function writeRank(source, xPlayer, payload, create)
     roles[id] = { name = label, level = level, color = color, permissions = nextPerms }
     persistRoles(roles)
 
+    -- Sans cela, la modification ne vaut que pour les futures attributions du grade.
+    local online = 0
+    if not create then
+        online = reapplyRole(id, roles[id])
+    end
+
     logStaff(source, create and "rank_create" or "rank_update", {
-        id = id, name = label, level = level, count = countSet(nextPerms),
+        id = id, name = label, level = level, count = countSet(nextPerms), applied = online,
     })
+
+    if not create then
+        Staff29.Notify(source, "SUCCESS", "Gestion Rangs", online > 0
+            and ("Grade enregistré. %d joueur%s connecté%s mis à jour."):format(online, online > 1 and "s" or "", online > 1 and "s" or "")
+            or "Grade enregistré et appliqué à ceux qui le portent.")
+    end
 end
 
 RegisterNetEvent("vfw:staff:createRank", function(payload)

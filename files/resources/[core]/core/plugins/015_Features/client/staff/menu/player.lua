@@ -46,6 +46,18 @@ function StaffMenu.BuildPlayerMenu()
     end
 
     local tigStatus = info.hasTig and ":dot-orange: EN TIG" or "Aucun"
+
+  -- Le casier est le seul écran qui demandait les sanctions ; la fiche se contentait de lire
+  -- ce qu'il avait laissé. Sans passage par « Casier du joueur », elle affichait donc toujours
+  -- « 0 », même pour quelqu'un qui en avait quinze. On les demande ici aussi, une seule fois
+  -- par joueur sélectionné (le marqueur est partagé avec le casier).
+  local selected = StaffMenu.data.selectedPlayer
+  if selected and StaffMenu._sanctionsFor ~= selected then
+        StaffMenu.data.sanctionsPlayerList = TriggerServerCallback("vfw:staff:getPlayerSanctions",
+            selected, info.identifier, info.discord) or {}
+        StaffMenu._sanctionsFor = selected
+    end
+
   local sanctionsCount = StaffMenu.data.sanctionsPlayerList and #StaffMenu.data.sanctionsPlayerList or 0
 
     local previewData = {

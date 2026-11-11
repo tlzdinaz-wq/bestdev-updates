@@ -474,6 +474,10 @@ VFW.RegisterCommand("setvip", "boutique", function(source, xPlayer, args)
     target.globalData.vip_tier = tier
     Staff29.Update("UPDATE users SET vip_tier = ? WHERE id = ?", { tier, target.accountId })
 
+    -- La capacité d'inventaire dépend du palier : sans ce rappel, le nouveau poids
+    -- n'arrivait qu'au prochain sac équipé ou retiré.
+    if Inv and Inv.RefreshMaxWeight then Inv.RefreshMaxWeight(target) end
+
     target.triggerEvent("vfw:updatePlayerGlobalData", target.getGlobalData())
     target.triggerEvent("vip:updateStatus", { tier = tier })
 

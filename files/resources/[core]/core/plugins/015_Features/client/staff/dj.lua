@@ -66,6 +66,12 @@ local function CreatePlatineInteraction(platineId, platineData)
         scope = platineData.scope or "public",
         job = platineData.job or nil
     }
+
+    -- Une platine n'est qu'une position : sans objet à cet endroit, le lecteur de médias
+    -- n'avait rien à faire chanter. On lui en déclare un, invisible.
+    if VFW.RegisterMediaPoint then
+        VFW.RegisterMediaPoint("platine:" .. tostring(platineId), PlatinesData[platineId].position, platineName)
+    end
 end
 
 ---Vérifie si le joueur a accès à une platine
@@ -106,6 +112,11 @@ end
 ---@param data table
 local function loadPlatines(data)
     -- Nettoyer les données stockées
+    if VFW.RemoveMediaPoint then
+        for platineId in pairs(PlatinesData) do
+            VFW.RemoveMediaPoint("platine:" .. tostring(platineId))
+        end
+    end
     PlatinesData = {}
 
     -- Créer les points d'interaction
@@ -209,6 +220,9 @@ end)
 RegisterNetEvent("core:deleteDJPlatine", function(platineId)
     -- Supprimer les données stockées
     PlatinesData[platineId] = nil
+    if VFW.RemoveMediaPoint then
+        VFW.RemoveMediaPoint("platine:" .. tostring(platineId))
+    end
 end)
 
 ---@param platineId number
@@ -216,16 +230,9 @@ end)
 RegisterNetEvent("core:updateDJPlatine", function(platineId, platineData)
     if not platineData then return end
 
-    -- Mettre à jour les données stockées
-    local pos = platineData.position
-    PlatinesData[platineId] = {
-        id = platineId,
-        name = platineData.name or ("Platine #" .. platineId),
-        position = vector3(pos.x, pos.y, pos.z),
-        radius = platineData.radius or 50.0,
-        scope = platineData.scope or "public",
-        job = platineData.job or nil
-    }
+    -- Mettre à jour les données stockées (et refaire le point du lecteur, la platine ayant
+    -- pu changer de nom ou d'endroit).
+    CreatePlatineInteraction(platineId, platineData)
 end)
 
 -- ============================================

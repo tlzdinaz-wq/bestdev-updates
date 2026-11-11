@@ -88,20 +88,66 @@ local function MemberRow(factionName, permId)
     return IL.Single("SELECT * FROM faction_members WHERE faction_name = ? AND identifier = ?", { factionName, permId })
 end
 
-local function EnsureMember(factionName, xPlayer)
+--- Le chef de la faction, au sens du staff : rang 1 dans `crew_members`.
+---
+--- Le staff et la tablette tiennent deux listes separees — `crew_members` (rang 1 a 5, Chef a
+--- Recrue) pour la gestion, `faction_members` (grades de la faction) pour la tablette. Rien ne
+--- les reliait : le chef nomme par le staff entrait dans la tablette au grade le plus bas, donc
+--- sans aucun droit. L'onglet « Recruter » n'apparaissait pour personne, et « Grades » non plus :
+--- la faction ne pouvait meme pas se reparer elle-meme.
+local function IsStaffChief(factionName, identifier)
+    local rank = IL.Scalar(
+        "SELECT rank FROM crew_members WHERE crew_name = ? AND identifier = ? LIMIT 1",
+        { factionName, identifier })
+    return IL.Int(rank, 0) == 1
+end
+
+--- Un membre tient-il deja le grade le plus haut ? Sert a ne promouvoir le chef que dans une
+--- faction qui n'a pas de patron, pour ne jamais rien retirer a personne.
+local function HasSomeoneAtLevel(factionName, level, exceptIdentifier)
+    local row = IL.Single([[
+        SELECT id FROM faction_members
+        WHERE faction_name = ? AND grade_level = ? AND identifier <> ?
+        LIMIT 1
+    ]], { factionName, level, exceptIdentifier or "" })
+    return row ~= nil
+end
+
+---@param grades table|nil la liste déjà chargée par l'appelant, pour éviter une requête de plus
+local function EnsureMember(factionName, xPlayer, grades)
     if not xPlayer then return nil end
+
+    grades = grades or GradeList(factionName)
+    local highest = grades[1]
+    local lowest = grades[#grades]
+
     local row = MemberRow(factionName, xPlayer.identifier)
     if row then
         IL.Execute("UPDATE faction_members SET name = ?, last_seen = NOW() WHERE id = ?", { xPlayer.name, row.id })
+
+        -- Reparation des factions deja bloquees : le chef y est entre au grade le plus bas avant
+        -- que les deux listes ne soient reliees. On ne le remonte que si personne d'autre ne tient
+        -- le grade du dessus, pour ne jamais retrograder le patron en place.
+        if highest and IL.Int(row.grade_level, 0) < highest.level
+            and IsStaffChief(factionName, xPlayer.identifier)
+            and not HasSomeoneAtLevel(factionName, highest.level, xPlayer.identifier) then
+            IL.Execute("UPDATE faction_members SET grade_level = ? WHERE id = ?", { highest.level, row.id })
+            row.grade_level = highest.level
+        end
+
         return row
     end
 
-    local grades = GradeList(factionName)
-    local lowest = grades[#grades]
+    -- Premiere ouverture de la tablette : le chef entre patron, les autres au grade le plus bas.
+    local level = lowest and lowest.level or 0
+    if highest and IsStaffChief(factionName, xPlayer.identifier) then
+        level = highest.level
+    end
+
     IL.Execute([[
         INSERT INTO faction_members (faction_name, identifier, name, grade_level, joined_at, last_seen)
         VALUES (?, ?, ?, ?, NOW(), NOW())
-    ]], { factionName, xPlayer.identifier, xPlayer.name, lowest and lowest.level or 0 })
+    ]], { factionName, xPlayer.identifier, xPlayer.name, level })
 
     return MemberRow(factionName, xPlayer.identifier)
 end
@@ -120,7 +166,7 @@ end
 
 local function MyGrade(factionName, xPlayer)
     local grades = GradeList(factionName)
-    local member = EnsureMember(factionName, xPlayer)
+    local member = EnsureMember(factionName, xPlayer, grades)
     local level = member and IL.Int(member.grade_level, 0) or 0
     return FindGradeByLevel(grades, level), grades, member
 end

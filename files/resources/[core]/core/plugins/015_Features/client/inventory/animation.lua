@@ -94,9 +94,18 @@ local function GetWeaponNotifData(weaponHash)
     return { name = "unknown", label = "Arme" }
 end
 
+local lastSafeZoneWeaponNotif = 0
+
 function VFW.WeaponAnim(id, ghost)
-    if IsWeaponRestricted() then
+    if IsWeaponRestricted() or (ZoneSafe and ZoneSafe.weaponLockActive) then
         SetCurrentPedWeapon(PlayerPedId(), `WEAPON_UNARMED`, true)
+        if ZoneSafe and ZoneSafe.weaponLockActive then
+            local now = GetGameTimer()
+            if now - lastSafeZoneWeaponNotif > 3000 then
+                lastSafeZoneWeaponNotif = now
+                VFW.ShowNotification({ type = "ROUGE", message = "Impossible de sortir une arme en zone safe." })
+            end
+        end
         return
     end
 

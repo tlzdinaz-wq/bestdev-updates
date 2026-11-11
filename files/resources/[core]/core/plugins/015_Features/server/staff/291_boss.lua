@@ -65,6 +65,35 @@ function Boss.GetPermMatrix(jobName)
     return matrix
 end
 
+--- Lit les droits d'un grade, quelle que soit la forme envoyée par la tablette.
+---
+--- L'écran de création envoie une table « nom -> vrai », celui de modification une liste
+--- d'objets `{ name, enabled }`. Le serveur ne savait lire que la liste : les droits cochés à
+--- la création étaient tous perdus, sans message.
+---@param input any
+---@return table<string, boolean>
+function Boss.ReadGradePerms(input)
+    local out = {}
+    if type(input) ~= "table" then return out end
+
+    -- Forme liste : { { name = "...", enabled = true }, ... } ou { "nom", ... }
+    for i = 1, #input do
+        local entry = input[i]
+        if type(entry) == "table" and type(entry.name) == "string" then
+            out[entry.name] = entry.enabled ~= false
+        elseif type(entry) == "string" then
+            out[entry] = true
+        end
+    end
+
+    -- Forme table : { nom = true, ... }
+    for key, value in pairs(input) do
+        if type(key) == "string" then out[key] = value == true end
+    end
+
+    return out
+end
+
 function Boss.SetGradePerms(jobName, gradeName, perms)
     Staff29.Update("DELETE FROM society_grade_perms WHERE job_name = ? AND grade_name = ?", { jobName, gradeName })
     for i = 1, #BASE_PERMISSIONS do
@@ -491,28 +520,39 @@ Staff29.Cb("core:jobs:addRole", function(source, data)
     local role = data.role
     local name = Staff29.Clean(role.name, 60)
     local label = Staff29.Clean(role.label, 80) or name
-    local grade = Staff29.ToInt(role.grade, 0, 100)
     local salary = Staff29.ToInt(role.salary, 0, 10000000) or 0
 
-    if not name or name == "" or not grade then return false, "Ce rôle n'est pas valide" end
+    if not name or name == "" then return false, "Ce rôle n'est pas valide" end
+
+    -- Le formulaire de la tablette ne demande qu'un nom, un salaire et des droits : il n'envoie
+    -- aucun numéro de grade. L'ancien code l'exigeait et refusait donc toutes les créations
+    -- (« Ce rôle n'est pas valide »). À défaut, le nouveau grade se place au-dessus du plus haut.
+    local grade = Staff29.ToInt(role.grade, 0, 100)
+    if not grade then
+        local highest = Staff29.Scalar(
+            "SELECT MAX(grade) FROM job_grades WHERE job_name = ?", { jobName }, nil)
+        highest = Staff29.ToInt(highest, 0, 100)
+        grade = (highest or -1) + 1
+        if grade > 100 then return false, "Le nombre maximum de grades est atteint" end
+    end
 
     local exists = Staff29.Scalar(
         "SELECT COUNT(*) FROM job_grades WHERE job_name = ? AND grade = ?", { jobName, grade }, 0) or 0
     if exists > 0 then return false, "Ce grade existe déjà" end
+
+    local sameName = Staff29.Scalar(
+        "SELECT COUNT(*) FROM job_grades WHERE job_name = ? AND name = ?", { jobName, name }, 0) or 0
+    if sameName > 0 then return false, "Un rôle porte déjà ce nom" end
 
     Staff29.Insert([[
         INSERT INTO job_grades (job_name, grade, name, label, salary, is_boss, permissions)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     ]], { jobName, grade, name, label, salary, role.isBoss and 1 or 0, Staff29.Encode({}) })
 
-    local perms = {}
-    if Staff29.IsTable(role.permissions) then
-        for i = 1, #role.permissions do
-            local entry = role.permissions[i]
-            if Staff29.IsTable(entry) and entry.name then perms[entry.name] = true end
-        end
-    end
-    Boss.SetGradePerms(jobName, name, perms)
+    -- Les droits arrivent en liste depuis l'écran de modification, et en table
+    -- « nom -> vrai » depuis celui de création : les deux sont acceptées, sans quoi les cases
+    -- cochées à la création étaient perdues en silence.
+    Boss.SetGradePerms(jobName, name, Boss.ReadGradePerms(role.permissions))
 
     VFW.DB.LoadJobs()
     Boss.NotifyPanel(jobName)
@@ -540,17 +580,9 @@ Staff29.Cb("core:jobs:updateRole", function(source, data)
         UPDATE job_grades SET label = ?, salary = ? WHERE job_name = ? AND name = ?
     ]], { label, salary, jobName, name })
 
-    local perms = {}
+    -- Pas de droits envoyés = on ne touche pas aux siens.
     if Staff29.IsTable(role.permissions) then
-        for i = 1, #role.permissions do
-            local entry = role.permissions[i]
-            if Staff29.IsTable(entry) and entry.name then
-                perms[entry.name] = entry.enabled ~= false
-            elseif type(entry) == "string" then
-                perms[entry] = true
-            end
-        end
-        Boss.SetGradePerms(jobName, name, perms)
+        Boss.SetGradePerms(jobName, name, Boss.ReadGradePerms(role.permissions))
     end
 
     VFW.DB.LoadJobs()

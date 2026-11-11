@@ -229,6 +229,16 @@ function VFW.DB.RefreshItemsCatalog()
         }
     end
     VFW.Items = items
+
+    -- Les armes livrées comme items (packs d'armes, créations depuis Gestion > Items) doivent
+    -- entrer dans le registre des armes, sinon le jeu ne sait ni les nommer ni les illustrer.
+    if VFW.RegisterWeaponItems then
+        local added = VFW.RegisterWeaponItems()
+        if added > 0 then
+            console.init("Items", ("%d arme(s) du catalogue ajoutée(s) au registre"):format(added))
+        end
+    end
+
     console.init("Items", ("%d items chargés"):format(#rows))
     return items
 end

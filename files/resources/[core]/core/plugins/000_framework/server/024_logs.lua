@@ -9,6 +9,8 @@ local COLORS = {
     staff = 10181046,
 }
 
+local warnedPaths = {}   -- un avertissement par chemin inconnu, pas un par message
+
 local function resolveWebhook(path)
     if type(path) ~= "string" or path == "" then return nil end
 
@@ -27,7 +29,19 @@ local function resolveWebhook(path)
         node = node[part]
     end
 
-    if type(node) == "string" and node ~= "" then return node end
+    if type(node) == "string" then
+        -- Déclaré mais laissé vide : canal volontairement éteint, rien à dire.
+        if node ~= "" then return node end
+        return nil
+    end
+
+    -- Le chemin n'existe pas dans la configuration : le message est perdu, et le gérant ne
+    -- peut même pas lui donner d'adresse puisque Gestion ne propose que les chemins déclarés.
+    -- Sans cet avertissement, la faute est invisible (c'était le cas de deux canaux de métier).
+    if not warnedPaths[path] then
+        warnedPaths[path] = true
+        console.warn(("[logs] canal inconnu « %s » : ce message n'ira nulle part (à déclarer dans config/logs/config.lua)"):format(path))
+    end
     return nil
 end
 
@@ -175,6 +189,90 @@ function VFW.Logs.Staff(source, action, payload)
     })
 end
 
+-- ── Actions staff : de la table `logs_staff` vers Discord ──
+--
+-- Les actions du staff n'arrivaient dans Discord que pour deux d'entre elles (tpm et
+-- antiattach). Tout le reste — bannir, expulser, donner un item, changer un métier… — n'allait
+-- que dans la table `logs_staff`, alors que Gestion > Webhooks logs propose un salon pour
+-- chacune : le gérant renseignait l'adresse et ne recevait jamais rien.
+--
+-- La table ci-dessous relie une action au salon déjà prévu pour elle. Les actions absentes
+-- d'ici restent enregistrées en base, comme avant : elles n'ont pas de salon déclaré, et un
+-- nouveau nom ne peut pas être ajouté à la configuration d'un serveur déjà installé (ses
+-- fichiers de configuration ne sont jamais écrasés).
+local STAFF_CHANNELS = {
+    staff_mode              = { "staff.service",    "Mode staff" },
+    staff_chat              = { "staff.msg",        "Chat staff" },
+    staff_wipe              = { "staff.wipe",       "Wipe" },
+    perm_wipe               = { "staff.wipe",       "Wipe des permissions" },
+    prison_jail             = { "staff.jail",       "Mise en prison" },
+    set_job                 = { "staff.setjob",     "Métier modifié" },
+    set_faction             = { "staff.setfaction", "Faction modifiée" },
+    heal                    = { "staff.heal",       "Soin" },
+    revive                  = { "staff.revive",     "Réanimation" },
+    revive_zone             = { "staff.revive",     "Réanimation de zone" },
+    repair                  = { "staff.repair",     "Réparation" },
+    upgrade                 = { "staff.upgrade",    "Amélioration de véhicule" },
+    setcarcolor             = { "staff.setcarcolor","Couleur de véhicule" },
+    set_staff_ped           = { "staff.setped",     "Apparence imposée" },
+    clear_staff_ped         = { "staff.unsetped",   "Apparence rendue" },
+    goto_vehicle            = { "staff.teleport",   "Téléportation vers un véhicule" },
+    bring_vehicle           = { "staff.teleport",   "Véhicule ramené" },
+
+    spawn_vehicle           = { "staff.car", "Véhicule créé" },
+    give_vehicle            = { "staff.car", "Véhicule donné" },
+    vehicle_spawn_menu      = { "staff.car", "Véhicule créé (menu)" },
+    vehicle_spawn_command   = { "staff.car", "Véhicule créé (commande)" },
+    vehicle_spawn_carlist   = { "staff.car", "Véhicule créé (liste)" },
+    vehicle_spawn_owned     = { "staff.car", "Véhicule d'un joueur créé" },
+    animator_vehicle_spawn  = { "staff.car", "Véhicule créé (animateur)" },
+
+    items_give              = { "staff.giveitem", "Item donné" },
+    items_give_all          = { "staff.giveitem", "Item donné à tous" },
+    give_item_temp          = { "staff.giveitem", "Item temporaire donné" },
+    items_weapon_give       = { "staff.giveitem", "Arme donnée" },
+
+    vehicle_delete_entity   = { "staff.dv", "Véhicule supprimé" },
+    vehicle_delete_spawned  = { "staff.dv", "Véhicule créé supprimé" },
+    vehicle_delete_radius   = { "staff.dv", "Véhicules supprimés autour" },
+    clear_zone              = { "staff.dv", "Zone nettoyée" },
+
+    staff_sanction_ban      = { "staff.ban",  "Bannissement" },
+    staff_sanction_kick     = { "staff.kick", "Expulsion" },
+    staff_sanction_jail     = { "staff.jail", "Prison" },
+    staff_sanction_revoke   = { "staff.ban",  "Sanction levée" },
+    staff_sanction_delete   = { "staff.ban",  "Sanction supprimée" },
+
+    staff_report_open       = { "reports.create", "Report ouvert" },
+    staff_report_take       = { "reports.take",   "Report pris" },
+    staff_report_close      = { "reports.close",  "Report fermé" },
+    staff_report_release    = { "reports.update", "Report relâché" },
+}
+
+--- Le contenu d'une action, lisible : les champs simples d'abord, le reste en JSON.
+local function describePayload(payload)
+    if type(payload) ~= "table" then return "" end
+
+    local lines, count = {}, 0
+    for _, key in ipairs({ "target", "targetName", "targetSource", "name", "item", "count",
+                           "reason", "duration", "model", "plate", "job", "grade", "faction",
+                           "amount", "role", "reportId" }) do
+        local value = payload[key]
+        if (type(value) == "string" and value ~= "") or type(value) == "number" then
+            count = count + 1
+            lines[count] = ("%s : `%s`"):format(key, tostring(value))
+        end
+    end
+
+    if count == 0 then
+        local raw = encode(payload)
+        if raw and raw ~= "{}" and #raw <= 900 then return ("```json\n%s```"):format(raw) end
+        return ""
+    end
+
+    return table.concat(lines, "\n")
+end
+
 AddEventHandler("vfw:logs:staff", function(source, action, payload)
     VFW.Logs.Staff(source, action, payload)
 
@@ -192,6 +290,16 @@ AddEventHandler("vfw:logs:staff", function(source, action, payload)
                 VFW.Logs.Describe(source), payload.enabled and "active" or "desactive"),
             color = COLORS.warning,
         })
+    else
+        local mapped = STAFF_CHANNELS[action]
+        if mapped then
+            local details = describePayload(payload)
+            VFW.Logs.Send(mapped[1], {
+                title = mapped[2],
+                description = VFW.Logs.Describe(source) .. (details ~= "" and ("\n" .. details) or ""),
+                color = COLORS.staff,
+            })
+        end
     end
 end)
 

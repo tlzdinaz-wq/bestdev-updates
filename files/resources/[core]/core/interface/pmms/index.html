@@ -11,6 +11,14 @@
 		<script src="mediaelement.min.js"></script>
 		<script src="wave.js"></script>
 		<script src="script.js?v=9"></script>
+		<style>
+			/* L'ecran de commande livre avec PMMS est remplace par interface/mediaplayer/ :
+			   cette page ne sert plus qu'au moteur (son, video, indicateur, notifications).
+			   Le cadre reste affiche mais ne prend pas la souris, sinon l'indicateur et la
+			   video ne se verraient jamais ; seul le panneau est masque. */
+			#ui { display: none !important; }
+			html, body { background: transparent !important; }
+		</style>
 	</head>
 	<body>
 		<div class="notifications"></div>

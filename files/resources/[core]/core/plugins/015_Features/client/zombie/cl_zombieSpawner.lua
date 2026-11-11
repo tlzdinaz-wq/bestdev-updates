@@ -9,6 +9,11 @@ local BurstPendingZones = {}
 local LootableZombies = {}
 local IsLooting = false
 
+-- Déclarée ici parce que `zombie:recheckZone`, plus haut dans le fichier, l'appelle : sans
+-- cela, le handler visait une globale inexistante et plantait sur « attempt to call a nil
+-- value » à chaque zone créée ou réactivée.
+local IsPointInZoneFast
+
 local function GetPolygonCenter(polygon)
     local sumX, sumY = 0, 0
     for i = 1, #polygon do
@@ -141,7 +146,7 @@ local function IsPointInPolygon(px, py, polygon)
     return inside
 end
 
-local function IsPointInZoneFast(zone, px, py)
+function IsPointInZoneFast(zone, px, py)
     if not zone._cx then return false end
     local dx = px - zone._cx
     local dy = py - zone._cy

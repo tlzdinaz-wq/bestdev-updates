@@ -37,6 +37,13 @@ files {
     -- Armurerie Ammu-Nation (page dediee, iframe de l'interface)
     "interface/ammunation/index.html",
     "interface/ammunation/**/*",
+    -- Radio (page dediee, iframe de l'interface) : remplace l'ecran du bundle
+    "interface/radio/index.html",
+    "interface/radio/**/*",
+    -- Interface du lecteur de medias (page dediee) : l'ecran livre avec PMMS
+    -- est remplace par celle-ci ; interface/pmms/ ne sert plus qu'au moteur.
+    "interface/mediaplayer/index.html",
+    "interface/mediaplayer/**/*",
     -- Lecteur de medias (page dediee, iframe de l'interface) : platines DJ,
     -- autoradio, boombox et televisions passent par elle.
     "interface/pmms/index.html",

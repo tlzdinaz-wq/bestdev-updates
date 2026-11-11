@@ -62,16 +62,52 @@ function Inv.ResolveBagCapacity(drawableId, sex)
     return 0, nil
 end
 
-local function baseMaxWeight()
-    return tonumber(Config.MaxWeight) or 5000
+--- La capacité de base d'un joueur, sac non compris.
+---
+--- Le palier VIP annonce une capacité dans `config/vip/config.lua` (60 kg pour l'or) et le
+--- menu VIP l'affiche au joueur — mais **personne ne l'appliquait** : la capacité restait celle
+--- du framework, 25 kg, quel que soit le palier. C'est ce que rapportait le bug « VIP Gold :
+--- 60 kg annoncés, 25 kg réels ».
+---
+--- Deux précautions : la table VIP est en **kilos** alors que l'inventaire compte en unités de
+--- 5 g (1 kg = 200), d'où la conversion ; et on ne descend jamais sous `Config.MaxWeight`, pour
+--- qu'un palier mal réglé ne retire de la place à personne.
+---@param xPlayer table
+---@return number unités
+local function baseMaxWeight(xPlayer)
+    local base = tonumber(Config.MaxWeight) or 5000
+
+    local tier = xPlayer and tonumber(xPlayer.vipTier) or 0
+    if VIPConfig and VIPConfig.GetInventoryWeight and Inv.KgToUnits then
+        local kg = tonumber(VIPConfig.GetInventoryWeight(tier))
+        if kg and kg > 0 then
+            local units = Inv.KgToUnits(kg)
+            if units and units > base then return units end
+        end
+    end
+
+    return base
 end
 
 local function applyMaxWeight(xPlayer)
+    if not xPlayer then return end
     local bonus = tonumber(Inv.BagBonus[xPlayer.source]) or 0
     if bonus < 0 then bonus = 0 end
     if bonus > 500 then bonus = 500 end
-    xPlayer.setMaxWeight(baseMaxWeight() + bonus)
+    xPlayer.setMaxWeight(baseMaxWeight(xPlayer) + bonus)
 end
+
+--- Recalcule la capacité d'un joueur : appelé à la connexion et à chaque changement de palier.
+---@param xPlayer table
+function Inv.RefreshMaxWeight(xPlayer)
+    applyMaxWeight(xPlayer)
+end
+
+-- Sans cela, le palier n'aurait d'effet qu'au premier sac équipé ou retiré.
+AddEventHandler("vfw:characterLoaded", function(source)
+    local xPlayer = VFW.GetPlayerFromId(source)
+    if xPlayer then applyMaxWeight(xPlayer) end
+end)
 
 Inv.RegisterNet("vfw:bag:addWeightBonus", function(capacity, drawableId, sex)
     local source = source

@@ -1,11 +1,15 @@
 local isDrawerOpen = false
+-- Garde séparée pendant l'aller-retour serveur : la carte ne peut s'ouvrir qu'une fois les
+-- zones connues (le bundle les attend dans le message d'ouverture, il n'a pas de rafraîchissement),
+-- et sans ce drapeau un second clic lançait une deuxième requête.
+local isOpening = false
 
 local function FetchZones()
     return TriggerServerCallback("zombie:getZones") or {}
 end
 
 local function OpenZombieZoneDrawer()
-    if isDrawerOpen then return end
+    if isDrawerOpen or isOpening then return end
 
     local pg = VFW.PlayerGlobalData
     if not pg or not pg.permissions then return end
@@ -14,10 +18,12 @@ local function OpenZombieZoneDrawer()
         return
     end
 
-    isDrawerOpen = true
-
+    isOpening = true
     local zones = FetchZones()
+    isOpening = false
+
     local coords = GetEntityCoords(PlayerPedId())
+    isDrawerOpen = true
 
     SendNUIMessage({
         action = "nui:zombieZoneDrawer:open",

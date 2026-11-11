@@ -9,6 +9,21 @@ local LEDGER = {
 local TYPE_OF_ACTION = {}
 for kind, action in pairs(LEDGER) do TYPE_OF_ACTION[action] = kind end
 
+-- Le droit exigé pour chaque type de sanction, et son nom à l'écran.
+--
+-- Le panneau des sanctions passe par un seul point d'entrée (`vfw:staff:applySanction`) qui ne
+-- demandait que `sanctions` — le droit d'ouvrir le panneau. Décocher « Ban » sur un grade ne
+-- changeait donc rien : la case existait, le serveur ne la regardait pas, et n'importe quel
+-- membre du staff pouvant ouvrir le panneau pouvait bannir. Les autres chemins (commandes,
+-- menu joueur, levée de sanction) vérifiaient déjà, eux, le droit exact.
+local SANCTION_PERMISSION = {
+    warn      = { "warn",     "avertir" },
+    kick      = { "kick",     "expulser" },
+    ban       = { "ban",      "bannir" },
+    tig       = { "give_tig", "donner des TIG" },
+    tigweapon = { "give_tig", "donner des TIG" },
+}
+
 local REASON_MIN = 2
 local REASON_MAX = 200
 local HISTORY_LIMIT = 200
@@ -550,6 +565,14 @@ Staff29.Cb("vfw:staff:applySanction", function(source, data)
 
     local kind = data.type
     if type(kind) ~= "string" or not LEDGER[kind] then return false end
+
+    -- Le droit du type demandé, en plus de celui d'ouvrir le panneau.
+    local needed = SANCTION_PERMISSION[kind]
+    if needed and not xPlayer.hasPermission(needed[1]) then
+        Staff29.Notify(source, "ERROR", "Sanctions",
+            ("Vous n'avez pas la permission de %s."):format(needed[2]))
+        return false
+    end
 
     local reason = cleanReason(data.reason)
     if not reason then

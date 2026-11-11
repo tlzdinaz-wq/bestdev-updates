@@ -1064,13 +1064,48 @@ RegisterNUICallback("init", function(data, cb)
 	cb({})
 end)
 
+--- Met un refus de lecture en français, et garde le détail pour la console.
+---
+--- Le lecteur annonçait « Error loading <url> : <message anglais> » : illisible pour un joueur,
+--- et impossible à rapporter correctement. Or sans ce message, rien ne distingue une adresse
+--- refusée d'un lecteur qui ne démarre pas — la barre d'avancement, elle, bouge de toute façon
+--- puisqu'elle suit l'horloge du serveur.
+---@param stage string
+---@param data table
+local function mediaError(stage, data)
+	local raw = tostring(data and data.message or "")
+	local url = tostring(data and data.url or "")
+
+	local reason
+	if raw:find("153") or raw:lower():find("embed") then
+		reason = "la vidéo interdit la lecture en dehors de YouTube"
+	elseif raw:lower():find("not found") or raw:find("404") then
+		reason = "l'adresse est introuvable"
+	elseif raw:lower():find("network") then
+		reason = "le réseau n'a pas répondu"
+	elseif raw:lower():find("format") or raw:lower():find("src") or raw:lower():find("support") then
+		reason = "ce format n'est pas lisible"
+	else
+		reason = raw ~= "" and raw or "raison inconnue"
+	end
+
+	-- Le détail brut reste en console : c'est lui qui sert à diagnostiquer.
+	print(("[media] %s a échoué : %s | %s"):format(stage, url, raw))
+
+	TriggerEvent("vfw:showNotification", {
+		type = "ROUGE",
+		subtitle = "Musique",
+		content = ("Lecture impossible : %s."):format(reason),
+	})
+end
+
 RegisterNUICallback("initError", function(data, cb)
-	TriggerEvent("pmms:error", "Error loading " .. data.url .. ": " .. data.message)
+	mediaError("chargement", data)
 	cb({})
 end)
 
 RegisterNUICallback("playError", function(data, cb)
-	TriggerEvent("pmms:error", "Error playing " .. data.url .. ": " .. data.message)
+	mediaError("lecture", data)
 	cb({})
 end)
 

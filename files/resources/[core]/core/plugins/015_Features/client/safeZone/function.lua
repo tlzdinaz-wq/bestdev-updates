@@ -144,6 +144,33 @@ end
 ZoneSafe.lastSafePosition = nil
 ZoneSafe.carkillActive = false
 ZoneSafe.degatsActive = false
+ZoneSafe.weaponLockActive = false
+ZoneSafe.driveByLockActive = false
+
+-- « Sortir une arme » est enregistré comme la touche 45 (rechargement). Ça n'empêche ni de dégainer
+-- (molette, chiffres, inventaire) ni de tirer, encore moins depuis une voiture (autres touches).
+local WEAPON_LOCK_CONTROLS <const> = {
+    12, 13, 14, 15, 16, 17, 37, 45,
+    68, 69, 70, 91, 92, 99, 100, 114,
+    140, 141, 142,
+    157, 158, 159, 160, 161, 162, 163, 164, 165,
+    257, 261, 262, 263, 264, 331,
+}
+local VEHICLE_ATTACK_CONTROLS <const> = { 68, 69, 70, 91, 92, 114 }
+
+local function lockWeapon(ped)
+    local player = PlayerId()
+    if GetSelectedPedWeapon(ped) ~= `WEAPON_UNARMED` then
+        SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true)
+    end
+    SetPedCanSwitchWeapon(ped, false)
+    DisablePlayerFiring(player, true)
+    SetPlayerCanDoDriveBy(player, false)
+    BlockWeaponWheelThisFrame()
+    for i = 1, #WEAPON_LOCK_CONTROLS do
+        DisableControlAction(0, WEAPON_LOCK_CONTROLS[i], true)
+    end
+end
 
 function ZoneSafe:GetGroundCoords(coords)
     local startPos = vector3(coords.x, coords.y, coords.z + 1.0)
@@ -198,7 +225,10 @@ function ZoneSafe:ApplyDisabledAction(disabledActions)
             end
         elseif type(action) == "number" then
             DisableControlAction(0, action, true)
-            if MELEE_TRIGGER_CONTROLS[action] then
+            if action == 45 then
+                self.weaponLockActive = true
+                lockWeapon(ped)
+            elseif MELEE_TRIGGER_CONTROLS[action] then
                 hasMeleeRestriction = true
             end
         end
@@ -207,6 +237,15 @@ function ZoneSafe:ApplyDisabledAction(disabledActions)
     if hasMeleeRestriction then
         for i = 1, #MELEE_EXTRA_CONTROLS do
             DisableControlAction(0, MELEE_EXTRA_CONTROLS[i], true)
+        end
+        -- La bagarre coupe le tir à pied (touche 24). Le tir en voiture passe par d'autres touches.
+        if not self.weaponLockActive then
+            self.driveByLockActive = true
+            SetPlayerCanDoDriveBy(PlayerId(), false)
+            DisablePlayerFiring(PlayerId(), true)
+            for i = 1, #VEHICLE_ATTACK_CONTROLS do
+                DisableControlAction(0, VEHICLE_ATTACK_CONTROLS[i], true)
+            end
         end
     end
 end
@@ -223,6 +262,14 @@ function ZoneSafe:ResetSpecialActions()
 
     if self.carkillActive then
         self.carkillActive = false
+    end
+
+    if self.weaponLockActive or self.driveByLockActive then
+        local player = PlayerId()
+        SetPlayerCanDoDriveBy(player, true)
+        SetPedCanSwitchWeapon(ped, true)
+        self.weaponLockActive = false
+        self.driveByLockActive = false
     end
 
     self.lastSafePosition = nil

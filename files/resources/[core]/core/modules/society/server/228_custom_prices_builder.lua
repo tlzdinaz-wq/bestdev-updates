@@ -56,6 +56,96 @@ local MOD_TYPES <const> = {
     { id = "horn",            label = "Klaxon",                   category = "other",       hasLevels = false },
 }
 
+
+-- Tarifs livrés au premier démarrage.
+--
+-- La table `custom_prices_base` était créée **vide** : tant que personne n'avait rempli le
+-- builder, le serveur ne synchronisait aucun prix (`hasPriceData` restait faux) et le client
+-- retombait sur un forfait de 1000 $ pour tout, sans supplément par niveau. Un full perf
+-- coûtait donc 4 000 $ quel que soit le véhicule, et monter d'un cran ne changeait rien :
+-- c'est le « les prix des full perf sont bugués ».
+--
+-- Ces montants ne sont qu'un point de départ, modifiable dans
+-- Gestion > Builders > Prix custom. Ils ne sont posés que si la ligne n'existe pas.
+local SEED_PRICES <const> = {
+    engine          = { 12000, 6000 },
+    brakes          = {  6000, 3000 },
+    transmission    = {  9000, 4500 },
+    suspension      = {  5000, 2500 },
+    turbo           = { 20000,    0 },
+
+    spoiler         = { 3500, 0 },
+    front_bumper    = { 4000, 0 },
+    rear_bumper     = { 4000, 0 },
+    side_skirts     = { 3000, 0 },
+    exhaust         = { 3500, 0 },
+    grille          = { 2500, 0 },
+    hood            = { 4500, 0 },
+    fender          = { 3000, 0 },
+    roof            = { 3000, 0 },
+
+    primary_color   = { 1500, 0 },
+    secondary_color = { 1500, 0 },
+    pearlescent     = { 2000, 0 },
+
+    wheel_type      = { 2000, 0 },
+    wheel_model     = { 4000, 0 },
+    wheel_color     = { 1000, 0 },
+    tire_smoke      = { 2500, 0 },
+
+    xenon           = { 2500, 0 },
+    xenon_color     = { 1000, 0 },
+    neon            = { 5000, 0 },
+    neon_color      = { 1000, 0 },
+
+    window_tint     = { 2000, 0 },
+    interior_color  = { 1500, 0 },
+    dashboard_color = { 1500, 0 },
+
+    plate_style     = { 1000, 0 },
+    livery          = { 3000, 0 },
+    horn            = { 1500, 0 },
+}
+
+--- Pose les tarifs de départ pour les types qui n'en ont pas encore.
+--- Ne touche jamais une ligne existante : ce qui a été réglé dans le builder est conservé.
+---@return number posés
+local function seedBasePrices()
+    local rows = VFW.Society.Query("SELECT mod_type FROM custom_prices_base") or {}
+    local known = {}
+    for i = 1, #rows do known[rows[i].mod_type] = true end
+
+    local added = 0
+    for i = 1, #MOD_TYPES do
+        local modType = MOD_TYPES[i].id
+        local seed = SEED_PRICES[modType]
+        if seed and not known[modType] then
+            VFW.Society.Update(
+                "INSERT IGNORE INTO custom_prices_base (mod_type, base_price, price_per_level) VALUES (?, ?, ?)",
+                { modType, seed[1], seed[2] })
+            added = added + 1
+        end
+    end
+
+    return added
+end
+
+CreateThread(function()
+    while not VFW.Ready do Wait(250) end
+
+    local ok, added = pcall(seedBasePrices)
+    if not ok then
+        console.warn("[prix custom] tarifs de depart non poses : " .. tostring(added))
+        return
+    end
+
+    if added > 0 then
+        console.init("Prix custom", ("%d tarif(s) de depart posé(s)"):format(added))
+        if VFW.Society and VFW.Society.ReloadCustomPrices then
+            VFW.Society.ReloadCustomPrices()
+        end
+    end
+end)
 -- Classes de véhicules du jeu, dans l'ordre de GetVehicleClass : le menu mécano
 -- retient le même nom pour chercher le pourcentage de la classe.
 local VEHICLE_CLASSES <const> = {

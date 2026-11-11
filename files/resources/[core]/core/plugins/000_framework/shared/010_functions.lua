@@ -94,6 +94,47 @@ function VFW.RegisterWeaponItem(weaponName, weaponLabel)
     weaponsByHash[joaat(upper)] = newWeapon
 end
 
+--- Inscrit toutes les armes du catalogue d'items dans le registre des armes.
+---
+--- `VFW.RegisterWeaponItem` existait pour ça depuis le début, mais **personne ne l'appelait** :
+--- une arme absente de `Config.Weapons` — typiquement une arme de pack ajoutée en item —
+--- restait inconnue du système. `VFW.GetWeaponFromHash` rendait nil, et l'arme en main
+--- s'affichait « ARME » avec une image « ? », alors qu'elle occupait bien un emplacement.
+---
+--- Appelée à chaque chargement du catalogue, des deux côtés. Idempotente.
+---@return number nombre d'armes ajoutées au registre
+function VFW.RegisterWeaponItems()
+    if type(VFW.Items) ~= "table" then return 0 end
+
+    -- Le registre des armes natives est rempli dans un thread, donc pas forcément prêt quand le
+    -- catalogue arrive. S'il est encore vide, toute arme native paraîtrait inconnue et serait
+    -- réinscrite en double : on attend qu'il le soit, sans bloquer l'appelant.
+    if next(weaponsByHash) == nil then
+        CreateThread(function()
+            local waited = 0
+            while next(weaponsByHash) == nil and waited < 10000 do
+                Wait(50)
+                waited = waited + 50
+            end
+            if next(weaponsByHash) ~= nil then VFW.RegisterWeaponItems() end
+        end)
+        return 0
+    end
+
+    local added = 0
+    for name, item in pairs(VFW.Items) do
+        if type(name) == "string" and name:sub(1, 7) == "weapon_" then
+            local upper = string.upper(name)
+            if not VFW.GetWeaponFromHash(upper) then
+                VFW.RegisterWeaponItem(upper, (type(item) == "table" and item.label) or upper)
+                added = added + 1
+            end
+        end
+    end
+
+    return added
+end
+
 ---@param weaponHash number
 ---@return table
 function VFW.GetWeaponFromHash(weaponHash)
