@@ -518,36 +518,48 @@ Staff29.Cb("core:jobs:addRole", function(source, data)
     end
 
     local role = data.role
-    local name = Staff29.Clean(role.name, 60)
-    local label = Staff29.Clean(role.label, 80) or name
+    local rawName = Staff29.Clean(role.name, 60)
+    local label = Staff29.Clean(role.label, 80)
+    if (not rawName or rawName == "") and label then rawName = label end
+    if not label or label == "" then label = rawName end
+
+    local name = rawName and rawName:lower() or ""
+    name = name:gsub("[àâä]", "a"):gsub("[éèêë]", "e"):gsub("[îï]", "i")
+    name = name:gsub("[ôö]", "o"):gsub("[ùûü]", "u"):gsub("ç", "c")
+    name = name:gsub("[^%w]+", "_"):gsub("^_+", ""):gsub("_+$", ""):sub(1, 50)
+    if name == "" then return false, "Ce grade n'est pas valide" end
+
     local salary = Staff29.ToInt(role.salary, 0, 10000000) or 0
 
-    if not name or name == "" then return false, "Ce rôle n'est pas valide" end
-
-    -- Le formulaire de la tablette ne demande qu'un nom, un salaire et des droits : il n'envoie
-    -- aucun numéro de grade. L'ancien code l'exigeait et refusait donc toutes les créations
-    -- (« Ce rôle n'est pas valide »). À défaut, le nouveau grade se place au-dessus du plus haut.
+    -- Le formulaire n'envoie pas de numéro. On prend le premier numéro libre,
+    -- au-dessus du plus haut grade déjà en place.
     local grade = Staff29.ToInt(role.grade, 0, 100)
     if not grade then
         local highest = Staff29.Scalar(
             "SELECT MAX(grade) FROM job_grades WHERE job_name = ?", { jobName }, nil)
         highest = Staff29.ToInt(highest, 0, 100)
         grade = (highest or -1) + 1
-        if grade > 100 then return false, "Le nombre maximum de grades est atteint" end
     end
+    if grade > 100 then return false, "Le nombre maximum de grades est atteint" end
 
     local exists = Staff29.Scalar(
         "SELECT COUNT(*) FROM job_grades WHERE job_name = ? AND grade = ?", { jobName, grade }, 0) or 0
-    if exists > 0 then return false, "Ce grade existe déjà" end
+    if exists > 0 then
+        local highest = Staff29.ToInt(Staff29.Scalar(
+            "SELECT MAX(grade) FROM job_grades WHERE job_name = ?", { jobName }, nil), 0, 100)
+        grade = (highest or -1) + 1
+        if grade > 100 then return false, "Le nombre maximum de grades est atteint" end
+    end
 
     local sameName = Staff29.Scalar(
         "SELECT COUNT(*) FROM job_grades WHERE job_name = ? AND name = ?", { jobName, name }, 0) or 0
     if sameName > 0 then return false, "Un rôle porte déjà ce nom" end
 
-    Staff29.Insert([[
-        INSERT INTO job_grades (job_name, grade, name, label, salary, is_boss, permissions)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ]], { jobName, grade, name, label, salary, role.isBoss and 1 or 0, Staff29.Encode({}) })
+    local inserted = Staff29.Insert([[
+        INSERT INTO job_grades (job_name, grade, name, label, salary, is_boss)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ]], { jobName, grade, name, label, salary, role.isBoss and 1 or 0 })
+    if not inserted then return false, "Le grade n'a pas pu être créé" end
 
     -- Les droits arrivent en liste depuis l'écran de modification, et en table
     -- « nom -> vrai » depuis celui de création : les deux sont acceptées, sans quoi les cases
@@ -556,7 +568,7 @@ Staff29.Cb("core:jobs:addRole", function(source, data)
 
     VFW.DB.LoadJobs()
     Boss.NotifyPanel(jobName)
-    return true, "Rôle créé"
+    return true, "Rôle créé", grade
 end)
 
 Staff29.Cb("core:jobs:updateRole", function(source, data)

@@ -115,20 +115,22 @@ CreateThread(function()
 end)
 
 function VFW.Logs.Send(path, embed)
-    local webhook = resolveWebhook(path)
-    if not webhook then return false end
     if type(embed) ~= "table" then return false end
 
     embed.color = embed.color or COLORS.default
     embed.footer = embed.footer or { text = VFW.BrandName() }
     embed.timestamp = embed.timestamp or os.date("!%Y-%m-%dT%H:%M:%SZ")
 
+    local entry = describeLog(path, embed)
+    pushRecent(entry)
+
+    local webhook = resolveWebhook(path)
+    if not webhook then return false end
+
     local body = json.encode({
         username = VFW.BrandName(),
         embeds = { embed },
     })
-    local entry = describeLog(path, embed)
-    pushRecent(entry)
 
     postWebhook(webhook, body, function(status)
         if status ~= 200 and status ~= 204 then
@@ -292,12 +294,22 @@ AddEventHandler("vfw:logs:staff", function(source, action, payload)
         })
     else
         local mapped = STAFF_CHANNELS[action]
+        local details = describePayload(payload)
+        local who = VFW.Logs.Describe(source)
         if mapped then
-            local details = describePayload(payload)
             VFW.Logs.Send(mapped[1], {
                 title = mapped[2],
-                description = VFW.Logs.Describe(source) .. (details ~= "" and ("\n" .. details) or ""),
+                description = who .. (details ~= "" and ("\n" .. details) or ""),
                 color = COLORS.staff,
+            })
+        else
+            -- Pas de salon Discord pour cette action : elle reste visible dans Staff logs.
+            pushRecent({
+                category = "staff",
+                type = action,
+                message = action .. " — " .. who .. (details ~= "" and (" " .. details:gsub("\n", " "):sub(1, 240)) or ""),
+                source = VFW.BrandName(),
+                timestamp = os.date("%d/%m/%Y %H:%M:%S"),
             })
         end
     end

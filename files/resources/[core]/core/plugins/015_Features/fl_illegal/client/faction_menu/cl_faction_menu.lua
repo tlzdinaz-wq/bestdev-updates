@@ -270,6 +270,15 @@ local function RenderVehicleActionsMenu()
     end)
 end
 
+local function CanRecruitFromMenu()
+    if VFW.GetMyCrewPermission and VFW.GetMyCrewPermission("recruit") then
+        return true
+    end
+    local faction = VFW.PlayerData and VFW.PlayerData.faction
+    local rank = faction and tonumber(faction.rank)
+    return rank == 1 or rank == 2
+end
+
 local function RenderMainMenu()
     if not FactionMenu.main then return end
 
@@ -286,6 +295,18 @@ local function RenderMainMenu()
     )
 
     FactionMenu.main.Separator("ACTIONS")
+
+    if CanRecruitFromMenu() then
+        FactionMenu.main.Button("Recruter", "Inviter la personne la plus proche dans la faction", nil, nil, false, function()
+            local closestPlayer = GetClosestPlayer(5.0)
+            if not closestPlayer then
+                VFW.ShowNotification({ type = 'ILLEGAL', message = "Aucune personne à proximité" })
+                return
+            end
+            TriggerServerEvent("core:faction:invitePlayer", closestPlayer.serverId)
+            VFW.ShowNotification({ type = 'ILLEGAL', message = "Invitation envoyée." })
+        end)
+    end
 
     FactionMenu.main.Button("Actions Personnage", nil, nil, 'chevron', false, function()
     end, FactionMenu.playerActions)

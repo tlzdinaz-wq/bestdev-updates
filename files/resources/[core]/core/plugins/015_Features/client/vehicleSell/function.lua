@@ -310,19 +310,45 @@ function VehicleReseller:DrawVehicles(locationId)
     playerCoords = GetEntityCoords(playerPed)
 
     local loc = ensureLocation(locationId)
+    loc.spawnPending = loc.spawnPending or {}
+    loc.spawnRetryAt = loc.spawnRetryAt or {}
 
-    for i = 1, #loc.cache do
-        local vehData <const> = loc.cache[i]
-        local pos <const> = GetParkingSpotAsVector4(locationId, i)
-        if not vehData or not pos then
-            goto continue
+    local now = GetGameTimer()
+    local spawning = false
+    for _, pending in pairs(loc.spawnPending) do
+        if pending then
+            spawning = true
+            break
         end
+    end
 
-        if not loc.spawnedVehicles[i] or not DoesEntityExist(loc.spawnedVehicles[i]) then
-            self:SpawnVehicles(locationId, vehData.model, pos, i)
+    if not spawning then
+        for i = 1, #loc.cache do
+            local vehData = loc.cache[i]
+            local pos = GetParkingSpotAsVector4(locationId, i)
+            local spawned = loc.spawnedVehicles[i]
+            if vehData and pos and not (spawned and DoesEntityExist(spawned)) and (loc.spawnRetryAt[i] or 0) <= now then
+                -- Une seule voiture à la fois. Le chargement du modèle (jusqu'à 5 s)
+                -- et des collisions (jusqu'à 5 s) ne bloque plus la touche pour parler au PNJ.
+                loc.spawnPending[i] = true
+                local model = vehData.model
+                CreateThread(function()
+                    local ok = pcall(function()
+                        self:SpawnVehicles(locationId, model, pos, i)
+                    end)
+                    local current = self.locations[locationId]
+                    if not current then return end
+                    current.spawnPending[i] = nil
+                    local created = current.spawnedVehicles[i]
+                    if not ok or not created or not DoesEntityExist(created) then
+                        current.spawnRetryAt[i] = GetGameTimer() + 15000
+                    else
+                        current.spawnRetryAt[i] = nil
+                    end
+                end)
+                break
+            end
         end
-
-        ::continue::
     end
 
     for i, vehicle in pairs(loc.spawnedVehicles) do

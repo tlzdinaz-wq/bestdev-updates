@@ -800,14 +800,15 @@ RegisterNUICallback("bossPanel:addRole", function(data, cb)
     end
 
     local playerData = VFW.PlayerData
-    local result, message = TriggerServerCallback("core:jobs:addRole", {
+    local result, message, grade = TriggerServerCallback("core:jobs:addRole", {
         jobName = playerData.job.name,
         role = role
     })
 
     cb({
         ok = result,
-        message = message
+        message = message,
+        grade = grade
     })
 end)
 

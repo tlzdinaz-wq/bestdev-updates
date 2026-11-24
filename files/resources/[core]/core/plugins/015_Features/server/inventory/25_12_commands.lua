@@ -68,6 +68,15 @@ VFW.RegisterCommand("giveitem", "give_item", function(source, xPlayer, args)
 
     local added = Inv.GivePlayerItem(target, itemName, count, nil, true)
 
+    if added > 0 then
+        TriggerEvent("vfw:logs:staff", source, "items_give", {
+            target = target.source,
+            name = target.name,
+            item = itemName,
+            count = added,
+        })
+    end
+
     if xPlayer then
         if added > 0 then
             xPlayer.showNotification({

@@ -20,13 +20,17 @@ local function DefaultPermissions(isBoss)
     return out
 end
 
+local function isOn(value)
+    return value == true or value == 1 or value == "1" or value == "true"
+end
+
 local function NormalizePermissions(raw, isBoss)
     local out = DefaultPermissions(isBoss)
     if IL.IsTable(raw) then
         for i = 1, #PERM_KEYS do
             local key = PERM_KEYS[i]
             if raw[key] ~= nil then
-                out[key] = raw[key] == true
+                out[key] = isOn(raw[key])
             end
         end
     end
@@ -61,16 +65,29 @@ end
 
 local function GradeList(factionName)
     local rows = EnsureGrades(factionName)
+    local maxLevel = 0
+    for i = 1, #rows do
+        local level = IL.Int(rows[i].level, 0)
+        if level > maxLevel then maxLevel = level end
+    end
+
     local out = {}
     for i = 1, #rows do
         local row = rows[i]
         local level = IL.Int(row.level, 0)
+        local isBoss = maxLevel > 0 and level == maxLevel
+        local permissions = NormalizePermissions(IL.Decode(row.permissions, nil), isBoss or level >= 10)
+        -- Le grade du dessus doit pouvoir recruter. Sinon l'onglet n'existe pour personne.
+        if isBoss then
+            permissions.canAccessTablet = true
+            permissions.canRecruit = true
+        end
         out[#out + 1] = {
             id = row.id,
             name = row.name,
             level = level,
             color = row.color or "#9e9e9e",
-            permissions = NormalizePermissions(IL.Decode(row.permissions, nil), level >= 10),
+            permissions = permissions,
         }
     end
     table.sort(out, function(a, b) return a.level > b.level end)

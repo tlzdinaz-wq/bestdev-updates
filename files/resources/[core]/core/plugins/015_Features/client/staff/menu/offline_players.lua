@@ -237,7 +237,7 @@ function StaffMenu._OpenOfflinePlayerActions(player, charId)
     StaffMenu.data.offlineSanctionsList = TriggerServerCallback("vfw:staff:getPlayerSanctions",
         StaffMenu.selectedOfflinePlayer.onlineSource,
         StaffMenu.selectedOfflinePlayer.identifier,
-        StaffMenu.selectedOfflinePlayer.discord) or {}
+        StaffMenu.selectedOfflinePlayer.id) or {}
 
     local adminBanner = exports["core"]:GetVUIBanner("admin")
     local VUI = exports["VUI"]
@@ -304,7 +304,10 @@ function StaffMenu.BuildOfflinePlayerActionsMenu()
         rpName = player.name
     end
 
-    local sanctionsCount = StaffMenu.data.offlineSanctionsList and #StaffMenu.data.offlineSanctionsList or 0
+    local sanctionsCount = 0
+    if type(StaffMenu.data.offlineSanctionsList) == "table" then
+        for _ in pairs(StaffMenu.data.offlineSanctionsList) do sanctionsCount = sanctionsCount + 1 end
+    end
 
     local previewData = {
         { type = "header", iconUrl = "people.png",   label = "",                  value = tostring(player.pseudo or "Sans pseudo") },

@@ -300,14 +300,39 @@ RegisterServerCallback("laboBuilder:getFactions", function(source)
     if not builder(source) then return {} end
 
     local out, n = {}, 0
+    local seen = {}
+
+    local function push(name, label, kind)
+        if type(name) ~= "string" or name == "" or name == "nocrew" or name == "nofaction" or seen[name] then
+            return
+        end
+        seen[name] = true
+        n = n + 1
+        out[n] = { name = name, label = label or name, kind = kind }
+    end
+
+    local rows = query("SELECT name, label FROM crews ORDER BY label ASC")
+    for i = 1, #rows do
+        push(rows[i].name, rows[i].label, "faction")
+    end
+
+    if n == 0 and VFW and VFW.Factions then
+        for name, faction in pairs(VFW.Factions) do
+            push(name, type(faction) == "table" and faction.label or name, "faction")
+        end
+    end
+
     for name, job in pairs(VFW.Jobs or {}) do
         local isJob = type(job) == "table" and job.name == name and job.grades ~= nil
         if isJob then
-            n = n + 1
-            out[n] = { name = name, label = job.label or name }
+            push(name, job.label, "job")
         end
     end
-    table.sort(out, function(a, b) return a.label < b.label end)
+
+    table.sort(out, function(a, b)
+        if a.kind ~= b.kind then return a.kind == "faction" end
+        return (a.label or a.name) < (b.label or b.name)
+    end)
     return out
 end)
 

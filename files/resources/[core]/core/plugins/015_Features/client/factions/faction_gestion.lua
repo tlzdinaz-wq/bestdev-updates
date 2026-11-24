@@ -1192,17 +1192,13 @@ end)
 ---@param name string
 ---@return boolean
 function VFW.GetMyCrewPermission(name)
-    local perm = VFW.PlayerData.faction.permissions
-
-    for k, v in pairs(perm) do
-        if VFW.PlayerData.faction.grade_name == k then
-            if v[name] then
-                return true
-            else
-                return false
-            end
-        end
+    local faction = VFW.PlayerData and VFW.PlayerData.faction
+    local perm = faction and faction.permissions
+    if type(perm) ~= "table" or type(faction.grade_name) ~= "string" then
+        return false
     end
 
-    return false
+    local row = perm[faction.grade_name]
+    if type(row) ~= "table" then return false end
+    return row[name] == true
 end

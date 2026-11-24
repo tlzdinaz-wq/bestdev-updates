@@ -152,23 +152,10 @@ local function SpawnNpc(locationId, npcCoords, npcModel)
         end
     end
 
-    VFW.CreatePed(npcCoords, npcModel)
-    Wait(1000)
-
-    peds = GetGamePool('CPed')
-    for _, ped in ipairs(peds) do
-        if DoesEntityExist(ped) and not IsPedAPlayer(ped) then
-            local pedCoords = GetEntityCoords(ped)
-            local dist = #(pedCoords - vector3(npcCoords.x, npcCoords.y, npcCoords.z))
-            if dist < 3.0 then
-                local pedModel = GetEntityModel(ped)
-                if pedModel == modelHash then
-                    VehicleResellerNPCs[locationId] = ped
-                    SetupNpcProtection(ped)
-                    return
-                end
-            end
-        end
+    local ped = VFW.CreatePed(npcCoords, npcModel)
+    if ped and ped ~= 0 and DoesEntityExist(ped) then
+        VehicleResellerNPCs[locationId] = ped
+        SetupNpcProtection(ped)
     end
 end
 
@@ -192,20 +179,35 @@ local function CleanupAll()
     vehicleSellReady = false
 end
 
+local initLock = false
+
 local function InitVehicleSell()
+    if initLock then return end
+    initLock = true
+
     CleanupAll()
 
     VehicleResellerConfigs = TriggerServerCallback("vehicleSell:getAllConfigs") or {}
+    vehicleSellReady = true
 
     for locationId, cfg in pairs(VehicleResellerConfigs) do
         SpawnNpc(locationId, cfg.npc_coords, cfg.npc_model)
     end
 
-    vehicleSellReady = true
+    initLock = false
 end
 
 RegisterNetEvent("vfw:playerLoaded", function()
     InitVehicleSell()
+end)
+
+CreateThread(function()
+    while not VFW.IsPlayerLoaded() do
+        Wait(500)
+    end
+    if not vehicleSellReady then
+        InitVehicleSell()
+    end
 end)
 
 AddEventHandler("onResourceStop", function(resourceName)

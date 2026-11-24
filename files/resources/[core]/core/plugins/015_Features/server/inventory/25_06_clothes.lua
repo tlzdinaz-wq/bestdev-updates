@@ -74,16 +74,40 @@ end
 --- qu'un palier mal réglé ne retire de la place à personne.
 ---@param xPlayer table
 ---@return number unités
+--- Le palier affiché dans le menu VIP (rôle ou colonne) et le poids annoncé.
+--- Sans ça, un VIP Gold par permission gardait les 25 kg de base.
+local function vipTierOf(xPlayer)
+    if Staff29 and Staff29.VIP and Staff29.VIP.GetPlayerTier then
+        return Staff29.VIP.GetPlayerTier(xPlayer) or 0
+    end
+
+    local tier = tonumber(xPlayer and xPlayer.vipTier) or 0
+    if tier == 0 and xPlayer and xPlayer.hasPermission then
+        if xPlayer.hasPermission("vip_gold") then tier = 3
+        elseif xPlayer.hasPermission("vip_silver") then tier = 2
+        elseif xPlayer.hasPermission("vip_bronze") then tier = 1 end
+    end
+    if tier < 0 then tier = 0 end
+    if tier > 3 then tier = 3 end
+    return tier
+end
+
 local function baseMaxWeight(xPlayer)
     local base = tonumber(Config.MaxWeight) or 5000
+    local tier = vipTierOf(xPlayer)
+    local kg
 
-    local tier = xPlayer and tonumber(xPlayer.vipTier) or 0
-    if VIPConfig and VIPConfig.GetInventoryWeight and Inv.KgToUnits then
-        local kg = tonumber(VIPConfig.GetInventoryWeight(tier))
-        if kg and kg > 0 then
-            local units = Inv.KgToUnits(kg)
-            if units and units > base then return units end
-        end
+    if Staff29 and Staff29.VIP and Staff29.VIP.GetTierConfig then
+        local config = Staff29.VIP.GetTierConfig(tier)
+        kg = config and tonumber(config.inventoryWeight)
+    end
+    if not kg and VIPConfig and VIPConfig.GetInventoryWeight then
+        kg = tonumber(VIPConfig.GetInventoryWeight(tier))
+    end
+
+    if kg and kg > 0 and Inv.KgToUnits then
+        local units = Inv.KgToUnits(kg)
+        if units and units > base then return units end
     end
 
     return base
@@ -105,6 +129,7 @@ end
 
 -- Sans cela, le palier n'aurait d'effet qu'au premier sac équipé ou retiré.
 AddEventHandler("vfw:characterLoaded", function(source)
+    Inv.BagBonus[source] = 0
     local xPlayer = VFW.GetPlayerFromId(source)
     if xPlayer then applyMaxWeight(xPlayer) end
 end)
@@ -144,11 +169,9 @@ AddEventHandler("vfw:playerDropped", function(source)
     pendingSkinSave[source] = nil
 end)
 
-AddEventHandler("vfw:characterLoaded", function(source, xPlayer)
-    Inv.BagBonus[source] = 0
-    if xPlayer then
-        applyMaxWeight(xPlayer)
-    end
+AddEventHandler("vfw:playerLoaded", function(source, xPlayer)
+    if not xPlayer then xPlayer = VFW.GetPlayerFromId(source) end
+    if xPlayer then applyMaxWeight(xPlayer) end
 end)
 
 Inv.RegisterNet("vfw:skin:save", function(skin)

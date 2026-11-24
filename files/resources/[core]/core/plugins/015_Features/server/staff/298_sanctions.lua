@@ -531,11 +531,16 @@ CreateThread(function()
     end
 end)
 
-Staff29.Cb("vfw:staff:getPlayerSanctions", function(source, sessionId, identifier, _discord)
+Staff29.Cb("vfw:staff:getPlayerSanctions", function(source, sessionId, identifier, accountId)
     local xPlayer = VFW.GetPlayerFromId(source)
     if not xPlayer or not xPlayer.hasPermission("staff_menu") then return {} end
 
+    -- Le casier envoie l'id du compte et trouve l'historique. La fiche n'envoyait que
+    -- l'identifiant personnage : la recherche ratait, et le compteur restait à 0.
     local target = resolveBySession(sessionId)
+    if not target and Staff29.IsString(accountId, 64) then
+        target = resolveByAccount(accountId)
+    end
     if not target and Staff29.IsString(identifier, 80) then
         target = resolveByIdentifier(identifier)
     end

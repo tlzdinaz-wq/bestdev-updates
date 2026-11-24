@@ -53,6 +53,10 @@ local function IndexZones(zones)
     end
 end
 
+function VFW.GetZombieZones()
+    return ZombieZones
+end
+
 RegisterNetEvent("zombie:syncZones")
 AddEventHandler("zombie:syncZones", function(zones)
     IndexZones(zones)

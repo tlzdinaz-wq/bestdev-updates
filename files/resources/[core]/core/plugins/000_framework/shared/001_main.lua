@@ -192,7 +192,7 @@ function VFW.IsSparseStaffPerms(perms)
     return true
 end
 
----Vérifie un droit staff côté client. `niveau_6` / `dev` / `admin` bypass toutes les clés.
+---Vérifie un droit staff côté client. Seul le grade `niveau_6` a tous les droits.
 ---@param key string|nil
 ---@return boolean
 function VFW.HasStaffPerm(key)
@@ -202,8 +202,6 @@ function VFW.HasStaffPerm(key)
     if VFW.IsNiveau6Role(data.role or data.roleId) then return true end
     local perms = data.permissions
     if type(perms) ~= "table" then return false end
-    if permGranted(perms.dev) or permGranted(perms.admin) then return true end
-    if VFW.IsSparseStaffPerms(perms) then return true end
     if permGranted(perms[key]) then return true end
     for k, v in pairs(perms) do
         if type(k) == "number" and v == key then return true end
@@ -223,16 +221,12 @@ function VFW.StaffPerms()
     else
         local src = data.permissions
         if type(src) ~= "table" then return {} end
-        if permGranted(src.dev) or permGranted(src.admin) or VFW.IsSparseStaffPerms(src) then
-            out = VFW.BuildFullPermissions()
-        else
-            out = {}
-            for k, v in pairs(src) do
-                if type(k) == "number" and type(v) == "string" then
-                    out[v] = true
-                elseif permGranted(v) then
-                    out[k] = true
-                end
+        out = {}
+        for k, v in pairs(src) do
+            if type(k) == "number" and type(v) == "string" then
+                out[v] = true
+            elseif permGranted(v) then
+                out[k] = true
             end
         end
     end
@@ -253,9 +247,6 @@ function VFW.ApplyStaffAccess(payload)
         VFW.PlayerGlobalData.permissions = payload.permissions
     end
     VFW.HydrateNiveau6Permissions(VFW.PlayerGlobalData)
-    if VFW.IsSparseStaffPerms(VFW.PlayerGlobalData.permissions) then
-        VFW.PlayerGlobalData.permissions = VFW.BuildFullPermissions()
-    end
 end
 
 VFW.CDN = VFW.CDN or {}

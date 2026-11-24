@@ -722,10 +722,8 @@ RegisterNetEvent('vfw:updatePlayerGlobalData', function(data)
     if VFW.HydrateNiveau6Permissions then
         VFW.HydrateNiveau6Permissions(data)
     end
-    if VFW.IsSparseStaffPerms and VFW.IsSparseStaffPerms(data.permissions) then
-        data.permissions = VFW.BuildFullPermissions()
-    end
     VFW.PlayerGlobalData = data
+    VFW._staffPermsCache = nil
 end)
 
 function VFW.SyncStaffAccess()

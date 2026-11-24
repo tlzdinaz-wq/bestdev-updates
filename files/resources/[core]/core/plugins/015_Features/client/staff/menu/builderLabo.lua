@@ -662,8 +662,9 @@ end)
 
 StaffMenu.builderLaboFaction.OnOpen(function()
     StaffMenu.builderLaboFaction.ClearItems()
+    cachedFactions = TriggerServerCallback("laboBuilder:getFactions") or {}
 
-    StaffMenu.builderLaboFaction.SearchInput("Rechercher une faction")
+    StaffMenu.builderLaboFaction.SearchInput("Rechercher une faction ou un métier")
 
     StaffMenu.builderLaboFaction.Button(":x: AUCUNE (LIBRE)", "Retirer la faction propriétaire", nil, nil, false, function()
         laboData.ownerFaction = nil
@@ -685,23 +686,42 @@ StaffMenu.builderLaboFaction.OnOpen(function()
     StaffMenu.builderLaboFaction.Button(":user: JOUEUR INDIVIDUEL", "Coffre uniquement, pas de gestion ni attaque", isPlayerOwned and (playerLabel or "Actuelle") or nil, isPlayerOwned and "check" or nil, false, function()
     end, StaffMenu.builderLaboPlayerSelect)
 
-    StaffMenu.builderLaboFaction.Separator("FACTIONS")
-
-    for _, f in ipairs(cachedFactions or {}) do
-        local isCurrent = laboData.ownerFaction == f.name
+    local function addOwnerButton(entry, definedMessage)
+        local isCurrent = laboData.ownerFaction == entry.name
         StaffMenu.builderLaboFaction.Button(
-            f.label,
-            f.name,
+            entry.label,
+            entry.name,
             isCurrent and "Actuelle" or nil,
             isCurrent and "check" or nil,
             false,
             function()
-                laboData.ownerFaction = f.name
+                laboData.ownerFaction = entry.name
                 laboData.ownerPlayerName = nil
-                VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder Labo', message = "Faction définie : " .. f.label })
+                VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Builder Labo', message = definedMessage .. entry.label })
                 exports["VUI"]:HandleBack()
             end
         )
+    end
+
+    StaffMenu.builderLaboFaction.Separator("FACTIONS")
+
+    local factionCount = 0
+    for _, f in ipairs(cachedFactions or {}) do
+        if f.kind == "faction" then
+            factionCount = factionCount + 1
+            addOwnerButton(f, "Faction définie : ")
+        end
+    end
+    if factionCount == 0 then
+        StaffMenu.builderLaboFaction.Button("Aucune faction", nil, nil, nil, false, function() end)
+    end
+
+    StaffMenu.builderLaboFaction.Separator("MÉTIERS")
+
+    for _, f in ipairs(cachedFactions or {}) do
+        if f.kind ~= "faction" then
+            addOwnerButton(f, "Métier défini : ")
+        end
     end
 end)
 

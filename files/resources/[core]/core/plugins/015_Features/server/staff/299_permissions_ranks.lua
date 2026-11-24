@@ -483,6 +483,8 @@ Staff29.Cb("vfw:staff:reloadRoles", function(source, done)
     return allowed
 end)
 
+local reapplyRole
+
 RegisterNetEvent("vfw:staff:saveRole", function(payload)
     local source = source
     local xPlayer = Staff29.Require(source, "gestion_perm")
@@ -541,6 +543,10 @@ RegisterNetEvent("vfw:staff:saveRole", function(payload)
 
     if saved > 0 then
         persistRoles(roles)
+        for i = 1, #changes do
+            local role = roles[changes[i].id]
+            if role then reapplyRole(changes[i].id, role) end
+        end
         logStaff(source, "role_save", { roles = changes })
     end
 
@@ -812,7 +818,7 @@ end)
 ---@param roleId string
 ---@param role table
 ---@return number online, number offline
-local function reapplyRole(roleId, role)
+function reapplyRole(roleId, role)
     local wanted = (roleId == DEV_ROLE) and allPermissionKeys() or copySet(role.permissions)
     local encoded = Staff29.Encode(wanted)
     local online = 0

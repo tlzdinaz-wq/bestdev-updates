@@ -32,6 +32,13 @@ function StaffMenu.ResetPlayerSpectate(playerId)
     end
 end
 
+local function countList(list)
+    if type(list) ~= "table" then return 0 end
+    local n = 0
+    for _ in pairs(list) do n = n + 1 end
+    return n
+end
+
 --- .BuildPlayerMenu
 function StaffMenu.BuildPlayerMenu()
     local player = getPlayerState(StaffMenu.data.selectedPlayer)
@@ -51,14 +58,16 @@ function StaffMenu.BuildPlayerMenu()
   -- ce qu'il avait laissé. Sans passage par « Casier du joueur », elle affichait donc toujours
   -- « 0 », même pour quelqu'un qui en avait quinze. On les demande ici aussi, une seule fois
   -- par joueur sélectionné (le marqueur est partagé avec le casier).
-  local selected = StaffMenu.data.selectedPlayer
-  if selected and StaffMenu._sanctionsFor ~= selected then
+    local selected = StaffMenu.data.selectedPlayer
+    local justLoaded = false
+    if selected and StaffMenu._sanctionsFor ~= selected then
         StaffMenu.data.sanctionsPlayerList = TriggerServerCallback("vfw:staff:getPlayerSanctions",
-            selected, info.identifier, info.discord) or {}
+            selected, info.identifier, info.accountId or info.id) or {}
         StaffMenu._sanctionsFor = selected
+        justLoaded = true
     end
 
-  local sanctionsCount = StaffMenu.data.sanctionsPlayerList and #StaffMenu.data.sanctionsPlayerList or 0
+    local sanctionsCount = countList(StaffMenu.data.sanctionsPlayerList)
 
     local previewData = {
         { type = "header", iconUrl = "people.png",   label = "",                  value = tostring(info.pseudo or "Sans pseudo") },
@@ -87,7 +96,7 @@ function StaffMenu.BuildPlayerMenu()
     local selectedPlayer = StaffMenu.data.selectedPlayer
     -- Si la fiche est déjà à l'écran (sélection dans la liste), ne pas la renvoyer.
     -- Sinon, l'envoyer APRÈS l'ouverture du menu (SetTimeout) pour ne pas bloquer le paint.
-    if StaffMenu._previewSource ~= selectedPlayer then
+    if justLoaded or StaffMenu._previewSource ~= selectedPlayer then
         local color = info.color or 0xFFFFFF
         SetTimeout(0, function()
             if not StaffMenu.player or not StaffMenu.player.opened then return end
@@ -348,7 +357,10 @@ function StaffMenu.BuildPlayerMenu()
     -- SANCTIONS & MODÉRATION
     -- ══════════════════════════════════
     if perms["sanctions"] then
-        local sanctionCount = StaffMenu.data.sanctionsPlayerList and #StaffMenu.data.sanctionsPlayerList or 0
+        local sanctionCount = 0
+        if type(StaffMenu.data.sanctionsPlayerList) == "table" then
+            for _ in pairs(StaffMenu.data.sanctionsPlayerList) do sanctionCount = sanctionCount + 1 end
+        end
         P_Button(":scales: CASIER DU JOUEUR", sanctionCount .. (sanctionCount > 1 and " sanctions" or " sanction"), nil, "arrow", false, function()
 
             StaffMenu.OpenSanctionsUI({
@@ -427,7 +439,6 @@ function StaffMenu.BuildPlayerMenu()
                 typeBan = "heures"
           end
             TriggerServerEvent("core:ban:banplayer", selectedPlayer, reason, time, GetPlayerServerId(PlayerId()), typeBan)
-            VFW.ShowNotification({ type = 'STAFF', variant = 'SUCCESS', subtitle = 'Gestion Joueur', message = "Joueur banni." })
         end)
     end
 

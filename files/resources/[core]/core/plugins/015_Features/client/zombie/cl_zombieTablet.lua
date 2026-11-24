@@ -18,11 +18,11 @@ local function OpenZombieZoneDrawer()
         return
     end
 
-    isOpening = true
-    local zones = FetchZones()
-    isOpening = false
-
+    -- La carte s'ouvre tout de suite avec les zones déjà reçues. Attendre le callback
+    -- bloquait l'affichage (jusqu'au délai du callback) et le menu staff reprenait
+    -- le focus : la tablette était visible, mais plus rien n'était cliquable.
     local coords = GetEntityCoords(PlayerPedId())
+    local zones = (VFW.GetZombieZones and VFW.GetZombieZones()) or {}
     isDrawerOpen = true
 
     SendNUIMessage({
@@ -32,8 +32,29 @@ local function OpenZombieZoneDrawer()
             playerCoords = { x = coords.x, y = coords.y },
         }
     })
-
     VFW.Nui.Focus(true)
+
+    SetTimeout(600, function()
+        if isDrawerOpen then VFW.Nui.Focus(true) end
+    end)
+
+    if #zones > 0 then return end
+
+    isOpening = true
+    CreateThread(function()
+        local fresh = FetchZones()
+        isOpening = false
+        if not isDrawerOpen then return end
+        local now = GetEntityCoords(PlayerPedId())
+        SendNUIMessage({
+            action = "nui:zombieZoneDrawer:open",
+            data = {
+                zones = fresh,
+                playerCoords = { x = now.x, y = now.y },
+            }
+        })
+        VFW.Nui.Focus(true)
+    end)
 end
 
 local function CloseZombieZoneDrawer()
